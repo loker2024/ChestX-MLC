@@ -1,0 +1,48 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- 虚拟环境 ----
+.venv/
+venv/
+env/
+
+# ---- macOS / 编辑器 ----
+.DS_Store
+._*
+.idea/
+.vscode/
+
+# ---- 本机工具链（符号链接，不入库）----
+.codegraph
+
+# ---- 数据（体积大，禁止入库；赛题要求只能用主办方数据）----
+data/
+datasets/
+images/
+raw/
+*.dcm
+*.nii
+
+# ---- 权重与训练产物 ----
+checkpoints/
+weights/
+runs/
+outputs/
+logs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.log
+
+# ---- 预测结果 ----
+predictions/
+submission_*.csv

@@ -1,0 +1,33 @@
+# ChestX-MLC 依赖清单（多目标胸部病变检测分类）
+#
+# 目标解释器: Python 3.12（本机 .venv 实测 3.12.14）
+# 赛题服务器: NVIDIA T4 16GB / CUDA 12.8 + cuDNN 9 / PyTorch 2.10.0 + torchvision 0.25.0
+#
+# 本机 (macOS arm64, MPS) 安装:
+#   uv pip install --python .venv/bin/python -r requirements.txt
+# 或:
+#   .venv/bin/python -m pip install -r requirements.txt
+#
+# 注意: PyPI 默认 wheel 在 Linux 上是 CPU 版；服务器需换官方 CUDA 源:
+#   .venv/bin/python -m pip install --index-url https://download.pytorch.org/whl/cu128 \
+#       torch==2.10.0 torchvision==0.25.0
+
+# ---- 深度学习框架（赛题服务器锁定版本）----
+torch==2.10.0
+torchvision==0.25.0
+timm==1.0.30
+
+# ---- 数据处理与评估 ----
+numpy==2.5.4
+pillow==12.3.0
+pandas==3.0.6
+scikit-learn==1.9.1
+PyYAML==6.0.3
+tqdm==4.70.1
+
+# ---- 图像与增强 ----
+opencv-python-headless==5.0.0.93
+albumentations==2.0.8
+
+# 提示: albumentations 启动时会联网检查更新，断网环境会打 UserWarning，
+# 可设 NO_ALBUMENTATIONS_UPDATE=1 关闭。
