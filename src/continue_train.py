@@ -14,6 +14,8 @@ from .evaluate import evaluate
 from .model import load_model
 from .train import seed_everything, train_step, save_model
 from .devices import select_device, synchronize, reset_peak, peak_memory
+from .fingerprints import dataset_fingerprint, EVALUATION_PROTOCOL
+from .training_state import load_training_state, restore_training_state, save_training_state
 
 
 def file_hash(path: Path) -> str:
@@ -30,7 +32,8 @@ def write_json(path: Path, value: dict) -> None:
 
 def run(baseline: Path = Path('outputs/baseline_v1'), output: Path = Path('outputs/baseline_v2'),
         additional_epochs: int = 3, learning_rate: float | None = None,
-        device_name: str = 'auto') -> None:
+        device_name: str = 'auto', resume_state: Path | None = None,
+        allow_nonofficial_counts: bool = False) -> None:
     if additional_epochs <= 0 or (learning_rate is not None and not 0 < learning_rate < 1):
         raise ValueError('轮数或学习率无效')
     if output.exists():
@@ -39,7 +42,18 @@ def run(baseline: Path = Path('outputs/baseline_v1'), output: Path = Path('outpu
     settings = json.loads((baseline / 'train_config.json').read_text(encoding='utf-8'))
     initial = json.loads((baseline / 'validation_metrics.json').read_text(encoding='utf-8'))
     history = pd.read_csv(baseline / 'history.csv', encoding='utf-8').to_dict('records')
-    start_epoch = int(initial['epoch']) + 1
+    restored_state = None
+    model_path = baseline/'best_model.pth'
+    if resume_state is not None:
+        if learning_rate is not None:
+            raise ValueError('完整恢复不能同时修改学习率；调参请使用仅权重新实验')
+        restored_state,model_path = load_training_state(resume_state)
+        settings = torch.load(model_path,map_location='cpu',weights_only=True)['metadata']
+        if restored_state['epoch'] not in {row['epoch'] for row in history}:
+            raise ValueError('来源实验历史缺少待恢复轮次，请指定该轮所属实验根目录')
+        if initial['epoch'] > restored_state['epoch']:
+            raise ValueError('来源最佳模型晚于恢复轮次，不能使用未来成绩选优')
+    start_epoch = int(restored_state['epoch'] if restored_state else initial['epoch']) + 1
     end_epoch = start_epoch + additional_epochs - 1
     history = [row for row in history if row['epoch'] < start_epoch]
     if learning_rate is not None:
@@ -54,21 +68,38 @@ def run(baseline: Path = Path('outputs/baseline_v1'), output: Path = Path('outpu
     config = settings['data']
     datasets = {s: ChestXrayDataset(config[s]['csv'], config[s]['images'], size=settings['size'])
                 for s in ('train', 'valid')}
-    if (len(datasets['train']), len(datasets['valid']), datasets['valid'].frame.Study_id.nunique()) != (30344, 1422, 859):
+    if not allow_nonofficial_counts and (len(datasets['train']), len(datasets['valid']), datasets['valid'].frame.Study_id.nunique()) != (30344, 1422, 859):
         raise ValueError('数据规模异常')
     for key in ('Subject_id', 'Study_id', 'Dicom_id'):
         if set(datasets['train'].frame[key]) & set(datasets['valid'].frame[key]):
             raise ValueError('训练验证集合重叠')
-    model = load_model(str(baseline / 'best_model.pth'), device)
+    train_fingerprint = dataset_fingerprint(datasets['train'].frame)
+    validation_fingerprint = dataset_fingerprint(datasets['valid'].frame)
+    if initial.get('validation_fingerprint') and (initial['validation_fingerprint'] != validation_fingerprint or initial.get('evaluation_protocol') != EVALUATION_PROTOCOL):
+        raise ValueError('来源实验使用不同的验证标签/划分或协议，不能沿用其最佳成绩')
+    refreshed_predictions = None
+    if not initial.get('validation_fingerprint'):
+        # 旧指标缺少指纹，重新评估旧最佳权重，而不是给历史结果补造身份。
+        incumbent = load_model(str(baseline/'best_model.pth'),device)
+        refreshed_predictions,refreshed_metrics = evaluate(incumbent,make_loader(datasets['valid'],settings['batch_size']),device)
+        initial = {**initial,**refreshed_metrics}
+        del incumbent
+    model = load_model(str(model_path), device)
     # 此入口仅恢复模型权重，AdamW 动量重新初始化，明确记录为新实验。
     optimizer = torch.optim.AdamW(model.parameters(), lr=settings['learning_rate'],
                                  weight_decay=settings['weight_decay'])
     train_loader = make_loader(datasets['train'], settings['batch_size'], shuffle=True, seed=settings['seed'])
     valid_loader = make_loader(datasets['valid'], settings['batch_size'])
+    if restored_state is not None:
+        restore_training_state(restored_state,optimizer,train_loader,valid_loader,settings,
+                               train_fingerprint,validation_fingerprint)
     settings.update(start_epoch=start_epoch, end_epoch=end_epoch, additional_epochs=additional_epochs, epochs=end_epoch,
-                    resume_from=str(baseline / 'best_model.pth'), optimizer_state_restored=False,
-                    optimizer_reset_reason='This entry resumes model weights only; optimizer is reinitialized',
-                    loader_rng_reinitialized=True)
+                    resume_from=str(model_path),optimizer_state_restored=restored_state is not None,
+                    optimizer_reset_reason=None if restored_state else 'Weights-only new experiment',
+                    loader_rng_reinitialized=restored_state is None,
+                    resume_state=str(resume_state) if resume_state else None,
+                    train_fingerprint=train_fingerprint,validation_fingerprint=validation_fingerprint,
+                    nonofficial_counts_allowed=allow_nonofficial_counts)
     output.mkdir(parents=True, exist_ok=False)
     write_json(output / 'train_config.json', settings)
     write_json(output / 'baseline1_manifest.json', {'name': 'Baseline-1', 'path': str(baseline), 'sha256': hashes})
@@ -76,6 +107,9 @@ def run(baseline: Path = Path('outputs/baseline_v1'), output: Path = Path('outpu
     # 初始候选包含 Baseline-1，续训成绩变差也不会丢失最佳模型。
     for name in ('best_model.pth', 'val_study_predictions.csv', 'validation_metrics.json'):
         shutil.copy2(baseline / name, output / name)
+    if refreshed_predictions is not None:
+        refreshed_predictions.to_csv(output/'val_study_predictions.csv',index=False,encoding='utf-8')
+        write_json(output/'validation_metrics.json',initial)
     all_metrics = [initial]
     start = time.perf_counter()
     try:
@@ -93,14 +127,14 @@ def run(baseline: Path = Path('outputs/baseline_v1'), output: Path = Path('outpu
                     print(f'epoch={epoch} step={step}/{len(train_loader)} images={seen} loss={total/seen:.6f} seconds={time.perf_counter()-train_start:.1f}', flush=True)
             synchronize(device)
             train_seconds = time.perf_counter() - train_start
-            if seen != 30344:
+            if seen != len(datasets['train']):
                 raise RuntimeError('训练图片数量异常')
             val_start = time.perf_counter()
             predictions, metrics = evaluate(model, valid_loader, device)
             metrics.update(epoch=epoch, train_loss=total/seen, training_images=seen,
                            train_seconds=train_seconds, validation_seconds=time.perf_counter()-val_start,
                            **peak_memory(device))
-            if metrics['study_count'] != 859 or metrics['macro_auc'] is None:
+            if metrics['study_count'] != datasets['valid'].frame.Study_id.nunique() or metrics['macro_auc'] is None:
                 raise RuntimeError('验证数量异常或 Macro-AUC 未定义')
             save_model(model, epoch_dir / 'model.pth', {**settings, 'completed_epoch': epoch})
             write_json(epoch_dir / 'train_config.json', {**settings, 'completed_epoch':epoch})
@@ -113,11 +147,8 @@ def run(baseline: Path = Path('outputs/baseline_v1'), output: Path = Path('outpu
                 torch.testing.assert_close(model(images), restored(images), rtol=0, atol=0)
             del restored
             metrics['reload_equal'] = True
-            # 后续继续训练可恢复 AdamW 状态与随机状态，避免再次丢失动量。
-            torch.save({'epoch': epoch, 'optimizer': optimizer.state_dict(),
-                        'torch_rng': torch.get_rng_state(), 'cuda_rng': torch.cuda.get_rng_state_all() if device == 'cuda' else [],
-                        'loader_rng': train_loader.generator.get_state()},
-                       epoch_dir / 'training_state.pth')
+            save_training_state(epoch_dir/'training_state.pth',epoch_dir/'model.pth',optimizer,
+                                train_loader,valid_loader,epoch,settings,train_fingerprint,validation_fingerprint)
             predictions.to_csv(epoch_dir / 'val_study_predictions.csv', index=False, encoding='utf-8')
             write_json(epoch_dir / 'validation_metrics.json', metrics)
             history.append({key: metrics[key] for key in ('epoch','train_loss','validation_loss','macro_auc','macro_f1','train_seconds','validation_seconds')})
@@ -147,5 +178,7 @@ if __name__ == '__main__':
     parser.add_argument('--additional-epochs', type=int, default=3)
     parser.add_argument('--learning-rate', type=float)
     parser.add_argument('--device', choices=['auto','cuda','mps','cpu'], default='auto')
+    parser.add_argument('--resume-state',type=Path,help='恢复新格式完整epoch边界状态；不修改原实验')
+    parser.add_argument('--allow-nonofficial-counts',action='store_true',help='仅限小样本开发测试')
     args = parser.parse_args()
-    run(args.source, args.output, args.additional_epochs, args.learning_rate, args.device)
+    run(args.source, args.output, args.additional_epochs, args.learning_rate, args.device,args.resume_state,args.allow_nonofficial_counts)

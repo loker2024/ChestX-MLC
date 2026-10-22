@@ -15,10 +15,13 @@ from .evaluate import evaluate
 from .model import build_model, load_model
 from .train import seed_everything, train_step, save_model
 from .devices import select_device, synchronize, reset_peak, peak_memory
+from .fingerprints import dataset_fingerprint
+from .training_state import save_training_state
 
 
-def run(device_name: str = 'auto') -> None:
-    output = Path('outputs/baseline_v1')
+def run(device_name: str = 'auto', config_path: Path = Path('configs/data.json'),
+        output: Path = Path('outputs/baseline_v1'), seed: int = 42,
+        allow_nonofficial_counts: bool = False) -> None:
     if output.exists():
         raise FileExistsError('输出目录已存在，拒绝覆盖 outputs/baseline_v1')
     free_disk = shutil.disk_usage('.').free
@@ -26,13 +29,13 @@ def run(device_name: str = 'auto') -> None:
         raise RuntimeError('磁盘剩余空间不足 2 GiB')
     device = select_device(device_name)
     torch.set_num_threads(4)
-    seed_everything(42)
-    config = json.loads(Path('configs/data.json').read_text(encoding='utf-8'))
+    seed_everything(seed)
+    config = json.loads(config_path.read_text(encoding='utf-8'))
     datasets = {split: ChestXrayDataset(config[split]['csv'], config[split]['images'], size=config['size']) for split in ('train', 'valid')}
     for key in ('Subject_id', 'Study_id', 'Dicom_id'):
         if set(datasets['train'].frame[key]) & set(datasets['valid'].frame[key]):
             raise ValueError(f'训练验证数据泄漏: {key}')
-    if (len(datasets['train']), len(datasets['valid']), datasets['valid'].frame['Study_id'].nunique()) != (30344, 1422, 859):
+    if not allow_nonofficial_counts and (len(datasets['train']), len(datasets['valid']), datasets['valid'].frame['Study_id'].nunique()) != (30344, 1422, 859):
         raise ValueError('官方数据规模不符，需核查')
     free_vram, total_vram = torch.cuda.mem_get_info() if device == 'cuda' else (None,None)
     print(f'Preflight device={device} disk={free_disk/1024**3:.2f}GiB', flush=True)
@@ -53,19 +56,20 @@ def run(device_name: str = 'auto') -> None:
             if device == 'cuda':
                 torch.cuda.empty_cache()
     print(f'Batch size {batch_size} probe passed', flush=True)
-    seed_everything(42)
+    seed_everything(seed)
     model = build_model().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01)
-    train_loader = make_loader(datasets['train'], batch_size, shuffle=True, seed=42)
+    train_loader = make_loader(datasets['train'], batch_size, shuffle=True, seed=seed)
     valid_loader = make_loader(datasets['valid'], batch_size)
-    settings = {'epochs': 1, 'seed': 42, 'batch_size': batch_size, 'size': config['size'],
+    settings = {'epochs': 1, 'seed': seed, 'batch_size': batch_size, 'size': config['size'],
                 'learning_rate': 0.001, 'weight_decay': 0.01, 'optimizer': 'AdamW',
                 'weights': None, 'device': device, 'gpu': torch.cuda.get_device_name(0) if device == 'cuda' else None,
                 'gpu_total_bytes': total_vram, 'gpu_free_before_bytes': free_vram,
                 'disk_free_before_bytes': free_disk, 'data': config,
                 'python': sys.version, 'torch': str(torch.__version__), 'torchvision': str(torchvision.__version__),
                 'threshold': 0.5, 'aggregation': 'mean image probabilities per Study_id',
-                'preprocess': 'RGB letterbox /255', 'num_workers': 0}
+                'preprocess': 'RGB letterbox /255', 'num_workers': 0,
+                'nonofficial_counts_allowed':allow_nonofficial_counts}
     output.mkdir(parents=True, exist_ok=False)
     (output / 'train_config.json').write_text(json.dumps(settings, indent=2), encoding='utf-8')
     reset_peak(device)
@@ -85,7 +89,7 @@ def run(device_name: str = 'auto') -> None:
     val_start = time.perf_counter()
     predictions, metrics = evaluate(model, valid_loader, device)
     validation_seconds = time.perf_counter() - val_start
-    if len(predictions) != 859:
+    if len(predictions) != datasets['valid'].frame.Study_id.nunique():
         raise RuntimeError('验证检查数不正确')
     metrics.update(epoch=1, train_loss=total_loss/seen, training_images=seen,
                    train_seconds=train_seconds, validation_seconds=validation_seconds,
@@ -99,6 +103,9 @@ def run(device_name: str = 'auto') -> None:
         images = next(iter(valid_loader))['image'].to(device)
         torch.testing.assert_close(model(images), restored(images), rtol=0, atol=0)
     metrics['reload_equal'] = True
+    save_training_state(output/'training_state.pth',output/'best_model.pth',optimizer,
+                        train_loader,valid_loader,1,settings,
+                        dataset_fingerprint(datasets['train'].frame),dataset_fingerprint(datasets['valid'].frame))
     predictions.to_csv(output / 'val_study_predictions.csv', index=False, encoding='utf-8')
     (output / 'validation_metrics.json').write_text(json.dumps(metrics, indent=2, allow_nan=False), encoding='utf-8')
     pd.DataFrame([{key: metrics[key] for key in ('epoch','train_loss','validation_loss','macro_auc','macro_f1','train_seconds','validation_seconds')}]).to_csv(output / 'history.csv', index=False, encoding='utf-8')

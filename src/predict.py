@@ -1,5 +1,6 @@
 """统一验证/测试预测入口；新建独立目录，不修改实验与权重。"""
 import argparse
+import copy
 from datetime import datetime
 import json
 from pathlib import Path
@@ -22,22 +23,36 @@ from .train import seed_everything
 from .devices import select_device, synchronize
 
 
-def prediction_config(model_path: Path) -> tuple[dict, str]:
+def prediction_config(model_path: Path, data_config: Path | None = None) -> tuple[dict, str]:
     """优先使用检查点内的训练元数据；兼容旧模型的同目录配置。"""
     checkpoint = torch.load(model_path, map_location='cpu', weights_only=True)
     config = checkpoint.get('metadata', {})
     if all(key in config for key in ('size','data','preprocess','batch_size','seed')):
-        return dict(config), 'checkpoint.metadata'
-    companion = model_path.parent / 'train_config.json'
-    if not companion.is_file():
-        raise ValueError('模型未携带完整配置且同目录无 train_config.json')
-    external = json.loads(companion.read_text(encoding='utf-8'))
-    if 'size' in config and config['size'] != external['size']:
-        raise ValueError('模型与配置的图片尺寸冲突')
-    return external, str(companion)
+        config, source = copy.deepcopy(config), 'checkpoint.metadata'
+    else:
+        companion = model_path.parent / 'train_config.json'
+        if not companion.is_file():
+            raise ValueError('模型未携带完整配置且同目录无 train_config.json')
+        external = json.loads(companion.read_text(encoding='utf-8'))
+        if 'size' in config and config['size'] != external['size']:
+            raise ValueError('模型与配置的图片尺寸冲突')
+        config, source = external, str(companion)
+    if data_config is not None:
+        override = json.loads(data_config.read_text(encoding='utf-8'))
+        if not isinstance(override,dict) or set(override)-{'size','batch_size','train','valid','test'}:
+            raise ValueError('数据配置只允许路径，以及用于核对的size和不生效的batch_size')
+        if 'size' in override and override['size'] != config['size']:
+            raise ValueError('路径覆盖不能更改模型输入尺寸')
+        for split in ('train','valid','test'):
+            if split in override:
+                paths = override[split]
+                if not isinstance(paths,dict) or set(paths) != {'csv','images'} or not all(isinstance(v,str) and v.strip() for v in paths.values()):
+                    raise ValueError(f'{split}必须只含csv和images两个非空路径')
+                config['data'][split] = dict(paths)
+    return config, source
 
 
-def compare_reference(studies: pd.DataFrame, metrics: dict, folder: Path,
+def _compare_reference(studies: pd.DataFrame, metrics: dict, folder: Path,
                       strict: bool, metric_atol: float, probability_atol: float) -> None:
     reference_path, previous_path = folder / 'validation_metrics.json', folder / 'val_study_predictions.csv'
     if not reference_path.is_file() or not previous_path.is_file():
@@ -47,6 +62,16 @@ def compare_reference(studies: pd.DataFrame, metrics: dict, folder: Path,
         return
     reference = json.loads(reference_path.read_text(encoding='utf-8'))
     previous = pd.read_csv(previous_path, dtype={'Subject_id':str,'Study_id':str}, encoding='utf-8')
+    for name in ('macro_auc','macro_f1'):
+        value = reference[name]
+        if value is None and name == 'macro_auc':
+            continue
+        if not isinstance(value,(float,int)) or not np.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError('历史参考指标包含非法值')
+    numeric = previous[PROB_COLUMNS].apply(pd.to_numeric,errors='raise').to_numpy()
+    if not np.isfinite(numeric).all() or ((numeric < 0) | (numeric > 1)).any():
+        raise ValueError('历史参考概率非法')
+    previous[PROB_COLUMNS] = numeric
     keys = ['Subject_id','Study_id']
     aligned = studies.merge(previous, on=keys, suffixes=('_new','_old'), validate='one_to_one', how='outer', indicator=True)
     same_ids = bool(aligned['_merge'].eq('both').all())
@@ -54,9 +79,15 @@ def compare_reference(studies: pd.DataFrame, metrics: dict, folder: Path,
     auc_difference = metrics['macro_auc'] - reference['macro_auc'] if metrics['macro_auc'] is not None and reference['macro_auc'] is not None else None
     f1_difference = metrics['macro_f1'] - reference['macro_f1']
     matched = same_ids and auc_difference is not None and abs(auc_difference) <= metric_atol and abs(f1_difference) <= metric_atol and difference <= probability_atol
+    identity_matches = None
+    if reference.get('validation_fingerprint') and metrics.get('validation_fingerprint'):
+        identity_matches = (reference['validation_fingerprint'] == metrics['validation_fingerprint'] and
+                            reference.get('evaluation_protocol') == metrics.get('evaluation_protocol'))
+        matched = matched and identity_matches
     metrics.update(reference_macro_auc=reference['macro_auc'], macro_auc_difference=auc_difference,
                    macro_f1_difference=f1_difference, max_probability_difference=difference,
-                   reference_ids_match=same_ids, reference_matches=bool(matched),
+                   reference_ids_match=same_ids, reference_identity_matches=identity_matches,
+                   reference_matches=bool(matched),
                    reference_comparison='matched' if matched else 'different',
                    comparison_tolerances={'metric_atol':metric_atol,'probability_atol':probability_atol})
     if not matched:
@@ -64,6 +95,19 @@ def compare_reference(studies: pd.DataFrame, metrics: dict, folder: Path,
         if strict:
             raise RuntimeError(message)
         warnings.warn(message, RuntimeWarning)
+
+
+def compare_reference(studies: pd.DataFrame, metrics: dict, folder: Path,
+                      strict: bool, metric_atol: float, probability_atol: float) -> None:
+    """只容错可选历史参考文件，当前数据的校验仍在主流程中严格执行。"""
+    try:
+        _compare_reference(studies,metrics,folder,strict,metric_atol,probability_atol)
+    except (OSError,ValueError,KeyError,TypeError) as exc:
+        metrics.update(reference_comparison='invalid',reference_matches=False,
+                       reference_error={'type':type(exc).__name__,'message':str(exc)})
+        if strict:
+            raise RuntimeError('严格复现失败：历史参考文件损坏或格式不正确') from exc
+        warnings.warn('历史参考文件损坏，跳过比较并继续预测：'+str(exc),RuntimeWarning)
 
 
 def dump(path: Path, value: dict) -> None:
@@ -74,7 +118,7 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
         threshold: float | None = None, strict_reproduce: bool = False,
         metric_atol: float = 1e-4, probability_atol: float = 1e-4,
         device_name: str = 'auto', template: Path | None = None,
-        allow_nonofficial_counts: bool = False) -> Path:
+        allow_nonofficial_counts: bool = False, data_config: Path | None = None) -> Path:
     if split in ('test','both') and submission_mode not in ('all_classes','threshold'):
         raise ValueError('测试输出必须显式选择 --all-classes 或 --threshold；官方语义尚未确认')
     if submission_mode == 'threshold' and (threshold is None or not np.isfinite(threshold) or not 0 <= threshold <= 1):
@@ -87,7 +131,7 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
         if len(columns) != 4 or set(columns) != {'Subject_id','Study_id','Predict_class','Probability'}:
             raise ValueError('模板包含不支持的字段（如 Gate），请先确认官方语义，不能猜填')
     folder = model_path.parent
-    config, config_source = prediction_config(model_path)
+    config, config_source = prediction_config(model_path,data_config)
     if config.get('preprocess') != 'RGB letterbox /255' or config.get('threshold') != 0.5:
         raise ValueError('此入口仅支持现有 RGB 等比例补边 /255 与0.5阈值配置')
     if config.get('aggregation') != 'mean image probabilities per Study_id':
@@ -109,6 +153,8 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
               'official_T4_tested': False, 'splits': {}}
     report.update(config_source=config_source, submission_mode=submission_mode,
                   submission_threshold=threshold, strict_reproduce=strict_reproduce,
+                  data_config_override=str(data_config.resolve()) if data_config else None,
+                  effective_data_paths=config['data'],
                   nonofficial_counts_allowed=allow_nonofficial_counts,
                   runtime={'python':platform.python_version(),'torch':str(torch.__version__),
                            'torchvision':str(torchvision.__version__),'cudnn':torch.backends.cudnn.version()})
@@ -206,13 +252,14 @@ def main() -> None:
     parser.add_argument('--probability-atol', type=float, default=1e-4)
     parser.add_argument('--device', choices=['auto','cuda','mps','cpu'], default='auto')
     parser.add_argument('--template', type=Path)
+    parser.add_argument('--data-config',type=Path,help='仅覆盖CSV/图片路径；保留检查点预处理及batch_size')
     parser.add_argument('--allow-nonofficial-counts', action='store_true', help='仅限小样本开发测试，记录到报告')
     args = parser.parse_args()
     if args.split != 'valid' and not args.all_classes and args.threshold is None:
         parser.error('请根据官方确认结果选择 --all-classes 或 --threshold；没有默认提交模式')
     run(args.model, args.split, 'all_classes' if args.all_classes else 'threshold' if args.threshold is not None else None,
         args.threshold, args.strict_reproduce, args.metric_atol, args.probability_atol,
-        args.device, args.template, args.allow_nonofficial_counts)
+        args.device, args.template, args.allow_nonofficial_counts,args.data_config)
 
 
 if __name__ == '__main__':

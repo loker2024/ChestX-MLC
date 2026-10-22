@@ -63,13 +63,15 @@ def main() -> None:
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--full-one-epoch', action='store_true')
     parser.add_argument('--device', choices=['auto','cuda','mps','cpu'], default='auto')
+    parser.add_argument('--output',type=Path,help='完整一轮模式的新实验目录，存在时拒绝覆盖')
+    parser.add_argument('--allow-nonofficial-counts',action='store_true',help='仅限小样本开发测试')
     args = parser.parse_args()
     if args.full_one_epoch:
-        if args.seed != 42 or args.data_config != 'configs/data.json':
-            parser.error('完整一轮模式当前固定 seed=42 和 configs/data.json')
         from .full_train import run
-        run(args.device)
+        run(args.device,Path(args.data_config),args.output or Path('outputs/baseline_v1'),args.seed,args.allow_nonofficial_counts)
         return
+    if args.output is not None:
+        parser.error('--output仅用于--full-one-epoch；单步测试自行创建独立目录')
     seed_everything(args.seed)
     torch.set_num_threads(2)
     device = select_device(args.device)

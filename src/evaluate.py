@@ -5,6 +5,7 @@ from sklearn.metrics import roc_auc_score, f1_score
 import torch
 
 from .data import parse_labels
+from .fingerprints import dataset_fingerprint, EVALUATION_PROTOCOL
 
 
 def study_metrics(frame: pd.DataFrame, predictions: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
@@ -35,7 +36,9 @@ def study_metrics(frame: pd.DataFrame, predictions: pd.DataFrame) -> tuple[pd.Da
                'macro_auc': float(np.mean(aucs)) if not undefined else None,
                'macro_f1': float(f1_score(truth, probs >= 0.5, average='macro', zero_division=0)),
                'f1_zero_division': 0,
-               'positive_studies': truth.sum(axis=0).astype(int).tolist()}
+               'positive_studies': truth.sum(axis=0).astype(int).tolist(),
+               'validation_fingerprint': dataset_fingerprint(frame),
+               'evaluation_protocol': dict(EVALUATION_PROTOCOL)}
     return result, metrics
 
 
