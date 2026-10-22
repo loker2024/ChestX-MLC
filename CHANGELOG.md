@@ -35,6 +35,10 @@
 - `14:30`（变更）`configs/default.yaml`：`image` 节新增 `hflip: false` 并注明含义。
 - `14:30`（变更）`requirements.txt`：新增测试依赖 `pytest==9.1.1`，P2 起需要运行 `python -m pytest`。
 - `14:32`（变更）`.gitignore`：数据与产物目录的忽略规则由「任意层级匹配」改为「仅仓库根目录」（如 `data/` → `/data/`），否则新建的源码包 `src/data/` 会被一并忽略而无法提交。
+- `14:35`（变更）`tests/conftest.py`：在原有的 `sys.path` 注入之外新增合成数据 fixture——`make_image`（在 `tmp_path` 下按目录结构生成小图）、`write_csv`（UTF-8 写出完整表头，默认含 `Predict_class`）、`labeled_split`（2 个 study / 3 张图，含同一 study 多图）、`unlabeled_split`（去掉标签列，模拟 test split）与 `write_config`（YAML 路径用 JSON 字符串包裹，`image.size=32`、`num_workers=0`）；数据全在临时目录生成，不碰真实影像。
+- `14:35`（新增）`tests/test_labels.py`：覆盖单类/多类、类别 10 落在下标 9、空值与空片段、重复、越界、非整数 token 共 15 例。
+- `14:35`（新增）`tests/test_index.py`：覆盖图片索引（大小写后缀、重复 stem、目录缺失）、同 study 多行聚合（图片顺序与前导零）、缺图报错、同 study 标签不一致报错、无标签列读取与缺列报错共 9 例。
+- `14:35`（新增）`tests/test_dataset.py`：覆盖 letterbox 等比补边与黑边位置、评估预处理确定性、张量形状、变长 `collate_studies` 的 `images`/`offsets`/`labels` 与 test split 无标签分支、`build_loader` 的三种 split 共 9 例。
 
 ## 2026-10-16
 
