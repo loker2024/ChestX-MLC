@@ -39,6 +39,8 @@
 - `14:35`（新增）`tests/test_labels.py`：覆盖单类/多类、类别 10 落在下标 9、空值与空片段、重复、越界、非整数 token 共 15 例。
 - `14:35`（新增）`tests/test_index.py`：覆盖图片索引（大小写后缀、重复 stem、目录缺失）、同 study 多行聚合（图片顺序与前导零）、缺图报错、同 study 标签不一致报错、无标签列读取与缺列报错共 9 例。
 - `14:35`（新增）`tests/test_dataset.py`：覆盖 letterbox 等比补边与黑边位置、评估预处理确定性、张量形状、变长 `collate_studies` 的 `images`/`offsets`/`labels` 与 test split 无标签分支、`build_loader` 的三种 split 共 9 例。
+- `14:42`（新增）`src/check_data.py`：新增训练前数据体检脚本，检查 CSV 必需列、ID 空值与固定宽度前导零格式、同 split 内 Dicom_id 唯一性、图片齐全、同 study 标签与患者一致性、三份划分两两不重叠，并打印每类图像/检查计数与类别 10 单独出现次数；默认每份 CSV 只读前 1000 行，`--full` 读全量并逐行核对图片，任一检查失败以退出码 1 结束。
+- `14:42`（新增）`tests/test_check_data.py`：覆盖 ID 按字符串读取、缺标签列报错、截断编号识别、缺图计数、同 study 标签顺序无关与冲突检测、跨 split 患者重叠检测共 6 例。
 
 ## 2026-10-16
 
