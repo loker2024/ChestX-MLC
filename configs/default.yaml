@@ -1,0 +1,58 @@
+# ChestX-MLC 默认配置
+#
+# 路径都相对“仓库根目录”理解：请在仓库根目录执行入口脚本，例如
+#     python src/run_train.py --config configs/default.yaml
+# 这样 data/、outputs/、checkpoints/ 才会落在预期位置。
+#
+# 字段含义与取值范围见 src/common/config.py 的注释；字段名写错会直接报错。
+
+# 数据：每个 split 一份标注 CSV + 一个图片根目录。
+# CSV 一行一张图，Study_id 相同的多行属于同一次检查（共享同一组标签）。
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv        # test.csv 没有 Predict_class 列
+    images: data/images/test
+
+# 图像预处理：先等比缩放到最长边 size 并补边成 size×size（letterbox），
+# 再做归一化。这样不同设备、不同尺寸的原图不会把胸片拉变形。
+image:
+  size: 320
+  letterbox: true
+  normalize: imagenet        # imagenet=减 ImageNet 均值除方差；none=只缩放像素到 0~1
+
+# 模型：ResNet-18 骨干（约 11.7M 参数）+ 单层 10 类分类头。
+model:
+  backbone: resnet18
+  pretrained: true           # 离线环境拿不到预训练权重时改成 false
+  num_classes: 10
+
+# 训练：batch 按“检查数”计。一次检查含 1~7 张图，实际图片数是各 study 图片数之和。
+train:
+  epochs: 25
+  batch_studies: 16
+  lr: 0.0003                 # 注意用小数写法；YAML 1.1 会把 3e-4 读成字符串
+  weight_decay: 0.01
+  warmup_epochs: 2
+  amp: true                  # 混合精度，仅 CUDA 生效
+  grad_clip: 5.0
+  num_workers: 8
+  early_stop_patience: 5     # valid macro-AUC 连续 5 个 epoch 不提升就停；0 关闭
+
+# 验证与推理。
+eval:
+  batch_studies: 32
+  threshold: 0.5             # 生成 submission.csv 时判定“预测为该类”的概率阈值
+
+# 产物目录（都在 .gitignore 中，不入库）。
+output:
+  run_dir: outputs           # 每次训练新建 outputs/<时间戳>_<tag>/
+  checkpoint_dir: checkpoints
+
+seed: 42
+device: auto                 # auto / cpu / cuda / cuda:0 / mps

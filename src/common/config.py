@@ -1,0 +1,244 @@
+"""读取并校验 YAML 配置。
+
+YAML 是嵌套字典，读进来后转成一组 dataclass（每个配置节对应一个类）：
+代码里用 `cfg.train.lr` 访问，比 `cfg["train"]["lr"]` 更直观，字段写错时也更早暴露。
+
+校验分两层：
+1. 结构与类型：字段名拼错、类型不对，在 load_config 时就报错；
+2. 取值范围：例如 lr 必须大于 0，由各个 dataclass 的 __post_init__ 检查。
+
+配置里的相对路径都按“当前工作目录”理解。入口脚本请在仓库根目录执行，
+这样 `data/train.csv`、`outputs` 才会落在预期位置。
+"""
+
+from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass
+from pathlib import Path
+from typing import Any, get_type_hints
+
+import yaml
+
+from common.constants import DEFAULT_IMAGE_SIZE, NUM_CLASSES
+
+
+@dataclass(frozen=True)
+class SplitConfig:
+    """一个数据划分（train / valid / test）的标注 CSV 与图片根目录。"""
+
+    csv: Path
+    images: Path
+
+
+@dataclass(frozen=True)
+class DataConfig:
+    """三份数据划分。字段名与 YAML 里的 train / valid / test 一一对应。"""
+
+    train: SplitConfig
+    valid: SplitConfig
+    test: SplitConfig
+
+
+@dataclass(frozen=True)
+class ImageConfig:
+    """图像预处理参数，供 data.transforms 使用。"""
+
+    size: int = DEFAULT_IMAGE_SIZE  # letterbox 之后的方形边长
+    letterbox: bool = True  # True=等比缩放后补边；False=直接拉伸到 size×size
+    normalize: str = "imagenet"  # "imagenet"=减均值除方差；"none"=只把像素缩到 0~1
+
+    def __post_init__(self) -> None:
+        if self.size <= 0:
+            raise ValueError(f"image.size 必须是正整数，当前为 {self.size}")
+        if self.normalize not in {"imagenet", "none"}:
+            raise ValueError(
+                f"image.normalize 只能是 'imagenet' 或 'none'，当前为 {self.normalize!r}"
+            )
+
+
+@dataclass(frozen=True)
+class ModelConfig:
+    """模型结构与权重来源。"""
+
+    backbone: str = "resnet18"  # timm 的模型名
+    pretrained: bool = True  # 是否加载 ImageNet 预训练权重
+    num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
+
+    def __post_init__(self) -> None:
+        if not self.backbone:
+            raise ValueError("model.backbone 不能为空")
+        if self.num_classes != NUM_CLASSES:
+            raise ValueError(
+                f"model.num_classes 必须等于 {NUM_CLASSES}（赛题固定 10 类），"
+                f"当前为 {self.num_classes}"
+            )
+
+
+@dataclass(frozen=True)
+class TrainConfig:
+    """训练超参数。"""
+
+    epochs: int = 25
+    batch_studies: int = 16  # 每个 batch 的检查数；图片数由各 study 实际张数决定
+    lr: float = 3e-4
+    weight_decay: float = 0.01
+    warmup_epochs: int = 2  # 前几个 epoch 线性升温到 lr
+    amp: bool = True  # 混合精度；仅 CUDA 上生效
+    grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
+    num_workers: int = 8
+    early_stop_patience: int = 5  # valid 指标连续多少个 epoch 不提升就停；0 表示关闭早停
+
+    def __post_init__(self) -> None:
+        if self.epochs < 1:
+            raise ValueError(f"train.epochs 必须 >= 1，当前为 {self.epochs}")
+        if self.batch_studies < 1:
+            raise ValueError(f"train.batch_studies 必须 >= 1，当前为 {self.batch_studies}")
+        if self.lr <= 0:
+            raise ValueError(f"train.lr 必须 > 0，当前为 {self.lr}")
+        if self.weight_decay < 0:
+            raise ValueError(f"train.weight_decay 必须 >= 0，当前为 {self.weight_decay}")
+        if not 0 <= self.warmup_epochs < self.epochs:
+            raise ValueError(
+                f"train.warmup_epochs 必须满足 0 <= warmup < epochs，"
+                f"当前 warmup={self.warmup_epochs}、epochs={self.epochs}"
+            )
+        if self.grad_clip < 0:
+            raise ValueError(f"train.grad_clip 必须 >= 0，当前为 {self.grad_clip}")
+        if self.num_workers < 0:
+            raise ValueError(f"train.num_workers 必须 >= 0，当前为 {self.num_workers}")
+        if self.early_stop_patience < 0:
+            raise ValueError(
+                f"train.early_stop_patience 必须 >= 0，当前为 {self.early_stop_patience}"
+            )
+
+
+@dataclass(frozen=True)
+class EvalConfig:
+    """验证 / 推理阶段参数。"""
+
+    batch_studies: int = 32  # 验证与推理的 batch 大小（同样按 study 计）
+    threshold: float = 0.5  # 生成提交文件时判定“预测为该类”的概率阈值
+
+    def __post_init__(self) -> None:
+        if self.batch_studies < 1:
+            raise ValueError(f"eval.batch_studies 必须 >= 1，当前为 {self.batch_studies}")
+        if not 0.0 <= self.threshold <= 1.0:
+            raise ValueError(f"eval.threshold 必须落在 [0, 1]，当前为 {self.threshold}")
+
+
+@dataclass(frozen=True)
+class OutputConfig:
+    """训练与推理产物的输出目录。"""
+
+    run_dir: Path = Path("outputs")  # 每次训练在其下新建 <时间戳>_<tag> 子目录
+    checkpoint_dir: Path = Path("checkpoints")
+
+
+@dataclass(frozen=True)
+class Config:
+    """整份配置。除 data 外都有默认值，data 必须在 YAML 里写全三个 split。"""
+
+    data: DataConfig
+    image: ImageConfig = field(default_factory=ImageConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)
+    train: TrainConfig = field(default_factory=TrainConfig)
+    eval: EvalConfig = field(default_factory=EvalConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
+    seed: int = 42
+    device: str = "auto"  # auto / cpu / cuda / cuda:0 / mps
+
+    def __post_init__(self) -> None:
+        if self.seed < 0:
+            raise ValueError(f"seed 必须 >= 0，当前为 {self.seed}")
+        if not self.device:
+            raise ValueError("device 不能为空，自动选择请写 'auto'")
+
+    def to_dict(self) -> dict[str, Any]:
+        """导出成普通 dict（Path 转成字符串），便于写 YAML 或存进 checkpoint。"""
+        return _to_plain(asdict(self))
+
+
+def load_config(path: str | Path = "configs/default.yaml") -> Config:
+    """读取 YAML 配置文件并返回校验后的 Config 对象。
+
+    读取失败时 PyYAML 会给出文件与行号；字段写错时的报错来自 _build_dataclass，
+    会指出具体是哪一节、哪个字段出了问题。
+    """
+    config_path = Path(path)
+    with config_path.open(encoding="utf-8") as file:
+        raw = yaml.safe_load(file)
+
+    if raw is None:
+        raise ValueError(f"配置文件内容为空：{config_path}")
+    return _build_dataclass(Config, raw, where="配置根节点")
+
+
+def _build_dataclass(cls: type, raw: Any, where: str) -> Any:
+    """把 YAML 读出的字典按 dataclass 的字段声明转成实例。
+
+    这里用两遍循环：
+
+    1. 先在 `raw` 的键上检查未知字段，避免 YAML 里把 `epochs` 写成 `epoch`
+       却被悄悄忽略（后面训练时才发现用的是默认值，非常难查）；
+    2. 再按 dataclass 的字段顺序逐个取值：配置里给了就用配置值，没给就用
+       字段默认值；两者都没有说明是必填字段，直接报错。
+    """
+    if not isinstance(raw, dict):
+        raise TypeError(f"{where} 应该是键值映射，实际是 {type(raw).__name__}")
+
+    known = {item.name for item in fields(cls)}
+    unknown = sorted(set(raw) - known)
+    if unknown:
+        raise ValueError(f"{where} 含未知字段 {unknown}，可用字段为 {sorted(known)}")
+
+    hints = get_type_hints(cls)
+    kwargs: dict[str, Any] = {}
+    for item in fields(cls):
+        field_where = f"{where}.{item.name}"
+        if item.name in raw:
+            kwargs[item.name] = _convert(raw[item.name], hints[item.name], field_where)
+        elif item.default is not MISSING:
+            kwargs[item.name] = item.default
+        elif item.default_factory is not MISSING:
+            kwargs[item.name] = item.default_factory()
+        else:
+            raise ValueError(f"{field_where} 是必填字段，但配置里没有写")
+    return cls(**kwargs)
+
+
+def _convert(value: Any, hint: Any, where: str) -> Any:
+    """把 YAML 值转换成字段声明的类型；类型不对时给出带字段路径的报错。"""
+    if is_dataclass(hint):
+        return _build_dataclass(hint, value, where)
+    if hint is Path:
+        if not isinstance(value, str) or not value:
+            raise TypeError(f"{where} 应该是非空路径字符串，实际是 {value!r}")
+        return Path(value)
+    if hint is bool:
+        if not isinstance(value, bool):
+            raise TypeError(f"{where} 应该是 true/false，实际是 {value!r}")
+        return value
+    if hint is int:
+        # bool 是 int 的子类，先排除掉，避免 `epochs: true` 这种写法混过去。
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError(f"{where} 应该是整数，实际是 {value!r}")
+        return value
+    if hint is float:
+        # 允许整数写法（如 lr: 1），统一转成 float 便于后续计算。
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{where} 应该是数字，实际是 {value!r}")
+        return float(value)
+    if hint is str:
+        if not isinstance(value, str) or not value:
+            raise TypeError(f"{where} 应该是非空字符串，实际是 {value!r}")
+        return value
+    return value
+
+
+def _to_plain(value: Any) -> Any:
+    """递归把 Path 转成 str，其余类型原样返回（供 Config.to_dict 使用）。"""
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _to_plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_plain(item) for item in value]
+    return value

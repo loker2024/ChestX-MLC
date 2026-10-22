@@ -16,6 +16,13 @@
 - `13:45`（新增）`docs/architecture.md`：新增架构与文件结构说明，记录设计约束、目录树、common/data/model/train/infer 各模块职责与关键接口、导入与运行约定、YAML 配置骨架、测试布局、数据流与产物、4 项待确认问题及变更约定。
 - `13:49`（变更）`docs/spec.md`：精简为 119 行，只保留三部分——源码/命令行/配置与测试的文件清单（含功能与关键接口）、实现顺序七阶段（骨架→数据底座→划分管道→模型→训练→推理提交→调优，每阶段带验收命令）、以及 3 项待确认默认值；删除原 15 节中的任务形式化推导、预处理与增强细则、提交逐字段校验清单、评估口径、风险表与里程碑表。
 - `13:52`（新增）`docs/plan0.md`：保存实现顺序与验收方式，按 P1 骨架与配置 → P2 数据底座 → P3 数据体检 → P4 模型与指标 → P5 训练 → P6 推理与提交 → P7 调优与冻结 推进，含每阶段涉及文件、产出、验收命令、测试映射与退出标准。
+- `14:00`（新增）`configs/default.yaml`：新增默认配置，固化 train/valid/test 的 CSV 与图片路径、320px letterbox 与 ImageNet 归一化、ResNet-18 骨干、训练超参（25 epoch、batch_studies=16、lr=3e-4、warmup=2、AMP、梯度裁剪 5.0、早停 5）、评估阈值 0.5、输出目录、seed 42 与 device auto。
+- `14:00`（新增）`src/common/__init__.py`：声明 common 包，只保留模块说明，不导入 torch / PyYAML 等重型依赖。
+- `14:00`（新增）`src/common/constants.py`：定义 `NUM_CLASSES=10`、`CLASS_IDS`（1~10）、`DEFAULT_IMAGE_SIZE=320`、图片后缀、ImageNet 均值方差与 CSV 编码。
+- `14:00`（新增）`src/common/config.py`：新增 `load_config`，把 YAML 转成 `Config` 及各节 dataclass；校验未知字段、字段类型与取值范围（epochs/lr/warmup/threshold 等），并提供 `Config.to_dict()`。
+- `14:00`（新增）`src/common/utils.py`：新增 `seed_everything`（Python/NumPy/PyTorch 种子与 cuDNN 确定性）、`resolve_device("auto")`（CUDA→MPS→CPU，显式不可用设备报错）与 `make_run_dir`（`outputs/<时间戳>_<tag>/`）。
+- `14:00`（新增）`src/common/checkpoint.py`：新增 `save_checkpoint` / `load_checkpoint`，权重之外记录优化器、epoch、指标、配置与 seed。
+- `14:00`（移除）`src/.gitkeep`、`configs/.gitkeep`：目录已有实际文件，删除占位文件。
 
 ## 2026-10-16
 
