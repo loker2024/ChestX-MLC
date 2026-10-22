@@ -61,8 +61,10 @@ ChestX-MLC/
 │   ├── test_labels.py
 │   ├── test_index.py
 │   ├── test_dataset.py
+│   ├── test_check_data.py
 │   ├── test_metrics.py
 │   ├── test_model.py
+│   ├── test_engine.py
 │   ├── test_submission.py
 │   └── test_pipeline.py
 ├── data/                # 不入库
@@ -119,7 +121,7 @@ ChestX-MLC/
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `engine.py` | 单 epoch 训练与验证、AMP、梯度裁剪、学习率调度、早停、逐 epoch 记录 | `fit(cfg, model, train_loader, val_loader, device) -> dict` |
+| `engine.py` | 单 epoch 训练与验证、AMP、梯度裁剪、学习率调度、早停、逐 epoch 记录 | `fit(cfg, model, train_loader, val_loader, device) -> dict`（`history / best_epoch / best_macro_auc / best_metrics / best_state`） |
 
 ### 3.5 infer：推理与提交
 
@@ -193,8 +195,10 @@ device: auto
 | `test_labels.py` | 分号解析、类别 10、重复/非法 token |
 | `test_index.py` | 前导零保留、多图 study 聚合、缺图报错、跨 split 无重叠 |
 | `test_dataset.py` | 张量形状与取值范围、变长 collate、test 无标签 |
+| `test_check_data.py` | ID 格式与缺图、同 study 标签一致、跨 split 重叠 |
 | `test_metrics.py` | 与 sklearn 对齐、退化类剔除、F1 阈值 |
 | `test_model.py` | 参数规模、study 级均值聚合与梯度、`pos_weight` 计算 |
+| `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
 | `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、UTF-8 回读 |
 | `test_pipeline.py` | 单步训练 loss 有限且参数更新、checkpoint 重载逐位一致、predict→submission 闭环 |
 

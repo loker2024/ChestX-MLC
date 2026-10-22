@@ -174,6 +174,7 @@ python -m pytest -q tests/test_submission.py tests/test_pipeline.py
 | P1 | `tests/conftest.py` | `src/` 入 `sys.path`，合成 CSV 与小图 fixture |
 | P2 | `test_labels.py` / `test_index.py` / `test_dataset.py` | 标签解析、前导零、多图聚合、缺图、变长 collate |
 | P4 | `test_metrics.py` / `test_model.py` | sklearn 对齐、退化类剔除、F1 阈值、参数规模与 study 聚合 |
+| P5 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
 | P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、端到端闭环 |
 
 ## 退出标准

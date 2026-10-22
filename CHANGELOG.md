@@ -51,6 +51,12 @@
 - `14:55`（新增）`tests/test_model.py`：覆盖 `build_model` 输出 `[N,10]` 与参数量约 11.2M、`aggregate_logits` 对 2/1/3 张图的 study 求均值与梯度、默认损失无 `pos_weight`、`pos_weight` 按类别频率计算、缺训练标签报错、加权损失有限共 8 例。
 - `14:57`（变更）`docs/architecture.md`：目录树与测试布局补充 `tests/test_model.py`，配置骨架的 `train` 节补充 `pos_weight: false`。
 - `14:57`（变更）`docs/plan0.md`：P4 涉及文件与验收命令纳入 `tests/test_model.py`，参数量期望由约 11.7M 更正为 11,181,642，并补充离线回退预训练权重的说明。
+- `15:16`（新增）`src/train/__init__.py`：声明 train 包，只保留模块说明，不导入 torch。
+- `15:16`（新增）`src/train/engine.py`：新增 `train_one_epoch`（AMP、梯度反缩放后再裁剪、按 study 数加权平均 loss）、`evaluate`（按 study 聚合后输出 loss / macro-AUC / macro-F1）、`fit`（AdamW、线性 warmup、按 valid macro-AUC 在内存里保留最优权重、AUC 连续不提升即早停），返回 history / best_epoch / best_macro_auc / best_metrics / best_state；AUC 为 NaN（valid 某类全阴或全阳）时不算提升，避免 NaN 抢走最优权重。
+- `15:16`（新增）`src/run_train.py`：训练入口，支持 `--config` / `--seed` / `--tag`；每次运行新建 `outputs/<时间戳>_<tag>/` 并写出 config.yaml、train.log、metrics.csv、best.pt，终端输出经 `_Tee` 同步写入日志。
+- `15:17`（新增）`tests/test_engine.py`：覆盖单 epoch 参数更新与 loss 有限、warmup 学习率按 `lr/2 → lr` 爬升、评估指标键与取值范围、AUC 停滞触发早停共 4 例。
+- `15:18`（变更）`docs/architecture.md`：目录树与测试布局补充 `tests/test_check_data.py` 与 `tests/test_engine.py`，train 模块接口注明 `fit` 返回字段。
+- `15:18`（变更）`docs/plan0.md`：测试映射补充 P5 行（`test_engine.py`）。
 
 ## 2026-10-16
 
