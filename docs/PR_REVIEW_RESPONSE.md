@@ -1,5 +1,18 @@
 # 审查回应与 PR 描述
 
+## 远端补传状态（2026-10-22 16:07，Asia/Shanghai）
+
+已通过 GitHub 文件清单核实 PR #2 当时只有19个文件（源码、测试及本说明），
+没有 README.md、configs/data.json 或 CHANGELOG.md 的变更。
+本地已有文件不能视为远端已交付。下面的完整 PR 描述仅在补传且确认 Files changed
+确实包含这三份文件后使用。在补传之前，PR 描述中应将“补充回归测试、README、
+CHANGELOG及审查回应”修正为“补充回归测试和审查回应；README、默认配置及CHANGELOG待补传”。
+
+补传清单：根目录 README.md、CHANGELOG.md；configs 目录 data.json；
+docs 目录同步更新本说明。提交到 yun0803/ChestX-MLC 的 develop 分支，
+现有 PR #2 自动更新。补传后逐项核对这三个路径确实在 PR diff 中，
+再把描述改成已完成；不要仅凭本地文件或提交消息判定已交付。
+
 ## 逐项回应
 
 | 编号 | 修订或处理状态 |
