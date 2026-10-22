@@ -49,7 +49,11 @@ class PredictionTests(unittest.TestCase):
                       'threshold':0.5,'aggregation':'mean image probabilities per Study_id',
                       'data':{split:{'csv':str(root/(split+'.csv')),'images':str(root)} for split in ('valid','test')}}
             checkpoint = root/'model.pth'
-            save_model(build_model(),checkpoint,config)
+            # 模拟同学拿到来自旧电脑的模型，内嵌路径在当前机器不可用。
+            embedded = {**config,'data':{split:{'csv':'old-machine/'+split+'.csv','images':'old-machine/images'} for split in ('valid','test')}}
+            save_model(build_model(),checkpoint,embedded)
+            paths_override = root/'data.json'
+            paths_override.write_text(json.dumps({'size':64,'valid':config['data']['valid'],'test':config['data']['test']}),encoding='utf-8')
             self.assertEqual(prediction_config(checkpoint)[1],'checkpoint.metadata')
             # 历史指标故意不同，默认应告警并继续；严格模式应失败。
             previous = frame[['Subject_id','Study_id']].drop_duplicates().assign(**dict.fromkeys(PROB_COLUMNS,0.1))
@@ -58,14 +62,14 @@ class PredictionTests(unittest.TestCase):
             before = sha256(checkpoint)
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always')
-                output = run(checkpoint,'both','all_classes',device_name='cpu',allow_nonofficial_counts=True)
+                output = run(checkpoint,'both','all_classes',device_name='cpu',allow_nonofficial_counts=True,data_config=paths_override)
             self.assertTrue(any('验证复测与历史' in str(w.message) for w in caught))
             metrics = json.loads((output/'validation_metrics.json').read_text(encoding='utf-8'))
             self.assertFalse(metrics['reference_matches'])
             self.assertEqual(len(pd.read_csv(output/'submission.csv')),120)
             self.assertEqual(sha256(checkpoint),before)
             with self.assertRaises(RuntimeError):
-                run(checkpoint,'valid',strict_reproduce=True,device_name='cpu',allow_nonofficial_counts=True)
+                run(checkpoint,'valid',strict_reproduce=True,device_name='cpu',allow_nonofficial_counts=True,data_config=paths_override)
             with self.assertRaises(ValueError):
                 run(checkpoint,'test')
 

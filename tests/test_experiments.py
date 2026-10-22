@@ -20,7 +20,7 @@ class ExperimentTests(unittest.TestCase):
                 (source/'train_config.json').write_text(json.dumps({'size':224,'learning_rate':0.001,'batch_size':16}),encoding='utf-8')
                 (source/'validation_metrics.json').write_text(json.dumps({'epoch':1,'macro_auc':0.7,'macro_f1':0.2}),encoding='utf-8')
                 (source/'history.csv').write_text('epoch\n1\n',encoding='utf-8')
-                (source/'val_study_predictions.csv').write_text('Study_id\n001\n',encoding='utf-8')
+                pd.DataFrame([{'Subject_id':'01','Study_id':'001',**{f'p{i}':0.2 for i in range(1,11)}}]).to_csv(source/'val_study_predictions.csv',index=False,encoding='utf-8')
                 before = sha256(source/'best_model.pth')
                 folder = register(source,'exp_001','test')
                 self.assertEqual(sha256(folder/'best_model.pth'),before)
