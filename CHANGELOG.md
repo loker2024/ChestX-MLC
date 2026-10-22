@@ -23,6 +23,8 @@
 - `14:00`（新增）`src/common/utils.py`：新增 `seed_everything`（Python/NumPy/PyTorch 种子与 cuDNN 确定性）、`resolve_device("auto")`（CUDA→MPS→CPU，显式不可用设备报错）与 `make_run_dir`（`outputs/<时间戳>_<tag>/`）。
 - `14:00`（新增）`src/common/checkpoint.py`：新增 `save_checkpoint` / `load_checkpoint`，权重之外记录优化器、epoch、指标、配置与 seed。
 - `14:00`（移除）`src/.gitkeep`、`configs/.gitkeep`：目录已有实际文件，删除占位文件。
+- `14:00`（新增）`tests/conftest.py`：把 `src/` 插入 `sys.path`，让测试与源码统一使用顶层导入（如 `from data.index import read_split`），无需安装项目。
+- `14:00`（移除）`tests/.gitkeep`：目录已有实际文件，删除占位文件。
 
 ## 2026-10-16
 
