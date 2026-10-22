@@ -8,6 +8,10 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-10-22
+
+- `14:23`（变更）`develop`：撤回 PR #2（merge commit `91e9c3a`，未修复 P0-1 交付材料），删除其新增的 19 个文件（`src/`、`tests/`、`docs/PR_REVIEW_RESPONSE.md`），代码恢复到 `a8d2d47`；PR #2 在 GitHub 上仍显示 MERGED。
+
 ## 2026-10-16
 
 - `13:35`（新增）`docs/胸片多标签分类数据流.svg`：保存以 study 为样本单位的数据流图，展示逐图特征提取、同一次检查内多图特征平均聚合、study 级训练与推理流程；提交阶段筛选预测标签为 1 的类别，按 `Study_id` 和类别逐行输出类别 ID 及原始预测概率。
@@ -23,3 +27,5 @@
 - `14:00`（新增）`docs/多目标胸部病变检测分类（ChestX-MLC）.md`：赛题说明文档，涵盖任务描述、数据集构成（训练 18513 / 验证 859 / 测试 1414 次检查）、10 个类别标签映射、数据目录结构与评估要求。
 - `14:00`（新增）`requirements.txt`：依赖清单，版本对齐赛题服务器（Python 3.12 / CUDA 12.8 / torch 2.10.0 + torchvision 0.25.0），包含训练栈 `timm`、数据处理与评估 `numpy`/`pillow`/`pandas`/`scikit-learn`/`PyYAML`/`tqdm`，以及图像增强 `opencv-python-headless`/`albumentations`。
 - `14:08`（变更）`requirements.txt`：补充 Windows（x64）安装说明与各平台 wheel 差异（PyPI CPU 版 vs cu128 GPU 版），并记录 macOS arm64（MPS）上的实测环境与设备选择建议。
+
+
