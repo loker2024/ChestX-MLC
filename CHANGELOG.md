@@ -26,6 +26,15 @@
 - `14:00`（新增）`tests/conftest.py`：把 `src/` 插入 `sys.path`，让测试与源码统一使用顶层导入（如 `from data.index import read_split`），无需安装项目。
 - `14:00`（移除）`tests/.gitkeep`：目录已有实际文件，删除占位文件。
 - `14:15`（移除）`docs/spec.md`：删除该技术规格说明书，规格内容改由 `docs/architecture.md` 与 `docs/plan0.md` 承载；`docs/` 下不再保留 spec 文件，本节 `13:20`／`13:36`／`13:49` 三条相关记录已同步标注“该文件已删除”。该文件此前未纳入版本控制，删除仅发生在工作区。
+- `14:30`（新增）`src/data/__init__.py`：声明 data 包，避免 `src/data` 与仓库根的 `data/` 数据目录构成隐式命名空间包；只保留模块说明。
+- `14:30`（新增）`src/data/labels.py`：新增 `parse_label_string`，把 `Predict_class` 的分号串解析为 float32[10] 多热向量；空值视为「无类别」，空片段、非整数、越界与重复类别直接报错并带上原始值。
+- `14:30`（新增）`src/data/index.py`：新增 `index_images`（递归索引图片根，键为文件名即 `Dicom_id`，重复 stem 报错）与 `read_split`（ID 按字符串读取保留前导零，同 `Study_id` 的多行聚合为一条 `StudyRecord`，校验同 study 标签一致，一次性报出全部缺失图片），以及 frozen dataclass `StudyRecord`。
+- `14:30`（新增）`src/data/transforms.py`：新增 `Letterbox`（等比缩放到最长边后居中补黑边，不把胸片拉变形）与 `build_eval_transform` / `build_train_transform`（随机仿射、亮度对比度抖动、可开关水平翻转，ImageNet 归一化）。
+- `14:30`（新增）`src/data/dataset.py`：新增 `StudyDataset`（一次检查的全部图片 + 标签为一个样本）、`collate_studies`（变长图片首尾相接，输出 `images[N,3,H,W]`、`offsets[B+1]`、`labels[B,10]`、`study_ids`，test split 不含 `labels` 键）与 `build_loader`（train 用增强、打乱并按 `cfg.train.batch_studies` 取批，其余 split 确定性并按 `cfg.eval.batch_studies`）。
+- `14:30`（变更）`src/common/config.py`：`ImageConfig` 新增 `hflip: bool = False`，胸片左右有方向含义，训练增强默认不水平翻转。
+- `14:30`（变更）`configs/default.yaml`：`image` 节新增 `hflip: false` 并注明含义。
+- `14:30`（变更）`requirements.txt`：新增测试依赖 `pytest==9.1.1`，P2 起需要运行 `python -m pytest`。
+- `14:32`（变更）`.gitignore`：数据与产物目录的忽略规则由「任意层级匹配」改为「仅仓库根目录」（如 `data/` → `/data/`），否则新建的源码包 `src/data/` 会被一并忽略而无法提交。
 
 ## 2026-10-16
 

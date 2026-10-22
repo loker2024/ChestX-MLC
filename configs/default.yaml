@@ -25,6 +25,7 @@ image:
   size: 320
   letterbox: true
   normalize: imagenet        # imagenet=减 ImageNet 均值除方差；none=只缩放像素到 0~1
+  hflip: false               # 训练是否水平翻转；胸片左右有方向含义，默认关闭
 
 # 模型：ResNet-18 骨干（约 11.7M 参数）+ 单层 10 类分类头。
 model:

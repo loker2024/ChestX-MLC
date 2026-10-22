@@ -44,6 +44,7 @@ class ImageConfig:
     size: int = DEFAULT_IMAGE_SIZE  # letterbox 之后的方形边长
     letterbox: bool = True  # True=等比缩放后补边；False=直接拉伸到 size×size
     normalize: str = "imagenet"  # "imagenet"=减均值除方差；"none"=只把像素缩到 0~1
+    hflip: bool = False  # 训练是否水平翻转；胸片左右有方向含义，默认关闭
 
     def __post_init__(self) -> None:
         if self.size <= 0:

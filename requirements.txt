@@ -68,5 +68,8 @@ tqdm==4.70.1
 opencv-python-headless==5.0.0.93
 albumentations==2.0.8
 
+# ---- 测试 ----
+pytest==9.1.1
+
 # 提示: albumentations 启动时会联网检查更新，断网环境会打 UserWarning，
 # 用 NO_ALBUMENTATIONS_UPDATE=1（见各平台第 7 条）可关闭。
