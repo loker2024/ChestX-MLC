@@ -81,6 +81,7 @@ class TrainConfig:
     batch_studies: int = 16  # 每个 batch 的检查数；图片数由各 study 实际张数决定
     lr: float = 3e-4
     weight_decay: float = 0.01
+    pos_weight: bool = False  # 按训练集类别频率给 BCE 的正样本加权；类别极不平衡时打开
     warmup_epochs: int = 2  # 前几个 epoch 线性升温到 lr
     amp: bool = True  # 混合精度；仅 CUDA 上生效
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪

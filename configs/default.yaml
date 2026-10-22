@@ -27,7 +27,7 @@ image:
   normalize: imagenet        # imagenet=减 ImageNet 均值除方差；none=只缩放像素到 0~1
   hflip: false               # 训练是否水平翻转；胸片左右有方向含义，默认关闭
 
-# 模型：ResNet-18 骨干（约 11.7M 参数）+ 单层 10 类分类头。
+# 模型：ResNet-18 骨干（1000 类版约 11.7M，换成 10 类头后约 11.2M）+ 单层分类头。
 model:
   backbone: resnet18
   pretrained: true           # 离线环境拿不到预训练权重时改成 false
@@ -39,6 +39,7 @@ train:
   batch_studies: 16
   lr: 0.0003                 # 注意用小数写法；YAML 1.1 会把 3e-4 读成字符串
   weight_decay: 0.01
+  pos_weight: false          # 按训练集类别频率给稀有类正样本加权，类别不平衡时打开
   warmup_epochs: 2
   amp: true                  # 混合精度，仅 CUDA 生效
   grad_clip: 5.0
