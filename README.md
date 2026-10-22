@@ -2,14 +2,18 @@
 
 ## 从新克隆的仓库开始
 
-Python 依赖见 requirements.txt。安装到隔离环境后检查依赖与测试：
+本机已测的最小直接依赖见 requirements-baseline.txt；原 requirements.txt 保留赛题目标栈，
+两份不是同一个环境。建议用独立环境，避免全局 d2l 等其他项目依赖冲突。Windows 示例：
 
 ```powershell
-python -m pip install -r requirements.txt
-python -m pip check
-python -m unittest discover -s tests -v
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-baseline.txt
+.venv\Scripts\python.exe -m pip check
+.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
+下文的 python 应使用上述 .venv\Scripts\python.exe，或已激活的环境；macOS/Linux 使用 .venv/bin/python。
+最小清单不是完整传递依赖锁文件，尚未完成新建环境的全量下载安装验收；本机实际依赖闭包检查见可靠性说明。
 单元测试使用临时合成样本，不需要官方数据或训练好的模型。真实数据检查需要先准备：
 
 ```text
@@ -35,6 +39,41 @@ python -m src.check_data --config configs/data.json
 只有读取通过后才运行训练。预测章节里的 outputs/... 是历史本机实验路径，
 新克隆中不存在；需要先训练产生检查点，或另行取得允许共享的模型及内嵌配置。
 本仓库不提供数据、模型权重和预测CSV，不会自动下载预训练权重。
+
+## 可靠性修订：换机、登记与完整轮次恢复
+
+详细验收与需上传文件见 docs/RELIABILITY_UPDATE.md。典型操作：
+
+```powershell
+# 换电脑后只覆盖数据路径，输入尺寸/预处理/推理批量仍以模型为准
+python -m src.predict --model outputs/experiments/exp_002/best_model.pth --split valid --data-config configs/data.json
+# 新的从零基线使用独立目录，可指定配置和种子
+python -m src.train --full-one-epoch --data-config configs/data.json --seed 42 --output outputs/runs/new_baseline
+# 只有新格式状态可完整恢复；仅从一个已完成epoch的边界继续，保留旧实验
+python -m src.continue_train --source outputs/runs/new_baseline --output outputs/runs/resumed --additional-epochs 1 --resume-state outputs/runs/new_baseline/training_state.pth
+```
+
+--data-config 只覆盖各 split 的 csv/images；可只提供 valid 或 test，路径相对于项目运行目录。
+size 若提供必须与模型相同，batch_size 不覆盖模型设置。生效路径写入 prediction_report.json。
+历史参考 JSON/CSV 损坏时默认告警并记为 invalid，严格模式才阻断；当前图片/标签/概率仍严格校验。
+
+实验登记先校验再在隐藏暂存目录复制，全部成功后原子发布；坏的旧实验会被跳过并告警，
+不会卡住后续编号，空汇总也能生成。汇总表只在同一验证划分/标签指纹和评估协议内排名。
+没有指纹的旧指标标记 unverified_legacy、不进入自动排名，不追溯补造历史身份。
+可用同一权重的新验证运行补充可验证快照：
+
+```powershell
+python -m src.experiments --source outputs/baseline_v2 --id exp_003 --notes "同一模型复测补充验证指纹，未重训" --validation-run outputs/实际验证运行目录
+```
+
+验证运行报告必须绑定同一模型 SHA-256。原实验不变，新快照具有独立编号。
+数据指纹针对 CSV 的 ID归属与标签语义，不含图片字节；依赖官方图片保持不变。
+
+--resume-state 与默认仅加载权重的新实验不同：恢复 AdamW、Python/NumPy/PyTorch及设备随机状态、
+训练/验证 DataLoader 随机状态，校验模型 SHA-256、完成轮次、训练/验证指纹和训练参数。
+完整恢复不能同时修改学习率、批量、设备类型或数据；目前要求 num_workers=0。
+旧 schema 状态（包括以前第4轮的状态）明确拒绝完整恢复，只能按原模式建立仅权重新实验。
+不支持任意 batch 中间恢复；不保证跨硬件/库版本逐位一致。MPS 状态路径未实机验收。
 
 ## 审查修订与基线边界
 
@@ -82,7 +121,7 @@ Subject_id,Study_id,Predict_class,Probability 四列，不添加 Gate。
 
 已有实验：exp_001 保存 Baseline-1，exp_002 保存四轮训练最佳模型；均为原结果的哈希校验快照，
 没有重新训练。outputs/experiment_summary.csv 汇总参数、最佳 epoch、验证 AUC/F1 和备注，
-按 Macro-AUC 排序。原始实验独立保留，汇总表为可重建索引。
+按同指纹组内 Macro-AUC 排序，缺少指纹的历史实验不自动排名。原始实验独立保留，汇总表为可重建索引。
 
 未来新实验使用独立训练输出目录，然后登记（以下训练命令本轮没有执行）：
 
@@ -92,8 +131,8 @@ python -m src.experiments --source outputs/runs/run_003 --id exp_003 --notes "�
 python -m src.predict --model outputs/experiments/exp_003/best_model.pth --split valid
 ```
 
-续训入口复用原模型和预处理，按最佳模型的 epoch 开始计数；恢复模型权重，
-AdamW 和数据加载器随机状态重新初始化，属于新实验，配置会明确记录。
+默认续训复用原模型和预处理，按最佳模型的 epoch 开始计数；AdamW 和加载器随机状态重新初始化，
+属于新实验。显式 --resume-state 时按已完成轮次恢复完整状态，区别会写入配置。
 保持验证集和聚合方法不变，通过验证 Macro-AUC 选择最佳模型；F1 使用固定0.5阈值。
 实验登记拒绝重复编号，不修改旧实验。每个快照含权重、训练参数、历史、验证预测、
 验证指标、experiment_notes.md 和来源哈希；不凭测试概率或训练损失评判性能。
@@ -129,7 +168,7 @@ batch=16、seed=42、预处理和 Study 级评估。旧检查点没有优化器�
 python -m src.train --full-one-epoch
 ```
 
-固定 seed=42、AdamW lr=0.001、weight_decay=0.01、224×224，无外部权重。
+默认 seed=42、AdamW lr=0.001、weight_decay=0.01、224×224，无外部权重；完整一轮入口可指定独立输出、配置和种子。
 先用独立模型探测 batch=16，显存不足时尝试 8；正式模型重新初始化。
 只遍历训练集一次，使用全部验证图片，先 sigmoid 再按 Study_id 平均概率。
 Loss 是按图片数加权的 BCE 均值；AUC、F1 是 Study 级指标，F1 阈值 0.5。

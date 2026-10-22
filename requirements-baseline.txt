@@ -1,0 +1,10 @@
+# 本机已测的最小基线直接依赖，建议在独立venv中安装。
+# 不是完整传递依赖锁文件，也不是官方T4镜像兼容性认证。
+# 与原requirements.txt分开，保留原赛题目标版本清单。
+# Python 3.13.11本机测试；torch的+cu128本地版本满足对应基础版本约束。
+torch==2.11.0
+torchvision==0.26.0
+numpy==2.4.0
+pillow==12.0.0
+pandas==3.0.3
+scikit-learn==1.9.0

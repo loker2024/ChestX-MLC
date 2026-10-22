@@ -22,8 +22,17 @@
 - `13:06`（修复）`src/full_train.py`、`src/train.py`、`src/continue_train.py`：全量/单步/续训支持 --device；非CUDA设备不调用CUDA专属统计；新逐轮检查点保存同目录配置。
 - `13:06`（变更）`tests/test_submission.py`、`README.md`、`docs/PR_REVIEW_RESPONSE.md`、`CHANGELOG.md`：补齐两种提交语义、空输出/漏项/篡改概率回归测试、基线实验边界、PR描述和审查回应；历史提交未改写，官方语义仍待确认。
 - `13:06`（新增）`outputs/review_checks_20261022_130325/*`、`outputs/baseline_v2/epoch_4/predictions/20261022_130319_4ed3e91b/*`（已忽略）：保存真实旧检查点全量验证复测和原真实测试概率两种导出校验结果；未重新训练或上传，未修改原始模型。
+- `14:23`（变更）`develop`：撤回 PR #2（merge commit `91e9c3a`，未修复 P0-1 交付材料），删除其新增的 19 个文件（`src/`、`tests/`、`docs/PR_REVIEW_RESPONSE.md`），代码恢复到 `a8d2d47`；PR #2 在 GitHub 上仍显示 MERGED。
+- `14:56`（修复）`CHANGELOG.md`：核对 develop 与 yun 分支后补回团队的14:23撤回记录，避免本地日志覆盖团队历史；本条修订尚需上传到yun分支。
 - `16:07`（变更）`README.md`、`docs/PR_REVIEW_RESPONSE.md`：补充新克隆的依赖、测试、官方数据准备及默认 configs/data.json 用法；记录实际 PR #2 缺失根目录文档和配置的交付问题，明确本地文件不代表已提交到远端。
 - `16:07`（变更）`CHANGELOG.md`：汇总本PR各轮新增源码、测试、配置和审查修订的路径记录；configs/data.json 的新增记录见2026-10-19 19:56，源码/测试路径覆盖原实现及2026-10-22修订；远端补传后须以 Files changed 核验。
+- `18:21`（修复）`src/predict.py`：新增仅数据路径覆盖，保持检查点预处理；可选历史参考损坏默认告警/记录invalid，严格模式才阻断；报告生效路径及验证身份。
+- `18:21`（修复）`src/experiments.py`：登记前验证、暂存目录原子发布、复制失败可重试、坏旧实验隔离、空汇总和原子CSV替换；新增同一模型验证复测导入和同指纹组内排名。
+- `18:21`（新增）`src/fingerprints.py`、`src/training_state.py`：验证划分/标签语义和评估协议指纹；绑定模型哈希的完整epoch状态保存与恢复，不补造旧优化器状态。
+- `18:21`（变更）`src/evaluate.py`、`src/full_train.py`、`src/train.py`、`src/continue_train.py`：评估记录指纹；新训练支持独立目录/配置/种子，续训支持显式完整状态恢复；合成规模开关默认关闭并记录，本轮未进行正式训练。
+- `18:21`（新增）`tests/test_reliability.py`、`tests/test_training_state.py`（变更）`tests/test_predict.py`、`tests/test_experiments.py`：覆盖坏参考、路径覆盖、失败登记、分组排名、随机状态和ResNet18训练入口恢复一致性，18项测试通过。
+- `18:21`（新增）`requirements-baseline.txt`、`docs/RELIABILITY_UPDATE.md`（变更）`README.md`、`docs/PR_REVIEW_RESPONSE.md`、`CHANGELOG.md`：最小直接依赖、隔离环境步骤、恢复边界和17文件上传清单；未改装全局环境或宣称完成干净安装验收。
+- `18:21`（新增）`outputs/experiments/exp_002/predictions/20261022_181637_c6140eaf/*`、`outputs/experiments/exp_003/*`（变更）`outputs/experiment_summary.csv`（已忽略）：同一第4轮权重复测Macro-AUC0.730568、Macro-F10.157715并登记验证身份快照，原实验不变，无新正式训练。
 
 ## 2026-10-20
 
