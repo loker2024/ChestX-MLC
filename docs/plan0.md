@@ -93,7 +93,7 @@ python src/check_data.py --config configs/default.yaml --full
 
 - `src/model/__init__.py`、`network.py`、`losses.py`
 - `src/common/metrics.py`
-- `tests/test_metrics.py`
+- `tests/test_metrics.py`、`tests/test_model.py`
 
 产出：
 
@@ -105,11 +105,11 @@ python src/check_data.py --config configs/default.yaml --full
 验收：
 
 ```bash
-python -m pytest -q tests/test_metrics.py
+python -m pytest -q tests/test_metrics.py tests/test_model.py
 python -c "import sys; sys.path.insert(0, 'src'); import torch; from common.config import load_config; from model.network import build_model, aggregate_logits; cfg = load_config('configs/default.yaml'); m = build_model(cfg); x = torch.randn(3, 3, 320, 320); print(m(x).shape); print(aggregate_logits(m(x), torch.tensor([0, 2, 3])).shape); print(sum(p.numel() for p in m.parameters()))"
 ```
 
-期望：参数量约 11.7M；`macro_auc` 与 sklearn 结果一致。
+期望：参数量 11,181,642（约 11.2M，即 1000 类版 ResNet-18 换掉分类头后的数字）；`macro_auc` 与 sklearn 结果一致；离线环境拿不到预训练权重时退回随机初始化并给出 `RuntimeWarning`。
 
 ## P5 训练
 
@@ -173,7 +173,7 @@ python -m pytest -q tests/test_submission.py tests/test_pipeline.py
 |---|---|---|
 | P1 | `tests/conftest.py` | `src/` 入 `sys.path`，合成 CSV 与小图 fixture |
 | P2 | `test_labels.py` / `test_index.py` / `test_dataset.py` | 标签解析、前导零、多图聚合、缺图、变长 collate |
-| P4 | `test_metrics.py` | sklearn 对齐、退化类剔除、F1 阈值 |
+| P4 | `test_metrics.py` / `test_model.py` | sklearn 对齐、退化类剔除、F1 阈值、参数规模与 study 聚合 |
 | P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、端到端闭环 |
 
 ## 退出标准

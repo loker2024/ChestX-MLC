@@ -62,6 +62,7 @@ ChestX-MLC/
 │   ├── test_index.py
 │   ├── test_dataset.py
 │   ├── test_metrics.py
+│   ├── test_model.py
 │   ├── test_submission.py
 │   └── test_pipeline.py
 ├── data/                # 不入库
@@ -170,6 +171,7 @@ train:
   batch_studies: 16
   lr: 3e-4
   weight_decay: 0.01
+  pos_weight: false
   warmup_epochs: 2
   amp: true
   grad_clip: 5.0
@@ -192,6 +194,7 @@ device: auto
 | `test_index.py` | 前导零保留、多图 study 聚合、缺图报错、跨 split 无重叠 |
 | `test_dataset.py` | 张量形状与取值范围、变长 collate、test 无标签 |
 | `test_metrics.py` | 与 sklearn 对齐、退化类剔除、F1 阈值 |
+| `test_model.py` | 参数规模、study 级均值聚合与梯度、`pos_weight` 计算 |
 | `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、UTF-8 回读 |
 | `test_pipeline.py` | 单步训练 loss 有限且参数更新、checkpoint 重载逐位一致、predict→submission 闭环 |
 

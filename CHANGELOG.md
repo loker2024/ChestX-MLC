@@ -41,6 +41,16 @@
 - `14:35`（新增）`tests/test_dataset.py`：覆盖 letterbox 等比补边与黑边位置、评估预处理确定性、张量形状、变长 `collate_studies` 的 `images`/`offsets`/`labels` 与 test split 无标签分支、`build_loader` 的三种 split 共 9 例。
 - `14:42`（新增）`src/check_data.py`：新增训练前数据体检脚本，检查 CSV 必需列、ID 空值与固定宽度前导零格式、同 split 内 Dicom_id 唯一性、图片齐全、同 study 标签与患者一致性、三份划分两两不重叠，并打印每类图像/检查计数与类别 10 单独出现次数；默认每份 CSV 只读前 1000 行，`--full` 读全量并逐行核对图片，任一检查失败以退出码 1 结束。
 - `14:42`（新增）`tests/test_check_data.py`：覆盖 ID 按字符串读取、缺标签列报错、截断编号识别、缺图计数、同 study 标签顺序无关与冲突检测、跨 split 患者重叠检测共 6 例。
+- `14:53`（新增）`src/common/metrics.py`：新增 `per_class_report`（逐类输出支持数、正样本比例、AUC、precision/recall/F1）、`macro_auc` 与 `macro_f1`；全正或全负的退化类别没有指标定义，记 NaN 并从平均里剔除（而不是填 0 拉低总分），标签与概率形状不一致直接报错。
+- `14:53`（新增）`src/model/__init__.py`：声明 model 包，只保留模块说明，不导入 torch/timm。
+- `14:53`（新增）`src/model/network.py`：新增 `build_model`（timm 构建 ResNet-18 骨干并把分类头换成 10 类；预训练权重下载失败时告警并退回随机初始化，保证离线也能跑）与 `aggregate_logits`（按 offsets 把同一次检查的多张图 logits 求均值，用 `index_add` 实现、梯度可正常回传）。
+- `14:53`（新增）`src/model/losses.py`：新增 `build_loss`，默认 `BCEWithLogitsLoss`；`train.pos_weight` 打开时按训练集频率计算 `pos_weight = 负样本数 / 正样本数`，没有正样本的类别取 1，缺训练标签时直接报错。
+- `14:53`（变更）`src/common/config.py`：`TrainConfig` 新增 `pos_weight: bool = False`，为 P4 的加权损失与 P7 的对比实验提供开关。
+- `14:53`（变更）`configs/default.yaml`：`train` 节新增 `pos_weight: false`；模型注释中的参数量由 11.7M 更正为 11.2M（1000 类版 ResNet-18 的分类头更大）。
+- `14:55`（新增）`tests/test_metrics.py`：覆盖与 sklearn 的 macro-AUC/F1 对齐、全负类与全正类剔除后与 sklearn 子集一致、全部退化返回 NaN、F1 随阈值变化、逐类明细列名与 support、形状不一致报错共 8 例。
+- `14:55`（新增）`tests/test_model.py`：覆盖 `build_model` 输出 `[N,10]` 与参数量约 11.2M、`aggregate_logits` 对 2/1/3 张图的 study 求均值与梯度、默认损失无 `pos_weight`、`pos_weight` 按类别频率计算、缺训练标签报错、加权损失有限共 8 例。
+- `14:57`（变更）`docs/architecture.md`：目录树与测试布局补充 `tests/test_model.py`，配置骨架的 `train` 节补充 `pos_weight: false`。
+- `14:57`（变更）`docs/plan0.md`：P4 涉及文件与验收命令纳入 `tests/test_model.py`，参数量期望由约 11.7M 更正为 11,181,642，并补充离线回退预训练权重的说明。
 
 ## 2026-10-16
 
