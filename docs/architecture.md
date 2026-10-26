@@ -2,7 +2,7 @@
 
 本文件记录 ChestX-MLC 的目标代码结构、模块边界与运行方式。赛题背景、数据格式与评测口径见 [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md)，数据流示意见 [胸片多标签分类数据流](胸片多标签分类数据流.svg)。
 
-> 当前 `src/`、`tests/`、`configs/` 下的文件为规划结构，尚未全部落地；实际改动与进度以 `CHANGELOG.md` 为准。
+> P1–P6 已按本文件落地；实际改动与进度以 `CHANGELOG.md` 为准。
 
 ## 1. 设计约束
 
@@ -127,8 +127,8 @@ ChestX-MLC/
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `predict.py` | 加载 checkpoint 对 loader 推理，聚合为 study 级概率 | `predict_loader(model, loader, device) -> pd.DataFrame`（`Study_id, p1..p10`） |
-| `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出 | `build_submission_frame(...)`、`validate_submission(path, test_csv)`、`write_submission(df, path)` |
+| `predict.py` | 加载 checkpoint 对 loader 推理，聚合为 study 级概率 | `load_checkpoint_model(config, path, device)`、`predict_loader(model, loader, device) -> pd.DataFrame`（`Study_id, p1..p10`） |
+| `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出 | `build_submission_frame(predictions, study_subjects, threshold=None)`、`validate_submission(path, test_csv, require_all_classes=True)`、`write_submission(df, path)` |
 
 ### 3.6 入口脚本
 
@@ -136,8 +136,8 @@ ChestX-MLC/
 |---|---|
 | `check_data.py` | 数据体检：CSV 字段、ID 前导零、图片齐全、跨 split 无重叠、标签分布；`--full` 检查全量数据 |
 | `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit` |
-| `run_eval.py` | 验证入口：加载 checkpoint，在 valid 上输出 macro-AUC/F1 与逐类明细 |
-| `run_infer.py` | 推理入口：test 推理并生成 `submission.csv` |
+| `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
+| `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold` 可按概率过滤 |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -215,10 +215,10 @@ device: auto
 
 每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml` 与 `train.log`。`data/`、`checkpoints/`、`outputs/` 均在 `.gitignore` 中，不入库。
 
-## 8. 待确认
+## 8. 待确认与已定事项
 
 1. 全量图片根目录与训练设备（本地 GPU 或赛题 T4 镜像）。
-2. 提交策略：输出全部 10 类概率（默认，利于 AUC），或按 0.5 阈值过滤。
+2. 提交策略（已确定）：默认输出全部 10 类概率（保留排序信息，利于 macro-AUC）；`run_infer.py --threshold` 可按概率过滤，并保证每个 study 至少一行。
 3. 离线服务器能否携带 ImageNet 预训练权重；不能时回退随机初始化。
 4. 类别 10 是否为“无异常”；当前按普通类别处理。
 

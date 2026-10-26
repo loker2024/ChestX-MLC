@@ -8,6 +8,18 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-10-26
+
+- `18:26`（新增）`src/infer/__init__.py`：声明 infer 包，只保留模块说明，不导入 torch / pandas 等重型依赖。
+- `18:26`（新增）`src/infer/predict.py`：新增 `load_checkpoint_model`（读取 `best.pt`、强制 `pretrained=False` 以免离线下载、加载权重后切到 eval）与 `predict_loader`（`torch.inference_mode` 逐批推理，`aggregate_logits` 按 study 聚合、sigmoid 后返回 `Study_id` + `p1..p10` 宽表）。
+- `18:26`（新增）`src/infer/submission.py`：新增 `SUBMISSION_COLUMNS`、`build_submission_frame`（默认每个 study 输出 10 类；给阈值时只保留过线类，全部未过线则保留 top-1 保证覆盖）、`write_submission`（UTF-8、LF、自动建父目录）与 `validate_submission`（列名与顺序、study 双向覆盖、`Subject_id` 一致、类别范围、概率有限且落在 `[0,1]`、重复行、10 类齐全）。
+- `18:26`（新增）`src/run_eval.py`：验证入口，支持 `--config` / `--checkpoint` / `--split`，在带标注 split 上输出 macro-AUC、macro-F1 与逐类明细。
+- `18:26`（新增）`src/run_infer.py`：推理入口，支持 `--config` / `--checkpoint` / `--out` / `--threshold`；默认输出全部 10 类概率，写完立即调用 `validate_submission` 按 test.csv 校验。
+- `18:26`（变更）`configs/default.yaml`：`eval.threshold` 注释改为“计算 macro-F1 的判定阈值；提交默认输出全部 10 类概率”，避免与默认提交策略混淆。
+- `18:28`（新增）`tests/test_submission.py`：覆盖全 10 类输出与列顺序、阈值过滤及 top-1 补位、UTF-8 写读闭环、允许过滤文件、前导零保留，以及列序错误、缺 study、未知 study、`Subject_id` 不匹配、类别越界、概率越界、重复行共 12 例。
+- `18:28`（新增）`tests/test_pipeline.py`：端到端闭环——训练 1 epoch 确认 loss 有限且参数更新，保存并重载 checkpoint 逐位一致，test 推理列名/顺序/概率范围正确，生成并校验 submission，最后直接调用 `run_eval.main` / `run_infer.main` 冒烟。
+- `18:37`（变更）`docs/architecture.md`：说明 P1–P6 已落地；补全 infer 的 `load_checkpoint_model` / `build_submission_frame` / `validate_submission` 接口与 `run_infer --threshold`，并把提交策略从待确认改为已确定（默认全部 10 类，阈值过滤可选）。
+
 ## 2026-10-22
 
 - `13:20`（新增）`docs/spec.md`：**（该文件已于 `14:15` 删除，见本节「移除」条目）** 新增技术规格说明书，固化任务形式化（study 为样本单位、同 study 多图共享标签、logits 均值聚合）、数据索引与标注解析规则（ID 一律按字符串读入以保留前导零）、患者级划分与无泄漏校验、预处理与增强白名单（默认禁用水平翻转）、模型与损失选型约束（由 ≤500MB 与单图 ≤100ms 反推参数量与 FLOPs 上限）、训练超参与复现要求、推理与 `submission.csv` 逐字段规格及 8 项覆盖率校验、macro-AUC/F1 口径（全正或全负类别剔除而非填零）、模块接口、配置 Schema、测试清单、验收标准与 8 项风险待确认。
