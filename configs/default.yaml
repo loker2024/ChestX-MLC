@@ -1,10 +1,12 @@
-# ChestX-MLC 默认配置
+# ChestX-MLC 默认配置（P7 冻结版，最终提交使用这一份）
 #
 # 路径都相对“仓库根目录”理解：请在仓库根目录执行入口脚本，例如
 #     python src/run_train.py --config configs/default.yaml
 # 这样 data/、outputs/ 才会落在预期位置。
 #
 # 字段含义与取值范围见 src/common/config.py 的注释；字段名写错会直接报错。
+# 实验配置用顶层 `_base: default.yaml` 继承本文件，只写要改的字段，
+# 例如 configs/exp_short.yaml；实验结论与复现命令见 docs/experiments.md。
 
 # 数据：每个 split 一份标注 CSV + 一个图片根目录。
 # CSV 一行一张图，Study_id 相同的多行属于同一次检查（共享同一组标签）。

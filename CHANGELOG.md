@@ -24,14 +24,23 @@
 - `19:03`（修复）`src/common/metrics.py`：全阴/全正类只跳过 AUC，precision/recall/F1 仍计算并参与 macro-F1，零除项按 0 处理；新增二维形状、空输入与 threshold 范围校验。
 - `19:03`（修复）`src/data/index.py`：`read_split` 拒绝重复 `Dicom_id`，并拒绝同一 `Study_id` 对应多个 `Subject_id`，避免重复计图或患者映射被静默覆盖。
 - `19:03`（修复）`src/infer/submission.py`、`src/run_infer.py`：`--threshold` 与 `build_submission_frame` 统一限制为 `[0,1]` 的有限数；未知 study 与 test.csv 缺 `Study_id`/`Subject_id` 时给出明确错误；推理 loader 按设备传入 `pin_memory`。
-- `19:14`（修复）`src/infer/submission.py`、`tests/test_submission.py`：test.csv 中同一 study 对应多个 Subject_id 时显式报错，避免患者映射被静默覆盖。
-- `19:14`（变更）`tests/test_pipeline.py`：端到端覆盖 `run_infer --threshold` 过滤分支。
-- `19:20`（变更）`tests/test_engine.py`：新增 CUDA 上 `fit` + `pos_weight` 的回归测试，确保训练循环而不只是 loss 构造能跑通设备路径。
 - `19:03`（修复）`src/infer/predict.py`：空 DataLoader 显式报错，避免 `torch.cat([])` 抛出难以定位的底层异常。
 - `19:03`（变更）`src/common/config.py`、`configs/default.yaml`：移除未使用的 `output.checkpoint_dir`；明确 `eval.threshold` 只用于 macro-F1，不影响训练、AUC 或默认全 10 类提交。
 - `19:03`（变更）`src/common/utils.py`、`src/data/dataset.py`、`src/data/transforms.py`、`src/run_eval.py`：`make_run_dir` 清洗 tag，`resolve_device` 校验 `cuda:N` 的卡号；`build_loader` 的 `pin_memory` 默认关闭、由入口显式开启；`RandomAffine` 使用双线性插值；评估入口按设备开启 `pin_memory`。
 - `19:03`（变更）`tests/conftest.py`、`tests/test_engine.py`、`tests/test_index.py`、`tests/test_metrics.py`、`tests/test_model.py`、`tests/test_submission.py`，新增 `tests/test_config.py`、`tests/test_utils.py`、`tests/test_run_train.py`：覆盖 pos_weight CUDA 设备、全正类权重、全 NaN AUC、重复 Dicom_id/患者冲突、F1 退化类口径、阈值/缺列/未知 study、配置与工具函数、训练 CLI 产物与日志；全套 `103 passed, 1 skipped`。
 - `19:03`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`：更新 P1–P6 已落地状态、`src/`/`tests/`/`configs/` 的实际结构、常用入口、pytest 命令与 `checkpoint_dir` 移除；同步 `hflip`、`build_loader(pin_memory)`、阈值范围、退化类 F1 口径与新增测试映射。
+- `19:14`（修复）`src/infer/submission.py`、`tests/test_submission.py`：test.csv 中同一 study 对应多个 Subject_id 时显式报错，避免患者映射被静默覆盖。
+- `19:14`（变更）`tests/test_pipeline.py`：端到端覆盖 `run_infer --threshold` 过滤分支。
+- `19:20`（变更）`tests/test_engine.py`：新增 CUDA 上 `fit` + `pos_weight` 的回归测试，确保训练循环而不只是 loss 构造能跑通设备路径。
+- `19:44`（新增）`configs/exp_short.yaml`、`configs/exp_pos_weight.yaml`、`configs/exp_short_pos_weight.yaml`：P7 实验配置，用顶层 `_base` 继承 `configs/default.yaml`；`exp_short*` 把 epochs 降到 6、关闭 early stop，只做方向筛查，完整 25 轮对照仍以 `default.yaml` 为基准。
+- `19:44`（变更）`src/common/config.py`：`load_config` 支持 `_base` 继承——先读父配置再逐层合并子配置，`_base` 必须是字符串且相对当前配置文件解析，循环继承、父文件缺失都会明确报错；合并后仍走 dataclass 严格校验。
+- `19:44`（新增）`src/common/metrics.py`：`parse_thresholds` 解析逗号分隔的阈值列表，`macro_f1_curve` 返回 `threshold` / `macro_f1` 两列，方便一次比较多个判定阈值。
+- `19:44`（变更）`src/run_eval.py`：新增 `--thresholds`，在单阈值指标之后追加阈值网格的 macro-F1 表，便于挑选 F1 阈值。
+- `19:44`（新增）`src/run_compare.py`：run 对比入口——按每个 run 存档的 `config.yaml` 重建 valid loader、加载 `best.pt` 重算 macro-AUC 与多阈值 macro-F1，汇总 backbone、输入尺寸、pos_weight、seed、最佳 epoch 与设备，写出 `summary.csv` 与 `summary.md`。
+- `19:44`（新增）`tests/test_run_compare.py`：覆盖每个 run 一行、pos_weight 与 seed 列、`summary.csv` / `summary.md` 内容，以及缺少 `config.yaml` / `best.pt` 时的报错。
+- `19:44`（变更）`tests/test_config.py`、`tests/test_metrics.py`：补 `_base` 的合并覆盖、循环继承、父文件缺失与实验配置直接加载，以及阈值解析、阈值曲线的测试。
+- `19:44`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`、`configs/default.yaml`：同步 P1–P7 状态、`configs/exp_*.yaml`、`docs/experiments.md`、`run_compare.py` 入口、`--thresholds` 命令、`_base` 继承说明与测试映射，并把 `default.yaml` 标注为 P7 冻结配置。
+- `19:46`（新增）`docs/experiments.md`：P7 调优记录——实验环境、实验矩阵、复现命令与冻结结论，对比表由 `run_compare.py` 的输出回填。
 
 ## 2026-10-22
 

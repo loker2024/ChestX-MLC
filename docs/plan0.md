@@ -156,16 +156,28 @@ python -m pytest -q tests/test_submission.py tests/test_pipeline.py
 
 涉及文件：
 
-- `configs/exp_*.yaml`（可选）
+- `configs/exp_short.yaml`、`configs/exp_pos_weight.yaml`、`configs/exp_short_pos_weight.yaml`（用 `_base` 继承默认配置）
+- `src/common/config.py`：`load_config` 支持 `_base` 继承
+- `src/common/metrics.py`：`parse_thresholds`、`macro_f1_curve`
+- `src/run_eval.py`：`--thresholds` 一次打印阈值网格下的 macro-F1
+- `src/run_compare.py`：重算多个 run 的 valid 指标并写出 `summary.csv` / `summary.md`
+- `docs/experiments.md`：实验记录、对比表与冻结结论
 - 无新增核心模块
 
 工作项：
 
 - 阈值与 `pos_weight` 对比；必要时消融骨干或输入尺寸。
 - 记录随机种子、数据划分、设备、macro-AUC 与 macro-F1，形成对比表。
-- 冻结最终提交策略与配置。
+- 冻结最终提交策略与配置（`configs/default.yaml`）。
 
-验收：对比表可复现；最终 `submission.csv` 通过 `validate_submission`。
+验收：
+
+```bash
+python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
+python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<final>/best.pt --out outputs/submission.csv
+```
+
+期望：对比表可复现；最终 `submission.csv` 通过 `validate_submission`。
 
 ## 测试映射
 
@@ -176,7 +188,7 @@ python -m pytest -q tests/test_submission.py tests/test_pipeline.py
 | P4 | `test_metrics.py` / `test_model.py` | sklearn 对齐、退化类 AUC 跳过但 F1 仍计算、阈值与空输入、参数规模、study 聚合、pos_weight 设备 |
 | P5 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup、早停、评估指标、全 NaN AUC 报错 |
 | P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、缺列报错、端到端闭环 |
-| P7 | `test_config.py` / `test_utils.py` / `test_run_train.py` | 配置校验、种子/设备/运行目录、训练 CLI 产物与日志 |
+| P7 | `test_config.py` / `test_utils.py` / `test_run_train.py` / `test_run_compare.py` | 配置校验与 `_base` 继承、种子/设备/运行目录、训练 CLI 产物与日志、run 对比表 |
 
 ## 退出标准
 

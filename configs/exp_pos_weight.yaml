@@ -1,0 +1,12 @@
+# 对照实验：按训练集类别频率给正样本加权（pos_weight）。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_pos_weight.yaml --tag pos_weight
+#
+# 为什么值得试：10 类标签里稀有类别的正样本很少，普通 BCE 容易把它们一直压成
+# 低概率；pos_weight 会让稀有类的正样本被错分时付出更大的 loss。
+# 是否真的更好要拿 valid 的 macro-AUC 和逐类 F1 说话，见 docs/experiments.md。
+_base: default.yaml
+
+train:
+  pos_weight: true

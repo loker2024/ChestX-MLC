@@ -162,14 +162,62 @@ def load_config(path: str | Path = "configs/default.yaml") -> Config:
 
     读取失败时 PyYAML 会给出文件与行号；字段写错时的报错来自 _build_dataclass，
     会指出具体是哪一节、哪个字段出了问题。
+
+    配置文件还可以用顶层的 `_base` 键继承另一份配置（详见 `_load_yaml`），
+    实验配置因此只需要写「和默认配置不一样的那几行」。
     """
     config_path = Path(path)
-    with config_path.open(encoding="utf-8") as file:
-        raw = yaml.safe_load(file)
+    raw = _load_yaml(config_path)
 
-    if raw is None:
+    if not raw:
         raise ValueError(f"配置文件内容为空：{config_path}")
     return _build_dataclass(Config, raw, where="配置根节点")
+
+
+def _load_yaml(path: Path, seen: tuple[Path, ...] = ()) -> dict[str, Any]:
+    """读一份 YAML，并按 `_base` 继承链合并成完整字典。
+
+    `_base` 写的是另一份配置文件的路径，相对当前文件所在的目录解析，例如
+    `configs/exp_pos_weight.yaml` 里的 `_base: default.yaml` 就指向
+    `configs/default.yaml`。
+
+    合并规则：先递归读出基础配置，再用本文件的键**递归**覆盖它——嵌套的
+    `data` / `train` 等小节按字段逐个合并，没有写的字段沿用基础配置；列表和
+    标量（例如 `model.backbone`）则整体替换，不做拼接。
+
+    `seen` 记录已经读过的文件，用来发现「A 继承 B、B 又继承 A」这种循环，
+    否则递归会一直转下去。
+    """
+    path = path.resolve()
+    if path in seen:
+        chain = " -> ".join(str(item) for item in (*seen, path))
+        raise ValueError(f"配置文件通过 _base 形成了循环继承：{chain}")
+
+    with path.open(encoding="utf-8") as file:
+        raw = yaml.safe_load(file) or {}
+
+    if not isinstance(raw, dict):
+        raise TypeError(f"配置文件顶层应该是键值映射，实际是 {type(raw).__name__}：{path}")
+
+    base_name = raw.pop("_base", None)
+    if base_name is None:
+        return raw
+    if not isinstance(base_name, str):
+        raise TypeError(f"_base 应该是配置文件路径字符串，实际是 {base_name!r}：{path}")
+
+    base = _load_yaml(path.parent / base_name, (*seen, path))
+    return _merge_config(base, raw)
+
+
+def _merge_config(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """把 override 合进 base：嵌套字典逐层合，其余值直接覆盖。"""
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _build_dataclass(cls: type, raw: Any, where: str) -> Any:

@@ -1,0 +1,11 @@
+# 筛查用的 pos_weight 配置：继承 exp_short.yaml（短周期），再打开 pos_weight。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_short_pos_weight.yaml --tag short_pos_weight
+#
+# 和 exp_short.yaml 用同一套短周期，两组结果才有可比性；正式对比时换成
+# exp_pos_weight.yaml（完整 25 轮）。
+_base: exp_short.yaml
+
+train:
+  pos_weight: true

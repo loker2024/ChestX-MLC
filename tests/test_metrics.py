@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import f1_score, roc_auc_score
 
-from common.metrics import macro_auc, macro_f1, per_class_report
+from common.metrics import macro_auc, macro_f1, macro_f1_curve, parse_thresholds, per_class_report
 
 
 def _synthetic(num_studies: int = 80) -> tuple[np.ndarray, np.ndarray]:
@@ -145,3 +145,35 @@ def test_one_dimensional_input_raises():
 def test_invalid_threshold_raises():
     with pytest.raises(ValueError, match="threshold"):
         macro_f1(np.zeros((2, 10)), np.full((2, 10), 0.5), threshold=1.5)
+
+
+def test_parse_thresholds_splits_on_commas():
+    assert parse_thresholds("0.3,0.4,0.5") == [0.3, 0.4, 0.5]
+    # 多余的空格和空段都跳过，命令行里写 "0.3, 0.4," 也能用。
+    assert parse_thresholds(" 0.4 ,, 0.6 ") == [0.4, 0.6]
+
+
+def test_parse_thresholds_rejects_typos():
+    """误把 0.5 写成 abc 时应直接报错，而不是悄悄少跑一个阈值。"""
+    with pytest.raises(ValueError, match="不是数字"):
+        parse_thresholds("0.5,abc")
+
+    with pytest.raises(ValueError, match="不能为空"):
+        parse_thresholds(", ,")
+
+
+def test_macro_f1_curve_has_one_row_per_threshold():
+    y_true, y_score = _synthetic()
+
+    curve = macro_f1_curve(y_true, y_score, [0.2, 0.5, 0.8])
+
+    assert list(curve.columns) == ["threshold", "macro_f1"]
+    assert curve["threshold"].tolist() == [0.2, 0.5, 0.8]
+    assert curve["macro_f1"].between(0.0, 1.0).all()
+
+
+def test_macro_f1_curve_rejects_empty_thresholds():
+    y_true, y_score = _synthetic()
+
+    with pytest.raises(ValueError, match="至少"):
+        macro_f1_curve(y_true, y_score, [])

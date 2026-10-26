@@ -2,7 +2,7 @@
 
 本文件记录 ChestX-MLC 的目标代码结构、模块边界与运行方式。赛题背景、数据格式与评测口径见 [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md)，数据流示意见 [胸片多标签分类数据流](胸片多标签分类数据流.svg)。
 
-> P1–P6 已按本文件落地；实际改动与进度以 `CHANGELOG.md` 为准。
+> P1–P7 已按本文件落地；实际改动与进度以 `CHANGELOG.md` 为准，调优结论与复现命令见 [experiments.md](experiments.md)。
 
 ## 1. 设计约束
 
@@ -22,11 +22,15 @@ ChestX-MLC/
 ├── requirements.txt
 ├── .gitignore
 ├── configs/
-│   └── default.yaml
+│   ├── default.yaml
+│   ├── exp_short.yaml
+│   ├── exp_pos_weight.yaml
+│   └── exp_short_pos_weight.yaml
 ├── docs/
 │   ├── 多目标胸部病变检测分类（ChestX-MLC）.md
 │   ├── 胸片多标签分类数据流.svg
-│   └── architecture.md
+│   ├── architecture.md
+│   └── experiments.md
 ├── src/
 │   ├── common/
 │   │   ├── __init__.py
@@ -55,7 +59,8 @@ ChestX-MLC/
 │   ├── check_data.py
 │   ├── run_train.py
 │   ├── run_eval.py
-│   └── run_infer.py
+│   ├── run_infer.py
+│   └── run_compare.py
 ├── tests/
 │   ├── conftest.py
 │   ├── test_labels.py
@@ -66,6 +71,10 @@ ChestX-MLC/
 │   ├── test_model.py
 │   ├── test_engine.py
 │   ├── test_submission.py
+│   ├── test_config.py
+│   ├── test_utils.py
+│   ├── test_run_train.py
+│   ├── test_run_compare.py
 │   └── test_pipeline.py
 ├── data/                # 不入库
 │   ├── train.csv
@@ -84,9 +93,9 @@ ChestX-MLC/
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
 | `constants.py` | 类别数、图像后缀、ImageNet 均值方差等常量 | `NUM_CLASSES = 10`、`CLASS_IDS`、`DEFAULT_IMAGE_SIZE = 320` |
-| `config.py` | YAML 读取、dataclass 校验与默认值 | `load_config(path) -> Config` |
+| `config.py` | YAML 读取（支持 `_base` 继承）、dataclass 校验与默认值 | `load_config(path) -> Config` |
 | `utils.py` | 随机种子、设备选择、运行目录与日志 | `seed_everything(seed)`、`resolve_device("auto")`、`make_run_dir()` |
-| `metrics.py` | 评估指标；训练监控与推理评估共用 | `macro_auc(y_true, y_score)`、`macro_f1(y_true, y_score, threshold)`、`per_class_report(...)` |
+| `metrics.py` | 评估指标；训练监控、推理评估与阈值筛选共用 | `macro_auc(y_true, y_score)`、`macro_f1(y_true, y_score, threshold)`、`per_class_report(...)`、`parse_thresholds(text)`、`macro_f1_curve(y_true, y_score, thresholds)` |
 | `checkpoint.py` | 权重的保存与加载，记录配置、种子与指标 | `save_checkpoint(...)`、`load_checkpoint(path, map_location)` |
 
 ### 3.2 data：数据底座
@@ -137,6 +146,7 @@ ChestX-MLC/
 | `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit` |
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
+| `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -153,8 +163,9 @@ ChestX-MLC/
 ```bash
 python src/check_data.py --config configs/default.yaml --full
 python src/run_train.py  --config configs/default.yaml --seed 42
-python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt
+python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
 python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
+python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
 python -m pytest
 ```
 
@@ -186,6 +197,8 @@ device: auto
 
 本地联调可把 `data.<split>.images` 指向 `data/example/train_example` 等示例目录；全量图片路径见第 8 节。
 
+实验配置用顶层 `_base` 继承默认配置，只写需要覆盖的字段；加载时先合并父配置再做 dataclass 校验，`_base` 的相对路径按当前配置文件所在目录解析。
+
 ## 6. 测试布局
 
 | 文件 | 覆盖点 |
@@ -195,13 +208,14 @@ device: auto
 | `test_index.py` | 前导零保留、多图 study 聚合、缺图报错、重复 Dicom_id 与患者一致性 |
 | `test_dataset.py` | 张量形状与取值范围、变长 collate、test 无标签 |
 | `test_check_data.py` | ID 格式与缺图、同 study 标签一致、跨 split 重叠 |
-| `test_metrics.py` | 与 sklearn 对齐、退化类 AUC 跳过、F1 仍计算、阈值与空输入校验 |
+| `test_metrics.py` | 与 sklearn 对齐、退化类 AUC 跳过、F1 仍计算、阈值解析与阈值网格、空输入校验 |
 | `test_model.py` | 参数规模、study 级均值聚合与梯度、`pos_weight` 计算 |
 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
 | `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、UTF-8 回读 |
-| `test_config.py` | 默认配置、未知字段、类型与范围校验、Path 序列化 |
+| `test_config.py` | 默认配置、`_base` 继承与循环检测、未知字段、类型与范围校验、Path 序列化 |
 | `test_utils.py` | 随机种子、设备选择、运行目录与 tag 清洗 |
 | `test_run_train.py` | 训练 CLI 产物、seed 覆盖、预训练元数据与日志 |
+| `test_run_compare.py` | 每个 run 一行、pos_weight/seed 列、summary.csv 与 summary.md、缺文件报错 |
 | `test_pipeline.py` | 单步训练 loss 有限且参数更新、checkpoint 重载逐位一致、predict→submission 闭环 |
 
 测试只使用合成小图，不读取真实影像。
@@ -215,12 +229,12 @@ device: auto
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
 
-每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml` 与 `train.log`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
+每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml` 与 `train.log`；`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 
 ## 8. 待确认与已定事项
 
 1. 全量图片根目录与训练设备（本地 GPU 或赛题 T4 镜像）。
-2. 提交策略（已确定）：默认输出全部 10 类概率（保留排序信息，利于 macro-AUC）；赛题示例默认以 0.5 为阈值，需要严格对齐示例时用 `run_infer.py --threshold 0.5`。阈值必须在 `[0, 1]`，过滤后每个 study 至少保留一行。
+2. 提交策略（P7 已冻结）：默认输出全部 10 类概率（保留排序信息，利于 macro-AUC）；赛题示例默认以 0.5 为阈值，需要严格对齐示例时用 `run_infer.py --threshold 0.5`。阈值必须在 `[0, 1]`，过滤后每个 study 至少保留一行。最终配置为 `configs/default.yaml`，实验配置只通过 `_base` 继承它，见 [experiments.md](experiments.md)。
 3. 离线服务器能否携带 ImageNet 预训练权重；不能时回退随机初始化。
 4. 类别 10 是否为“无异常”；当前按普通类别处理。
 

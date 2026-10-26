@@ -16,6 +16,7 @@ sklearn 遇到这种类会直接抛错（"Only one class present in y_true"）�
 y_true 是 0/1 标签，y_score 是 sigmoid 之后的概率（不是 logits）。
 """
 
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -116,3 +117,43 @@ def macro_f1(y_true: np.ndarray, y_score: np.ndarray, threshold: float = 0.5) ->
     """
     report = per_class_report(y_true, y_score, threshold)
     return float(report["f1"].mean())
+
+
+def parse_thresholds(text: str) -> list[float]:
+    """把 `0.3,0.4,0.5` 这样的命令行字符串拆成阈值列表。
+
+    空片段（例如结尾多写了一个逗号）直接跳过；一个数字都解析不出来时报错，
+    免得后面的对比表悄悄变成空的。
+    """
+    thresholds = []
+    for piece in text.split(","):
+        piece = piece.strip()
+        if not piece:
+            continue
+        try:
+            thresholds.append(float(piece))
+        except ValueError as error:
+            raise ValueError(f"阈值 {piece!r} 不是数字，示例：0.3,0.4,0.5") from error
+    if not thresholds:
+        raise ValueError("阈值列表不能为空，示例：0.3,0.4,0.5")
+    return thresholds
+
+
+def macro_f1_curve(
+    y_true: np.ndarray, y_score: np.ndarray, thresholds: Iterable[float]
+) -> pd.DataFrame:
+    """一次算出多个阈值下的 macro-F1，返回 `threshold`、`macro_f1` 两列的表。
+
+    P7 挑判定阈值时用它：AUC 与阈值无关，但 macro-F1 会随阈值变化，把整条
+    曲线打出来比只报一个 0.5 更能说明「这个阈值到底该不该动」。
+
+    阈值本身的合法性交给 `per_class_report` 检查（必须在 [0, 1] 内），
+    这样错误信息只有一份，不会两处各说各的。
+    """
+    rows = [
+        {"threshold": float(threshold), "macro_f1": macro_f1(y_true, y_score, float(threshold))}
+        for threshold in thresholds
+    ]
+    if not rows:
+        raise ValueError("thresholds 不能为空，至少要给一个阈值")
+    return pd.DataFrame(rows, columns=["threshold", "macro_f1"])

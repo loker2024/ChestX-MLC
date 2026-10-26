@@ -2,12 +2,12 @@
 
 ## 项目结构与模块组织
 
-本仓库用于 ChestX-MLC 胸片多标签分类。P1–P6 已完成数据底座、模型、训练、评估、推理与提交，当前处于 P7 调优准备阶段。
+本仓库用于 ChestX-MLC 胸片多标签分类。P1–P7 已完成数据底座、模型、训练、评估、推理、提交与调优冻结；当前进入复现实验与最终提交阶段。
 
-- `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md` 与数据流图；实现前先阅读赛题文档与架构说明。
-- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层，并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py` 四个入口。
-- `tests/`：pytest 测试与合成数据 fixture；当前覆盖标签、索引、数据集、数据体检、指标、模型、训练、提交与端到端链路。
-- `configs/`：运行配置，默认 `configs/default.yaml`。
+- `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md`、调优记录 `docs/experiments.md` 与数据流图；实现前先阅读赛题文档与架构说明。
+- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层，并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py`、`run_compare.py` 五个入口。
+- `tests/`：pytest 测试与合成数据 fixture；当前覆盖标签、索引、数据集、数据体检、指标、模型、训练、配置、run 对比、提交与端到端链路。
+- `configs/`：运行配置；`default.yaml` 是冻结的最终配置，`exp_*.yaml` 通过 `_base` 继承它，只写实验差异。
 - `requirements.txt`：Python 3.12 依赖及 macOS、Windows、Linux 安装说明。
 - `.gitignore`：排除数据、虚拟环境、模型权重及训练产物。
 - `CHANGELOG.md`：统一变更日志（即本仓库的 changelog）。
@@ -36,8 +36,9 @@ python -c "import torch; print(torch.__version__); print('CUDA:', torch.cuda.is_
 ```bash
 python src/check_data.py --config configs/default.yaml --full
 python src/run_train.py  --config configs/default.yaml --seed 42
-python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt
+python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
 python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
+python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
 ```
 
 `run_infer.py` 默认输出全部 10 类概率；需要按阈值过滤时加 `--threshold 0.5`（阈值必须在 `[0, 1]`）。

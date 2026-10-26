@@ -1,0 +1,13 @@
+# 快速筛查配置：把 epoch 数压短，只用来比较「哪个选项方向更好」，不追求最终成绩。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_short.yaml --tag short_baseline
+#
+# 为什么不在 default.yaml 上直接改：默认配置是最终提交用的完整配置，
+# 筛查只是阶段性的，单独放一份、通过 _base 继承默认值，两边的改动就不会互相污染。
+_base: default.yaml
+
+train:
+  epochs: 6
+  warmup_epochs: 2
+  early_stop_patience: 0   # 只跑 6 轮，不早停，保证两组对照跑满同样的轮数
