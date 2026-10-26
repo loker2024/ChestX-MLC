@@ -49,7 +49,7 @@ train:
 # 验证与推理。
 eval:
   batch_studies: 32
-  threshold: 0.5             # 生成 submission.csv 时判定“预测为该类”的概率阈值
+  threshold: 0.5             # 计算 macro-F1 的判定阈值；提交默认输出全部 10 类概率
 
 # 产物目录（都在 .gitignore 中，不入库）。
 output:
