@@ -95,3 +95,22 @@ def test_read_split_requires_label_column(unlabeled_split):
     """默认 labeled=True，缺 Predict_class 列时要明确报错。"""
     with pytest.raises(ValueError, match="Predict_class"):
         read_split(unlabeled_split["csv"], unlabeled_split["images"])
+
+
+def test_read_split_duplicate_dicom_raises(labeled_split, write_csv):
+    """同一 Dicom_id 出现两次会让同一张图被重复计数，必须报错。"""
+    rows = [*labeled_split["rows"], list(labeled_split["rows"][0])]
+    csv_path = write_csv("duplicate_dicom.csv", rows)
+
+    with pytest.raises(ValueError, match="Dicom_id"):
+        read_split(csv_path, labeled_split["images"])
+
+
+def test_read_split_inconsistent_subject_raises(labeled_split, write_csv):
+    """同一 Study_id 对应两个 Subject_id，说明患者映射坏了，不能静默取第一个。"""
+    rows = [list(row) for row in labeled_split["rows"]]
+    rows[1][1] = "subject_00002"
+    csv_path = write_csv("inconsistent_subject.csv", rows)
+
+    with pytest.raises(ValueError, match="Subject_id"):
+        read_split(csv_path, labeled_split["images"])

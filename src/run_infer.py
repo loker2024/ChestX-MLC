@@ -13,12 +13,24 @@
 from __future__ import annotations
 
 import argparse
+import math
 
 from common.config import load_config
 from common.utils import resolve_device
 from data.dataset import build_loader
 from infer.predict import load_checkpoint_model, predict_loader
 from infer.submission import build_submission_frame, validate_submission, write_submission
+
+
+def _probability(value: str) -> float:
+    """argparse 类型：把 --threshold 限制在 [0, 1] 的有限数。"""
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"阈值必须是数字，实际为 {value!r}") from error
+    if not math.isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        raise argparse.ArgumentTypeError(f"阈值必须落在 [0, 1]，实际为 {value!r}")
+    return parsed
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -31,7 +43,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--threshold",
-        type=float,
+        type=_probability,
         default=None,
         help="只输出概率 >= 该阈值的类别；默认输出全部 10 类概率",
     )
@@ -43,7 +55,7 @@ def main(argv: list[str] | None = None) -> None:
     config = load_config(args.config)
     device = resolve_device(config.device)
 
-    loader = build_loader(config, "test")
+    loader = build_loader(config, "test", pin_memory=device.type == "cuda")
     model = load_checkpoint_model(config, args.checkpoint, device)
     predictions = predict_loader(model, loader, device)
 

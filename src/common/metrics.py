@@ -40,7 +40,8 @@ def per_class_report(
     - `class_id`：赛题的类别 ID（1~10），不是数组下标；
     - `support`：这一类的正样本数；
     - `pos_rate`：正样本占比，方便一眼看出类别有多稀有；
-    - `auc` / `precision` / `recall` / `f1`：退化类为 NaN。
+    - `auc`：全阴/全正类没有定义，记为 NaN；
+    - `precision` / `recall` / `f1`：所有类都计算；全阴/全正类的零除项记 0。
     """
     y_true = np.asarray(y_true, dtype=np.float64)
     y_score = np.asarray(y_score, dtype=np.float64)
@@ -48,6 +49,12 @@ def per_class_report(
         raise ValueError(
             f"y_true 与 y_score 形状必须一致，当前为 {y_true.shape} 与 {y_score.shape}"
         )
+    if y_true.ndim != 2:
+        raise ValueError(f"y_true 与 y_score 必须是二维 [n, 类别数]，当前为 {y_true.ndim} 维")
+    if y_true.shape[0] == 0:
+        raise ValueError("y_true 不能为空，至少需要一个 study")
+    if not 0.0 <= threshold <= 1.0:
+        raise ValueError(f"threshold 必须落在 [0, 1]，当前为 {threshold}")
 
     rows: list[dict[str, Any]] = []
     for index in range(y_true.shape[1]):
@@ -64,17 +71,19 @@ def per_class_report(
             "recall": np.nan,
             "f1": np.nan,
         }
-        # 0 < 正样本数 < 样本总数，才说明这类既有正也有负，指标才有定义。
+        # AUC 只在“既有正样本又有负样本”时有定义；F1 不受这个限制。
         if 0 < positives < len(true):
             row["auc"] = float(roc_auc_score(true, score))
-            # 先按阈值把概率转成 0/1，再算这一类的二分类 F1。
-            # zero_division=0：模型一个都没预测成正类时，precision 记为 0 而不是报错。
-            precision, recall, f1, _ = precision_recall_fscore_support(
-                true, (score >= threshold).astype(np.int64), average="binary", zero_division=0
-            )
-            row["precision"] = float(precision)
-            row["recall"] = float(recall)
-            row["f1"] = float(f1)
+
+        # 先按阈值把概率转成 0/1，再算这一类的二分类 F1。
+        # zero_division=0：某类没有被预测为正、或本身没有正样本时，相关项记 0。
+        # 全阴/全正类虽然 AUC 无定义，但 F1 仍可评估，所以不能一起跳过。
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            true, (score >= threshold).astype(np.int64), average="binary", zero_division=0
+        )
+        row["precision"] = float(precision)
+        row["recall"] = float(recall)
+        row["f1"] = float(f1)
         rows.append(row)
 
     return pd.DataFrame(
@@ -99,10 +108,11 @@ def macro_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
 
 
 def macro_f1(y_true: np.ndarray, y_score: np.ndarray, threshold: float = 0.5) -> float:
-    """各类二分类 F1 的算术平均，退化类不参与平均。
+    """各类二分类 F1 的算术平均。
 
-    阈值决定「概率多大算预测为正」。阈值不同 F1 会明显变化，所以记录 F1 时
-    一定要带上阈值（P7 会做阈值对比）。
+    与 AUC 不同，F1 对全阴/全正类仍然有定义：零除项按 0 处理，因此所有类别
+    都参与平均。阈值决定「概率多大算预测为正」，记录 F1 时一定要带上阈值
+    （P7 会做阈值对比）。
     """
     report = per_class_report(y_true, y_score, threshold)
     return float(report["f1"].mean())

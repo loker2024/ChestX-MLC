@@ -71,6 +71,8 @@ def predict_loader(
         # 先转 float32 再搬 CPU：以后即使模型用半精度推理，概率也按 fp32 落表。
         probability_batches.append(torch.sigmoid(study_logits.float()).cpu())
 
+    if not probability_batches:
+        raise RuntimeError("推理集为空，无法生成预测")
     probabilities = torch.cat(probability_batches).numpy()
     frame = pd.DataFrame(probabilities, columns=[f"p{class_id}" for class_id in CLASS_IDS])
     frame.insert(0, "Study_id", study_ids)

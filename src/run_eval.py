@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> None:
     config = load_config(args.config)
     device = resolve_device(config.device)
 
-    loader = build_loader(config, args.split)
+    loader = build_loader(config, args.split, pin_memory=device.type == "cuda")
     model = load_checkpoint_model(config, args.checkpoint, device)
     predictions = predict_loader(model, loader, device)
 

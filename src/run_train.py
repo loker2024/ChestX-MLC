@@ -61,11 +61,14 @@ class _Tee:
 
 def run_training(config: Config, device: torch.device, run_dir: Path) -> dict[str, Any]:
     """真正的编排：建 loader、建模型、训练、写 metrics.csv、保存最优权重。"""
-    train_loader = build_loader(config, "train", train=True)
-    val_loader = build_loader(config, "valid")
+    pin_memory = device.type == "cuda"
+    train_loader = build_loader(config, "train", train=True, pin_memory=pin_memory)
+    val_loader = build_loader(config, "valid", pin_memory=pin_memory)
     print(f"训练 study 数: {len(train_loader.dataset)} | 验证 study 数: {len(val_loader.dataset)}")
 
     model = build_model(config).to(device)
+    pretrained_loaded = bool(getattr(model, "pretrained_loaded", False))
+    print(f"预训练权重: {'已加载' if pretrained_loaded else '未加载（随机初始化或配置关闭）'}")
     result = fit(config, model, train_loader, val_loader, device)
 
     # 一行一个 epoch，列名就是 engine 返回记录里的键，方便之后直接画曲线。
@@ -83,6 +86,7 @@ def run_training(config: Config, device: torch.device, run_dir: Path) -> dict[st
         metrics=result["best_metrics"],
         config=config,
         seed=config.seed,
+        metadata={"pretrained_loaded": pretrained_loaded, "device": str(device)},
     )
     print(f"最优权重已保存: {checkpoint_path}")
     return result
@@ -106,7 +110,10 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     with (run_dir / "train.log").open("w", encoding=CSV_ENCODING) as log_file:
-        with contextlib.redirect_stdout(_Tee(sys.stdout, log_file)):
+        with (
+            contextlib.redirect_stdout(_Tee(sys.stdout, log_file)),
+            contextlib.redirect_stderr(_Tee(sys.stderr, log_file)),
+        ):
             print(f"配置文件: {args.config}")
             print(f"运行目录: {run_dir}")
             print(f"设备: {device} | 随机种子: {config.seed}")

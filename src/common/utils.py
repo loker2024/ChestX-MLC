@@ -4,6 +4,7 @@
 """
 
 import random
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -26,7 +27,8 @@ def seed_everything(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
     # benchmark=True 会让 cuDNN 按速度自动挑卷积算法，速度略快但每次结果可能不同；
-    # 为了让实验可复现，这里关掉自动挑选，并强制使用确定性算法。
+    # 为了让实验可复现，这里关掉自动挑选并开启 cuDNN 确定性模式；
+    # 它不能保证所有算子的结果逐位一致。
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
@@ -48,8 +50,13 @@ def resolve_device(spec: str = "auto") -> torch.device:
         return torch.device("cpu")
 
     device = torch.device(spec)
-    if device.type == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError(f"配置要求使用 {spec}，但当前环境没有可用的 CUDA")
+    if device.type == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError(f"配置要求使用 {spec}，但当前环境没有可用的 CUDA")
+        if device.index is not None and not 0 <= device.index < torch.cuda.device_count():
+            raise RuntimeError(
+                f"配置要求使用 {spec}，但当前只有 {torch.cuda.device_count()} 张 CUDA 设备"
+            )
     if device.type == "mps" and not torch.backends.mps.is_available():
         raise RuntimeError(f"配置要求使用 {spec}，但当前环境没有可用的 MPS")
     return device
@@ -64,6 +71,9 @@ def make_run_dir(root: str | Path = "outputs", tag: str = "run") -> Path:
     这里用 exist_ok=False：同一秒内重复调用会直接报错，
     避免两次训练稀里糊涂地写进同一个目录、互相覆盖 best.pt。
     """
-    run_dir = Path(root) / f"{datetime.now():%Y%m%d-%H%M%S}_{tag}"
+    safe_tag = re.sub(r"[^0-9A-Za-z._-]+", "_", str(tag)).strip("._-")
+    if not safe_tag:
+        safe_tag = "run"
+    run_dir = Path(root) / f"{datetime.now():%Y%m%d-%H%M%S}_{safe_tag}"
     run_dir.mkdir(parents=True, exist_ok=False)
     return run_dir

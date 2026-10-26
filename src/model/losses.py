@@ -17,7 +17,11 @@ from torch import nn
 from common.config import Config
 
 
-def build_loss(cfg: Config, train_labels: np.ndarray | None = None) -> nn.Module:
+def build_loss(
+    cfg: Config,
+    train_labels: np.ndarray | None = None,
+    device: str | torch.device | None = None,
+) -> nn.Module:
     """构建训练损失。
 
     - 默认返回普通的 `BCEWithLogitsLoss`；
@@ -26,12 +30,15 @@ def build_loss(cfg: Config, train_labels: np.ndarray | None = None) -> nn.Module
       模型不敢轻易把稀有类全判成负；
     - 启用 pos_weight 时必须传入 `train_labels`（`[num_studies, 10]` 的 0/1
       矩阵，通常由训练集的 `StudyRecord.labels` 纵向拼成），否则没法统计频率；
+    - `device` 是损失张量（pos_weight）要放置的设备。训练/验证时必须和
+      logits 使用同一设备，否则 PyTorch 会报 "Expected all tensors to be on
+      the same device"；不传时留在 CPU，便于 CPU 单测；
     - pos_weight 只作用于训练损失，推理和指标仍用原始概率，不受影响。
 
     `pos_weight` 是训练时的一个超参数开关，P7 会对比开 / 关两种设置的指标。
     """
     if not cfg.train.pos_weight:
-        return nn.BCEWithLogitsLoss()
+        return nn.BCEWithLogitsLoss().to(device) if device is not None else nn.BCEWithLogitsLoss()
 
     if train_labels is None:
         raise ValueError(
@@ -42,12 +49,16 @@ def build_loss(cfg: Config, train_labels: np.ndarray | None = None) -> nn.Module
     positives = labels.sum(axis=0)  # [C]，每类的正样本数
     negatives = len(labels) - positives  # [C]，每类的负样本数
 
-    # 正样本数为 0 的类别在训练集里没出现过，权重给 1.0 即可；
-    # 用 np.maximum 兜住除零，避免得到 inf 后再把 loss 变成 nan。
+    # 只有“既有正样本又有负样本”的类别才需要按频率加权：
+    # - 正样本数为 0：类别在训练集里没出现，权重给 1.0；
+    # - 负样本数为 0：类别全是正样本，若权重给 0 会让正样本 loss 恒为 0，
+    #   模型完全学不到这一类，因此也给 1.0。
     pos_weight = np.where(
-        positives > 0, negatives / np.maximum(positives, 1.0), 1.0
+        (positives > 0) & (negatives > 0),
+        negatives / np.maximum(positives, 1.0),
+        1.0,
     )
 
     return nn.BCEWithLogitsLoss(
-        pos_weight=torch.tensor(pos_weight, dtype=torch.float32)
+        pos_weight=torch.tensor(pos_weight, dtype=torch.float32, device=device)
     )

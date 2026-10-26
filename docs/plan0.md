@@ -59,7 +59,7 @@ python -c "import sys; sys.path.insert(0, 'src'); from common.config import load
 - `index_images(root) -> dict[str, Path]`：递归索引，图片 stem 即 `Dicom_id`。
 - `read_split(csv_path, images_root, labeled) -> list[StudyRecord]`：按 study 聚合、校验同 study 标签一致、缺图报错。
 - `build_eval_transform(size)`、`build_train_transform(size, cfg)`：letterbox、ImageNet 归一化、默认不做水平翻转。
-- `StudyDataset`、`collate_studies(batch)`、`build_loader(cfg, split, train)`。
+- `StudyDataset`、`collate_studies(batch)`、`build_loader(cfg, split, train, pin_memory=False)`。
 
 验收：
 
@@ -172,10 +172,11 @@ python -m pytest -q tests/test_submission.py tests/test_pipeline.py
 | 阶段 | 测试文件 | 覆盖点 |
 |---|---|---|
 | P1 | `tests/conftest.py` | `src/` 入 `sys.path`，合成 CSV 与小图 fixture |
-| P2 | `test_labels.py` / `test_index.py` / `test_dataset.py` | 标签解析、前导零、多图聚合、缺图、变长 collate |
-| P4 | `test_metrics.py` / `test_model.py` | sklearn 对齐、退化类剔除、F1 阈值、参数规模与 study 聚合 |
-| P5 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
-| P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、端到端闭环 |
+| P2 | `test_labels.py` / `test_index.py` / `test_dataset.py` | 标签解析、前导零、多图聚合、缺图、重复 Dicom_id、患者一致性、变长 collate |
+| P4 | `test_metrics.py` / `test_model.py` | sklearn 对齐、退化类 AUC 跳过但 F1 仍计算、阈值与空输入、参数规模、study 聚合、pos_weight 设备 |
+| P5 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup、早停、评估指标、全 NaN AUC 报错 |
+| P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、缺列报错、端到端闭环 |
+| P7 | `test_config.py` / `test_utils.py` / `test_run_train.py` | 配置校验、种子/设备/运行目录、训练 CLI 产物与日志 |
 
 ## 退出标准
 

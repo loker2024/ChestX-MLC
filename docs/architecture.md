@@ -72,11 +72,10 @@ ChestX-MLC/
 │   ├── valid.csv
 │   ├── test.csv
 │   └── example/         # 本地联调用的小样本图片
-├── checkpoints/         # 不入库，运行时生成
-└── outputs/             # 不入库，运行时生成
+└── outputs/             # 不入库，运行时生成 best.pt、metrics.csv 等
 ```
 
-`src/.gitkeep` 在 `src/` 有实际文件后删除。当前不引入 `pyproject.toml`；若后续需要在赛题服务器上安装，再加包配置并把 `src` 设为包根。
+`src/.gitkeep` 已删除。当前不引入 `pyproject.toml`；若后续需要在赛题服务器上安装，再加包配置并把 `src` 设为包根。
 
 ## 3. 模块职责
 
@@ -95,9 +94,9 @@ ChestX-MLC/
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
 | `labels.py` | 标签字符串解析为 multi-hot；非法 token、重复类别报错 | `parse_label_string(value: str) -> np.ndarray  # float32[10]` |
-| `index.py` | 递归索引图片，按 study 聚合 CSV 行并校验一致性 | `index_images(root) -> dict[str, Path]`、`read_split(csv_path, images_root, labeled) -> list[StudyRecord]` |
+| `index.py` | 递归索引图片，按 study 聚合 CSV 行并校验标签、Dicom_id 唯一性与患者一致性 | `index_images(root) -> dict[str, Path]`、`read_split(csv_path, images_root, labeled) -> list[StudyRecord]` |
 | `transforms.py` | letterbox 缩放、ImageNet 归一化与训练增强（默认不做水平翻转） | `build_eval_transform(size)`、`build_train_transform(size, cfg)` |
-| `dataset.py` | study 级数据集与变长批拼接 | `StudyDataset`、`collate_studies(batch)`、`build_loader(cfg, split, train)` |
+| `dataset.py` | study 级数据集与变长批拼接 | `StudyDataset`、`collate_studies(batch)`、`build_loader(cfg, split, train, pin_memory=False)` |
 
 `collate_studies` 输出：
 
@@ -115,7 +114,7 @@ ChestX-MLC/
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
 | `network.py` | ResNet-18 骨干 + 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets) -> Tensor[B, 10]` |
-| `losses.py` | BCEWithLogitsLoss；可选按训练集频率计算 `pos_weight` | `build_loss(cfg, train_labels=None)` |
+| `losses.py` | BCEWithLogitsLoss；可选按训练集频率计算 `pos_weight`，并显式指定设备 | `build_loss(cfg, train_labels=None, device=None)` |
 
 ### 3.4 train：训练逻辑
 
@@ -128,7 +127,7 @@ ChestX-MLC/
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
 | `predict.py` | 加载 checkpoint 对 loader 推理，聚合为 study 级概率 | `load_checkpoint_model(config, path, device)`、`predict_loader(model, loader, device) -> pd.DataFrame`（`Study_id, p1..p10`） |
-| `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出 | `build_submission_frame(predictions, study_subjects, threshold=None)`、`validate_submission(path, test_csv, require_all_classes=True)`、`write_submission(df, path)` |
+| `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出；阈值必须在 `[0, 1]` | `build_submission_frame(predictions, study_subjects, threshold=None)`、`validate_submission(path, test_csv, require_all_classes=True)`、`write_submission(df, path)` |
 
 ### 3.6 入口脚本
 
@@ -137,7 +136,7 @@ ChestX-MLC/
 | `check_data.py` | 数据体检：CSV 字段、ID 前导零、图片齐全、跨 split 无重叠、标签分布；`--full` 检查全量数据 |
 | `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit` |
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
-| `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold` 可按概率过滤 |
+| `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -166,7 +165,7 @@ data:
   train: {csv: data/train.csv, images: data/images/train}
   valid: {csv: data/valid.csv, images: data/images/valid}
   test:  {csv: data/test.csv,  images: data/images/test}
-image: {size: 320, letterbox: true, normalize: imagenet}
+image: {size: 320, letterbox: true, normalize: imagenet, hflip: false}
 model: {backbone: resnet18, pretrained: true, num_classes: 10}
 train:
   epochs: 25
@@ -180,7 +179,7 @@ train:
   num_workers: 8
   early_stop_patience: 5
 eval: {batch_studies: 32, threshold: 0.5}
-output: {run_dir: outputs, checkpoint_dir: checkpoints}
+output: {run_dir: outputs}
 seed: 42
 device: auto
 ```
@@ -193,13 +192,16 @@ device: auto
 |---|---|
 | `conftest.py` | 把 `src/` 加入 `sys.path`；用 `tmp_path` 构造合成 CSV 与多图 study 的小图片 |
 | `test_labels.py` | 分号解析、类别 10、重复/非法 token |
-| `test_index.py` | 前导零保留、多图 study 聚合、缺图报错、跨 split 无重叠 |
+| `test_index.py` | 前导零保留、多图 study 聚合、缺图报错、重复 Dicom_id 与患者一致性 |
 | `test_dataset.py` | 张量形状与取值范围、变长 collate、test 无标签 |
 | `test_check_data.py` | ID 格式与缺图、同 study 标签一致、跨 split 重叠 |
-| `test_metrics.py` | 与 sklearn 对齐、退化类剔除、F1 阈值 |
+| `test_metrics.py` | 与 sklearn 对齐、退化类 AUC 跳过、F1 仍计算、阈值与空输入校验 |
 | `test_model.py` | 参数规模、study 级均值聚合与梯度、`pos_weight` 计算 |
 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
-| `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、UTF-8 回读 |
+| `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、UTF-8 回读 |
+| `test_config.py` | 默认配置、未知字段、类型与范围校验、Path 序列化 |
+| `test_utils.py` | 随机种子、设备选择、运行目录与 tag 清洗 |
+| `test_run_train.py` | 训练 CLI 产物、seed 覆盖、预训练元数据与日志 |
 | `test_pipeline.py` | 单步训练 loss 有限且参数更新、checkpoint 重载逐位一致、predict→submission 闭环 |
 
 测试只使用合成小图，不读取真实影像。
@@ -213,12 +215,12 @@ device: auto
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
 
-每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml` 与 `train.log`。`data/`、`checkpoints/`、`outputs/` 均在 `.gitignore` 中，不入库。
+每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml` 与 `train.log`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 
 ## 8. 待确认与已定事项
 
 1. 全量图片根目录与训练设备（本地 GPU 或赛题 T4 镜像）。
-2. 提交策略（已确定）：默认输出全部 10 类概率（保留排序信息，利于 macro-AUC）；`run_infer.py --threshold` 可按概率过滤，并保证每个 study 至少一行。
+2. 提交策略（已确定）：默认输出全部 10 类概率（保留排序信息，利于 macro-AUC）；赛题示例默认以 0.5 为阈值，需要严格对齐示例时用 `run_infer.py --threshold 0.5`。阈值必须在 `[0, 1]`，过滤后每个 study 至少保留一行。
 3. 离线服务器能否携带 ImageNet 预训练权重；不能时回退随机初始化。
 4. 类别 10 是否为“无异常”；当前按普通类别处理。
 

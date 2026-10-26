@@ -154,6 +154,7 @@ def write_config(tmp_path: Path):
                 "  num_workers: 0",
                 "eval:",
                 "  batch_studies: 2",
+                "device: cpu",
             ]
         )
         path = tmp_path / "config.yaml"

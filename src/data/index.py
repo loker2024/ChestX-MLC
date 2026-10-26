@@ -89,6 +89,16 @@ def read_split(
             f"{csv_path} 缺少必需的列 {missing_columns}，实际列为 {list(frame.columns)}"
         )
 
+    duplicated_dicom = frame.loc[
+        frame["Dicom_id"].duplicated(keep=False), "Dicom_id"
+    ].unique()
+    if len(duplicated_dicom) > 0:
+        preview = "、".join(str(value) for value in duplicated_dicom[:5])
+        raise ValueError(
+            f"{csv_path} 含重复的 Dicom_id（例如 {preview}）；"
+            "一行对应一次检查，重复行会让同一张图被计两次"
+        )
+
     images = index_images(images_root)
 
     # 先把缺图一次性找全再报错：边遍历边报错会在第一张图就中断，看不出缺口规模。
@@ -104,10 +114,16 @@ def read_split(
     grouped_rows: dict[str, list[tuple[str, Path, str]]] = {}
     subjects: dict[str, str] = {}
     for row in frame.itertuples(index=False):
+        previous_subject = subjects.get(row.Study_id)
+        if previous_subject is not None and previous_subject != row.Subject_id:
+            raise ValueError(
+                f"同一 study {row.Study_id} 对应多个 Subject_id："
+                f"{previous_subject!r} 与 {row.Subject_id!r}"
+            )
         grouped_rows.setdefault(row.Study_id, []).append(
             (row.Dicom_id, images[row.Dicom_id], row.Predict_class if labeled else "")
         )
-        subjects.setdefault(row.Study_id, row.Subject_id)
+        subjects[row.Study_id] = row.Subject_id
 
     records: list[StudyRecord] = []
     for study_id, rows in grouped_rows.items():

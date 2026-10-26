@@ -115,3 +115,43 @@ def test_early_stopping_stops_when_auc_stops_improving(config: Config, monkeypat
 
     assert len(result["history"]) == 3
     assert result["best_epoch"] == 1
+
+
+def test_fit_raises_when_all_valid_auc_are_nan(config: Config, monkeypatch) -> None:
+    """valid 全部类别都退化时不能静默保存随机初始权重，必须让训练失败。"""
+    train_loader, val_loader = _loaders(config)
+    monkeypatch.setattr(
+        engine,
+        "evaluate",
+        lambda *args, **kwargs: {
+            "loss": 0.5,
+            "macro_auc": float("nan"),
+            "macro_f1": 0.5,
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="AUC"):
+        fit(config, build_model(config), train_loader, val_loader, torch.device("cpu"))
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="需要 CUDA")
+def test_fit_with_pos_weight_on_cuda(config: Config) -> None:
+    """回归：pos_weight 必须和数据/模型在同一块 CUDA 上，否则训练第一步就会 device mismatch。"""
+    config = replace(
+        config,
+        train=replace(
+            config.train,
+            pos_weight=True,
+            epochs=1,
+            warmup_epochs=0,
+            early_stop_patience=0,
+        ),
+    )
+    train_loader, val_loader = _loaders(config)
+    device = torch.device("cuda")
+    model = build_model(config).to(device)
+
+    result = fit(config, model, train_loader, val_loader, device)
+
+    assert math.isfinite(result["history"][0]["train_loss"])
+    assert math.isfinite(result["history"][0]["valid_loss"])

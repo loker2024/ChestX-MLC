@@ -2,7 +2,7 @@
 #
 # 路径都相对“仓库根目录”理解：请在仓库根目录执行入口脚本，例如
 #     python src/run_train.py --config configs/default.yaml
-# 这样 data/、outputs/、checkpoints/ 才会落在预期位置。
+# 这样 data/、outputs/ 才会落在预期位置。
 #
 # 字段含义与取值范围见 src/common/config.py 的注释；字段名写错会直接报错。
 
@@ -53,8 +53,7 @@ eval:
 
 # 产物目录（都在 .gitignore 中，不入库）。
 output:
-  run_dir: outputs           # 每次训练新建 outputs/<时间戳>_<tag>/
-  checkpoint_dir: checkpoints
+  run_dir: outputs           # 每次训练新建 outputs/<时间戳>_<tag>/，best.pt 也在这里
 
 seed: 42
 device: auto                 # auto / cpu / cuda / cuda:0 / mps

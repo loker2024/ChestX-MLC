@@ -8,6 +8,7 @@ import torch
 
 from common.config import Config, DataConfig, ModelConfig, SplitConfig, TrainConfig
 from model.losses import build_loss
+from infer.predict import predict_loader
 from model.network import aggregate_logits, build_model
 
 
@@ -113,3 +114,43 @@ def test_pos_weight_loss_is_finite():
     value = loss(torch.randn(4, 10), torch.zeros(4, 10))
 
     assert torch.isfinite(value)
+
+
+def test_build_model_records_pretrained_state():
+    """随机初始化时也要显式记录，训练日志和 checkpoint 才能区分是否真的加载了预训练。"""
+    model = build_model(_config(pretrained=False))
+
+    assert model.pretrained_loaded is False
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="需要 CUDA")
+def test_pos_weight_on_cuda_is_finite():
+    """pos_weight 必须和 logits 在同一设备上，否则 CUDA 上会直接 device mismatch。"""
+    labels = np.zeros((10, 10))
+    labels[:3, 0] = 1.0
+
+    loss = build_loss(_config(pos_weight=True), labels, device="cuda")
+    assert loss.pos_weight is not None
+    assert loss.pos_weight.device.type == "cuda"
+
+    value = loss(
+        torch.randn(4, 10, device="cuda"),
+        torch.zeros(4, 10, device="cuda"),
+    )
+    assert torch.isfinite(value)
+
+
+def test_pos_weight_all_positive_class_is_not_zero():
+    """全正类若权重取 0，正样本 loss 恒为 0，模型永远学不到该类。"""
+    labels = np.ones((4, 10))
+    labels[:, 1:] = 0.0
+
+    loss = build_loss(_config(pos_weight=True), labels)
+
+    assert loss.pos_weight[0] == 1.0
+
+
+def test_predict_loader_empty_raises():
+    """空 loader 不能走到 torch.cat([])，否则报错信息很难定位。"""
+    with pytest.raises(RuntimeError, match="推理集为空"):
+        predict_loader(build_model(_config()), [], torch.device("cpu"))

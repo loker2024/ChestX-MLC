@@ -90,7 +90,9 @@ def collate_studies(batch: list[dict[str, Any]]) -> dict[str, Any]:
     return collated
 
 
-def build_loader(cfg: Config, split: str, train: bool = False) -> DataLoader:
+def build_loader(
+    cfg: Config, split: str, train: bool = False, pin_memory: bool = False
+) -> DataLoader:
     """按配置构建某个 split 的 DataLoader。
 
     - `train=True`：用带随机增强的预处理器、打乱 study 顺序、按
@@ -98,7 +100,9 @@ def build_loader(cfg: Config, split: str, train: bool = False) -> DataLoader:
     - `train=False`：用确定性预处理、保持 CSV 顺序、按 `cfg.eval.batch_studies`
       取批，验证和推理共用；
     - test split 的 CSV 没有 Predict_class 列，读进来时标签就是 None，
-      最终 batch 里不会出现 `labels` 键。
+      最终 batch 里不会出现 `labels` 键；
+    - `pin_memory` 由入口按实际设备传入：只有 CUDA 训练/推理才值得开启，
+      CPU 或 MPS 上保持 False，避免无意义的固定内存和弃用告警。
 
     打乱顺序按 study 而不是按图片进行：一个 study 的所有图必须在同一批里，
     否则图片维度上的均值聚合就跨批了。
@@ -124,6 +128,6 @@ def build_loader(cfg: Config, split: str, train: bool = False) -> DataLoader:
         shuffle=train,
         num_workers=cfg.train.num_workers,
         collate_fn=collate_studies,
-        # 固定内存只在 CPU→GPU 拷贝时有意义；CPU 上打开还会触发 torch 的弃用告警。
-        pin_memory=torch.cuda.is_available(),
+        # 固定内存只在 CPU→GPU 拷贝时有意义；由入口按实际设备显式传入。
+        pin_memory=pin_memory,
     )

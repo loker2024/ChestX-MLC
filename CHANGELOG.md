@@ -19,6 +19,19 @@
 - `18:28`（新增）`tests/test_submission.py`：覆盖全 10 类输出与列顺序、阈值过滤及 top-1 补位、UTF-8 写读闭环、允许过滤文件、前导零保留，以及列序错误、缺 study、未知 study、`Subject_id` 不匹配、类别越界、概率越界、重复行共 12 例。
 - `18:28`（新增）`tests/test_pipeline.py`：端到端闭环——训练 1 epoch 确认 loss 有限且参数更新，保存并重载 checkpoint 逐位一致，test 推理列名/顺序/概率范围正确，生成并校验 submission，最后直接调用 `run_eval.main` / `run_infer.main` 冒烟。
 - `18:37`（变更）`docs/architecture.md`：说明 P1–P6 已落地；补全 infer 的 `load_checkpoint_model` / `build_submission_frame` / `validate_submission` 接口与 `run_infer --threshold`，并把提交策略从待确认改为已确定（默认全部 10 类，阈值过滤可选）。
+- `19:03`（修复）`src/model/losses.py`、`src/train/engine.py`：`build_loss` 增加 `device` 参数并把 `pos_weight` 放到与 logits 相同的设备，修复 P7 打开 `train.pos_weight` 后在 CUDA 上报 `Expected all tensors to be on the same device` 的问题；全正类 `pos_weight` 从 0 改为 1.0，避免该类正样本 loss 恒为 0；训练/验证空集显式报错，valid 所有类别 AUC 均为 NaN 时不再静默保存随机初始权重。
+- `19:03`（变更）`src/model/network.py`、`src/common/checkpoint.py`、`src/run_train.py`：模型增加 `pretrained_loaded` 标记，checkpoint 增加 `metadata` 字段；训练日志记录预训练权重是否真正加载，并把 stderr（含 timm 回退 warning）一并写入 `train.log`；DataLoader 的 `pin_memory` 改为按设备显式传入。
+- `19:03`（修复）`src/common/metrics.py`：全阴/全正类只跳过 AUC，precision/recall/F1 仍计算并参与 macro-F1，零除项按 0 处理；新增二维形状、空输入与 threshold 范围校验。
+- `19:03`（修复）`src/data/index.py`：`read_split` 拒绝重复 `Dicom_id`，并拒绝同一 `Study_id` 对应多个 `Subject_id`，避免重复计图或患者映射被静默覆盖。
+- `19:03`（修复）`src/infer/submission.py`、`src/run_infer.py`：`--threshold` 与 `build_submission_frame` 统一限制为 `[0,1]` 的有限数；未知 study 与 test.csv 缺 `Study_id`/`Subject_id` 时给出明确错误；推理 loader 按设备传入 `pin_memory`。
+- `19:14`（修复）`src/infer/submission.py`、`tests/test_submission.py`：test.csv 中同一 study 对应多个 Subject_id 时显式报错，避免患者映射被静默覆盖。
+- `19:14`（变更）`tests/test_pipeline.py`：端到端覆盖 `run_infer --threshold` 过滤分支。
+- `19:20`（变更）`tests/test_engine.py`：新增 CUDA 上 `fit` + `pos_weight` 的回归测试，确保训练循环而不只是 loss 构造能跑通设备路径。
+- `19:03`（修复）`src/infer/predict.py`：空 DataLoader 显式报错，避免 `torch.cat([])` 抛出难以定位的底层异常。
+- `19:03`（变更）`src/common/config.py`、`configs/default.yaml`：移除未使用的 `output.checkpoint_dir`；明确 `eval.threshold` 只用于 macro-F1，不影响训练、AUC 或默认全 10 类提交。
+- `19:03`（变更）`src/common/utils.py`、`src/data/dataset.py`、`src/data/transforms.py`、`src/run_eval.py`：`make_run_dir` 清洗 tag，`resolve_device` 校验 `cuda:N` 的卡号；`build_loader` 的 `pin_memory` 默认关闭、由入口显式开启；`RandomAffine` 使用双线性插值；评估入口按设备开启 `pin_memory`。
+- `19:03`（变更）`tests/conftest.py`、`tests/test_engine.py`、`tests/test_index.py`、`tests/test_metrics.py`、`tests/test_model.py`、`tests/test_submission.py`，新增 `tests/test_config.py`、`tests/test_utils.py`、`tests/test_run_train.py`：覆盖 pos_weight CUDA 设备、全正类权重、全 NaN AUC、重复 Dicom_id/患者冲突、F1 退化类口径、阈值/缺列/未知 study、配置与工具函数、训练 CLI 产物与日志；全套 `103 passed, 1 skipped`。
+- `19:03`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`：更新 P1–P6 已落地状态、`src/`/`tests/`/`configs/` 的实际结构、常用入口、pytest 命令与 `checkpoint_dir` 移除；同步 `hflip`、`build_loader(pin_memory)`、阈值范围、退化类 F1 口径与新增测试映射。
 
 ## 2026-10-22
 

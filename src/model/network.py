@@ -39,6 +39,7 @@ def build_model(cfg: Config) -> nn.Module:
             pretrained=cfg.model.pretrained,
             num_classes=cfg.model.num_classes,
         )
+        model.pretrained_loaded = bool(cfg.model.pretrained)
     except (OSError, RuntimeError) as error:
         warnings.warn(
             f"加载 {cfg.model.backbone} 的预训练权重失败（{error}），改为随机初始化；"
@@ -50,6 +51,7 @@ def build_model(cfg: Config) -> nn.Module:
             pretrained=False,
             num_classes=cfg.model.num_classes,
         )
+        model.pretrained_loaded = False
     return model
 
 

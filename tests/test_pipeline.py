@@ -134,3 +134,22 @@ def test_pipeline_from_training_to_submission(
     )
     assert cli_submission_path.exists()
     validate_submission(cli_submission_path, config.data.test.csv)
+
+    # 6. 阈值分支也要走一遍 CLI：过滤后允许每个 study 少于 10 行。
+    threshold_path = tmp_path / "cli_threshold_submission.csv"
+    run_infer.main(
+        [
+            "--config",
+            str(config_path),
+            "--checkpoint",
+            str(checkpoint_path),
+            "--threshold",
+            "0.5",
+            "--out",
+            str(threshold_path),
+        ]
+    )
+    filtered = validate_submission(
+        threshold_path, config.data.test.csv, require_all_classes=False
+    )
+    assert len(filtered) >= len(predictions)

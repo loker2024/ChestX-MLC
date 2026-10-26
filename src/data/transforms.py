@@ -12,6 +12,7 @@ from typing import Callable
 import torch
 from PIL import Image
 from torchvision import transforms as T
+from torchvision.transforms import InterpolationMode
 
 from common.config import ImageConfig
 from common.constants import IMAGENET_MEAN, IMAGENET_STD
@@ -74,7 +75,13 @@ def build_train_transform(size: int, cfg: ImageConfig) -> Callable[[Image.Image]
 
     steps: list[Callable] = [
         *geometry,
-        T.RandomAffine(degrees=7, translate=(0.05, 0.05), scale=(0.9, 1.1), fill=0),
+        T.RandomAffine(
+            degrees=7,
+            translate=(0.05, 0.05),
+            scale=(0.9, 1.1),
+            interpolation=InterpolationMode.BILINEAR,
+            fill=0,
+        ),
         T.ColorJitter(brightness=0.15, contrast=0.15),
     ]
     if cfg.hflip:

@@ -1,6 +1,6 @@
 """模型权重的保存与加载。
 
-checkpoint 里不只存权重，还存了优化器状态、epoch、指标、配置和 seed。
+checkpoint 里不只存权重，还可以存优化器状态、epoch、指标、配置、seed 与额外 metadata。
 这样拿到任意一个 best.pt，都能回答“它是在什么配置、什么种子下训练出来的”，
 复现和排错时不用再翻当时的命令行。
 """
@@ -22,6 +22,7 @@ def save_checkpoint(
     metrics: dict[str, float] | None = None,
     config: Config | None = None,
     seed: int | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Path:
     """把训练状态保存到 path，返回实际写入的路径。
 
@@ -37,6 +38,7 @@ def save_checkpoint(
         "metrics": metrics,
         "config": config.to_dict() if config is not None else None,
         "seed": seed,
+        "metadata": metadata,
     }
 
     path = Path(path)

@@ -117,7 +117,7 @@ class EvalConfig:
     """验证 / 推理阶段参数。"""
 
     batch_studies: int = 32  # 验证与推理的 batch 大小（同样按 study 计）
-    threshold: float = 0.5  # 生成提交文件时判定“预测为该类”的概率阈值
+    threshold: float = 0.5  # 计算 macro-F1 的判定阈值；不参与训练，也不影响 AUC
 
     def __post_init__(self) -> None:
         if self.batch_studies < 1:
@@ -131,7 +131,6 @@ class OutputConfig:
     """训练与推理产物的输出目录。"""
 
     run_dir: Path = Path("outputs")  # 每次训练在其下新建 <时间戳>_<tag> 子目录
-    checkpoint_dir: Path = Path("checkpoints")
 
 
 @dataclass(frozen=True)

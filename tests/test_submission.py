@@ -196,3 +196,55 @@ def test_validate_submission_rejects_duplicate_rows(
 
     with pytest.raises(ValueError, match="重复"):
         _write_and_validate(tmp_path, frame, unlabeled_split["csv"])
+
+
+def test_build_submission_frame_rejects_invalid_threshold(predictions):
+    for threshold in (-0.1, 1.1, float("nan")):
+        with pytest.raises(ValueError, match="threshold"):
+            build_submission_frame(
+                predictions, STUDY_TO_SUBJECT, threshold=threshold
+            )
+
+
+def test_build_submission_frame_rejects_unknown_study(predictions):
+    with pytest.raises(ValueError, match="不在 study_subjects"):
+        build_submission_frame(predictions, {"study_00000": "subject_00000"})
+
+
+def test_validate_submission_rejects_missing_test_columns(tmp_path, predictions, write_csv):
+    frame = _valid_frame(predictions)
+    path = write_submission(frame, tmp_path / "submission.csv")
+    test_csv = write_csv(
+        "test_missing_columns.csv",
+        [["pic_000000", "subject_00000"]],
+        header=["Dicom_id", "Subject_id"],
+    )
+
+    with pytest.raises(ValueError, match="缺少必需的列"):
+        validate_submission(path, test_csv)
+
+
+def test_run_infer_rejects_out_of_range_threshold():
+    import run_infer
+
+    with pytest.raises(SystemExit):
+        run_infer.parse_args(["--checkpoint", "unused.pt", "--threshold", "1.5"])
+
+
+def test_validate_submission_rejects_conflicting_test_subjects(
+    tmp_path, predictions, write_csv
+):
+    frame = _valid_frame(predictions)
+    path = write_submission(frame, tmp_path / "submission.csv")
+    test_csv = write_csv(
+        "test_conflicting_subjects.csv",
+        [
+            ["pic_000000", "subject_00000", "study_00000", "AP", "Erect", "48", "64"],
+            ["pic_000001", "subject_99999", "study_00000", "AP", "Erect", "48", "64"],
+            ["pic_000002", "subject_00001", "study_00001", "AP", "Erect", "48", "64"],
+        ],
+        header=TEST_HEADER,
+    )
+
+    with pytest.raises(ValueError, match="多个 Subject_id"):
+        validate_submission(path, test_csv)

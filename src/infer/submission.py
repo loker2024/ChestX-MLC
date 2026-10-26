@@ -16,6 +16,7 @@ infer.predict 产出的是宽表（Study_id + p1..p10），这里负责把宽表
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -46,9 +47,16 @@ def build_submission_frame(
     返回列顺序固定为 SUBMISSION_COLUMNS；study 顺序与 predictions 一致，
     study 内部按类别 ID 1~10 排列。
     """
+    if threshold is not None and not (
+        math.isfinite(threshold) and 0.0 <= threshold <= 1.0
+    ):
+        raise ValueError(f"threshold 必须落在 [0, 1] 或为 None，当前为 {threshold!r}")
+
     rows: list[tuple[str, str, int, float]] = []
     for record in predictions.itertuples(index=False):
         study_id = str(record.Study_id)
+        if study_id not in study_subjects:
+            raise ValueError(f"predictions 里的 study {study_id} 不在 study_subjects 中")
         subject_id = study_subjects[study_id]
         probabilities = {
             class_id: float(getattr(record, f"p{class_id}")) for class_id in CLASS_IDS
@@ -105,6 +113,20 @@ def validate_submission(
     test_frame = pd.read_csv(
         Path(test_csv), dtype=str, keep_default_na=False, encoding=CSV_ENCODING
     )
+    missing_test_columns = sorted({"Study_id", "Subject_id"} - set(test_frame.columns))
+    if missing_test_columns:
+        raise ValueError(
+            f"{test_csv} 缺少必需的列 {missing_test_columns}，"
+            f"实际列为 {list(test_frame.columns)}"
+        )
+    subject_counts = test_frame.groupby("Study_id")["Subject_id"].nunique()
+    conflicting = subject_counts[subject_counts > 1]
+    if not conflicting.empty:
+        study_id = conflicting.index[0]
+        raise ValueError(
+            f"test.csv 中 study {study_id} 对应多个 Subject_id，"
+            "无法确定提交文件应使用的患者 ID"
+        )
     subjects = dict(zip(test_frame["Study_id"], test_frame["Subject_id"]))
 
     frame = pd.read_csv(

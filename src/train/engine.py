@@ -102,6 +102,8 @@ def train_one_epoch(
         total_loss += loss.item() * num_studies
         total_studies += num_studies
 
+    if total_studies == 0:
+        raise RuntimeError("训练集为空，无法计算 loss")
     return total_loss / total_studies
 
 
@@ -137,6 +139,8 @@ def evaluate(
         logits_list.append(study_logits.float().cpu())
         labels_list.append(labels.float().cpu())
 
+    if total_studies == 0:
+        raise RuntimeError("验证集为空，无法计算指标")
     y_score = torch.sigmoid(torch.cat(logits_list)).numpy()
     y_true = torch.cat(labels_list).numpy()
     return {
@@ -169,9 +173,9 @@ def fit(
     )
     scheduler = _build_scheduler(optimizer, config.train.warmup_epochs)
     scaler = torch.amp.GradScaler(device.type, enabled=_amp_enabled(config, device))
-    criterion = build_loss(config, _train_labels(train_loader))
+    criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
 
-    # best_state 先放一份初始权重：万一整场训练 AUC 都是 NaN，至少还有东西可存。
+    # best_state 记录当前最优权重；若整场 AUC 都无效，下面会显式报错而不是保存随机权重。
     best_state = _snapshot(model)
     best_auc = float("nan")
     best_epoch = 0
@@ -221,6 +225,12 @@ def fit(
                 break
 
         scheduler.step()
+
+    if best_epoch == 0:
+        raise RuntimeError(
+            "验证集所有类别的 AUC 都是 NaN（可能全为阳性或全为阴性），无法挑选最优权重；"
+            "请检查 valid 划分或增加验证样本"
+        )
 
     return {
         "history": history,

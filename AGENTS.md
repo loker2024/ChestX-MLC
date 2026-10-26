@@ -2,17 +2,17 @@
 
 ## 项目结构与模块组织
 
-本仓库用于 ChestX-MLC 胸片多标签分类，目前处于初始化阶段，尚无训练、推理入口或测试用例。
+本仓库用于 ChestX-MLC 胸片多标签分类。P1–P6 已完成数据底座、模型、训练、评估、推理与提交，当前处于 P7 调优准备阶段。
 
-- `docs/`：赛题说明、技术规格说明书 `docs/spec.md` 与数据流图；实现前先阅读赛题文档与规格说明书。
-- `src/`：可复用源码；当前仅有 `.gitkeep` 占位文件。
-- `tests/`：测试用例；当前仅有 `.gitkeep` 占位文件。
-- `configs/`：实验与运行配置；当前仅有 `.gitkeep` 占位文件。
+- `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md` 与数据流图；实现前先阅读赛题文档与架构说明。
+- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层，并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py` 四个入口。
+- `tests/`：pytest 测试与合成数据 fixture；当前覆盖标签、索引、数据集、数据体检、指标、模型、训练、提交与端到端链路。
+- `configs/`：运行配置，默认 `configs/default.yaml`。
 - `requirements.txt`：Python 3.12 依赖及 macOS、Windows、Linux 安装说明。
 - `.gitignore`：排除数据、虚拟环境、模型权重及训练产物。
 - `CHANGELOG.md`：统一变更日志（即本仓库的 changelog）。
 
-新增实现时，将可复用代码放入 `src/`，测试放入 `tests/`，配置放入 `configs/`。`.gitkeep` 仅用于让 Git 跟踪空目录，可在目录加入实际文件后移除。数据放在已忽略的 `data/` 或 `datasets/`，权重和结果分别放入 `checkpoints/`、`outputs/`。
+新增实现时，将可复用代码放入 `src/`，测试放入 `tests/`，配置放入 `configs/`。`.gitkeep` 仅用于让 Git 跟踪空目录，目录已有实际文件后应删除。数据放在已忽略的 `data/` 或 `datasets/`；训练产物（含 `best.pt`）放在每次运行新建的 `outputs/<时间戳>_<tag>/`，不再使用单独的 `checkpoints/`。
 
 ## 环境搭建与开发命令
 
@@ -31,7 +31,16 @@ python -m pip check
 python -c "import torch; print(torch.__version__); print('CUDA:', torch.cuda.is_available()); print('MPS:', torch.backends.mps.is_available())"
 ```
 
-仓库尚无构建、训练或推理命令；新增入口时同步补充用法。
+常用入口（在仓库根目录执行）：
+
+```bash
+python src/check_data.py --config configs/default.yaml --full
+python src/run_train.py  --config configs/default.yaml --seed 42
+python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt
+python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
+```
+
+`run_infer.py` 默认输出全部 10 类概率；需要按阈值过滤时加 `--threshold 0.5`（阈值必须在 `[0, 1]`）。
 
 ## 编码风格与命名
 
@@ -39,7 +48,7 @@ Python 使用四空格缩进，公开函数添加类型注解；模块、函数�
 
 ## 测试与实验验证
 
-目前未配置测试框架或覆盖率门槛。新增代码时建议采用 `pytest`，先添加测试依赖，再使用 `python -m pytest`；文件命名为 `tests/test_<module>.py`，测试函数以 `test_` 开头。
+测试框架为 `pytest`（依赖已写入 `requirements.txt`），在仓库根目录运行 `python -m pytest`。新增测试文件命名为 `tests/test_<module>.py`，测试函数以 `test_` 开头；当前未配置覆盖率门槛。
 
 优先验证标签映射、同次检查多图聚合、患者划分无泄漏及 CSV 字段与概率范围。使用小型合成数据测试，禁止提交真实影像。模型变更报告随机种子、数据划分、设备、Macro-AUC 与 Macro-F1；未执行的验证须明确说明。
 
