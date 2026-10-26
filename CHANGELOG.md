@@ -41,6 +41,8 @@
 - `19:44`（变更）`tests/test_config.py`、`tests/test_metrics.py`：补 `_base` 的合并覆盖、循环继承、父文件缺失与实验配置直接加载，以及阈值解析、阈值曲线的测试。
 - `19:44`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`、`configs/default.yaml`：同步 P1–P7 状态、`configs/exp_*.yaml`、`docs/experiments.md`、`run_compare.py` 入口、`--thresholds` 命令、`_base` 继承说明与测试映射，并把 `default.yaml` 标注为 P7 冻结配置。
 - `19:46`（新增）`docs/experiments.md`：P7 调优记录——实验环境、实验矩阵、复现命令与冻结结论，对比表由 `run_compare.py` 的输出回填。
+- `20:12`（变更）`docs/experiments.md`：改写为「训练在训练环境执行」口径——保留实验矩阵与可直接复制的命令，结果表改为待回填占位，并说明本机只跑 pytest 与文档校验。
+- `20:12`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`：同步「本机不训练、P7 对照实验和最终提交在训练环境执行」的分工与阶段状态。
 
 ## 2026-10-22
 

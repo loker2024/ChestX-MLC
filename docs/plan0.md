@@ -177,7 +177,7 @@ python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.
 python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<final>/best.pt --out outputs/submission.csv
 ```
 
-期望：对比表可复现；最终 `submission.csv` 通过 `validate_submission`。
+期望（在训练环境执行）：对比表可复现；最终 `submission.csv` 通过 `validate_submission`。
 
 ## 测试映射
 

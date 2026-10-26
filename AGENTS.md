@@ -2,7 +2,7 @@
 
 ## 项目结构与模块组织
 
-本仓库用于 ChestX-MLC 胸片多标签分类。P1–P7 已完成数据底座、模型、训练、评估、推理、提交与调优冻结；当前进入复现实验与最终提交阶段。
+本仓库用于 ChestX-MLC 胸片多标签分类。P1–P7 的代码、配置与文档已完成；P7 的对照实验和最终提交在训练环境（远程 GPU / 赛题服务器）执行，本机只做代码与测试验证。
 
 - `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md`、调优记录 `docs/experiments.md` 与数据流图；实现前先阅读赛题文档与架构说明。
 - `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层，并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py`、`run_compare.py` 五个入口。

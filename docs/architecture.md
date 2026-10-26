@@ -2,7 +2,7 @@
 
 本文件记录 ChestX-MLC 的目标代码结构、模块边界与运行方式。赛题背景、数据格式与评测口径见 [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md)，数据流示意见 [胸片多标签分类数据流](胸片多标签分类数据流.svg)。
 
-> P1–P7 已按本文件落地；实际改动与进度以 `CHANGELOG.md` 为准，调优结论与复现命令见 [experiments.md](experiments.md)。
+> P1–P7 的代码与配置已按本文件落地；P7 对照实验在训练环境执行。实际改动与进度以 `CHANGELOG.md` 为准，调优结论与复现命令见 [experiments.md](experiments.md)。
 
 ## 1. 设计约束
 

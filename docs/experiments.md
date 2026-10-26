@@ -1,16 +1,17 @@
 # P7 调优记录
 
-P7 的目标是把「训练什么、怎么评、交什么」固定下来。本文件记录实验环境、对照实验的
-矩阵与复现命令，以及最终的冻结结论；数字一律来自 `src/run_compare.py` 重算的结果
-（`outputs/compare/summary.md`），而不是手抄训练日志。
+P7 的目标是把「训练什么、怎么评、交什么」固定下来。训练统一放到训练环境（远程 GPU /
+赛题服务器）执行，本机只负责代码与文档验证，避免两边环境差异污染实验结果；因此本文件
+提供可直接复制的命令、实验矩阵和结果回填表格，数字一律来自 `src/run_compare.py` 生成的
+`summary.md`，不手抄训练日志。
 
 ## 实验环境
 
 | 项目 | 值 |
 | --- | --- |
-| 数据 | 全量 train 30,344 图 / valid 1,422 图（study 级，`data/images` 指向本地副本） |
-| 设备 | NVIDIA GeForce RTX 4060 Laptop（WSL Ubuntu 24.04，CUDA 12.8） |
-| 软件 | Python 3.12.3、torch 2.10.0+cu128、timm 1.0.30 |
+| 数据 | 全量 train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
+| 设备 | 训练环境 GPU（本机 RTX 4060 Laptop 只跑 pytest，不训练） |
+| 软件 | Python 3.12、torch 2.x（CUDA）、timm 1.0.30 |
 | 随机种子 | 42（所有 run 相同） |
 | 输入 | 320×320，letterbox，ImageNet 归一化，默认无水平翻转 |
 | 骨干 | timm `resnet18.a1_in1k`，ImageNet 预训练 |
@@ -29,7 +30,13 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。本�
 
 ## 复现命令
 
+在训练环境的仓库根目录执行；先确认 `data/images` 指向全量数据（或直接把
+`configs/default.yaml` 里的 `data.<split>.images` 改成本机路径）。
+
 ```bash
+# 0) 数据体检（可选，确认路径、标签与划分没问题）
+python src/check_data.py --config configs/default.yaml --full
+
 # 1) 两个短周期对照：同一 seed，只差 pos_weight
 python src/run_train.py --config configs/exp_short.yaml --seed 42 --tag short_baseline
 python src/run_train.py --config configs/exp_short_pos_weight.yaml --seed 42 --tag short_pos_weight
@@ -45,25 +52,36 @@ python src/run_infer.py --config configs/default.yaml \
     --checkpoint outputs/<final>/best.pt --out outputs/submission.csv
 ```
 
-`run_compare.py` 读的是每个 run 目录里存档的 `config.yaml`，所以即使仓库里的默认配置
-后来改了，旧 run 的指标也不会被「穿越式」改写。
+`run_compare.py` 读的是每个 run 目录里存档的 `config.yaml`，而不是仓库当前的默认配置，
+所以之后改默认值也不会「穿越式」改写旧 run 的指标。
 
 ## 结果
 
-> 等实验跑完后填写：直接贴 `outputs/compare/summary.md` 的表格，并记录每轮耗时。
+> 待训练环境跑完两组短周期对照后回填：把 `outputs/compare/summary.md` 的表格原样贴到
+> 这里，再补一列每轮耗时。下面先保留空行，方便直接填。
 
 | run | pos_weight | seed | best_epoch | macro-AUC | f1@0.3 | f1@0.4 | f1@0.5 | f1@0.6 | f1@0.7 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 待填 | | | | | | | | | |
+| `short_baseline` | 否 | 42 | | | | | | | |
+| `short_pos_weight` | 是 | 42 | | | | | | | |
+
+判读方法：
+
+- 先看 macro-AUC：它不受阈值影响，是模型排序能力的主指标；
+- 再看 `f1@0.5` 与整条阈值曲线：只有当别的阈值在各 run 上都更好时，才值得调整
+  `eval.threshold`；
+- `pos_weight` 打开后如果只有少数类 recall 上升、其余类掉得更多，macro-F1 不升反降，
+  就维持关闭。
 
 ## 冻结结论
 
-1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不再做阈值过滤——赛题的
-   macro-AUC 需要排序信息，全 10 类输出更稳妥；`--threshold 0.5` 只用于对齐赛题
-   示例的过滤形态。
-2. **配置**：`configs/default.yaml` 即最终配置，实验配置一律用 `_base` 继承它，
-   不在实验文件里复制一份超参。
+1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
+   macro-AUC 需要排序信息，全 10 类输出更稳妥；`--threshold 0.5` 只用于对齐赛题示例
+   的过滤形态。
+2. **配置**：`configs/default.yaml` 即最终配置（25 epoch、`pos_weight: false`、
+   `eval.threshold: 0.5`）；实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
+   在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果。
 3. **复现口径**：seed 固定 42，指标统一由 `run_compare.py` 在同一份 valid 上重算，
    训练设备与预训练加载情况记在 checkpoint 的 `metadata` 里。
-
-（阈值与 pos_weight 的取舍等结果出来后补在这里。）
+4. **分工**：本机只跑 `python -m pytest` 和文档校验；训练相关命令都在训练环境执行，
+   本文件随结果回填。
