@@ -48,3 +48,5 @@ env/
 # ---- 预测结果 ----
 /predictions/
 submission_*.csv
+/example
+docs/sju.md

@@ -20,6 +20,7 @@
 - `08:59`（新增）`tests/test_resume.py`：覆盖中断后进度与最优快照恢复、学习率与一次跑完的轨迹一致、CLI 补跑剩余 epoch 且不新建目录、省略 `--config` 时沿用存档配置，以及缺 `last.pt`、`last.pt` 无 `extras` 的报错。
 - `08:59`（变更）`tests/test_config.py`：补 `config_from_dict` 的 `to_dict` 往返与空字典报错两例。
 - `08:59`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`：补 `--resume` 命令、`last.pt` / `config_resume.yaml` 产物说明、`fit` 新签名与 `train.engine` 职责，并把断点续训加入 P5 验收与测试映射。
+- `10:25`（新增）`docs/manual.md`：新增 `loker` 分支使用手册，分环境与数据准备、配置字段与 `_base` 继承、`outputs/` 目录与 `best.pt` / `last.pt` / `metrics.csv` 等产物、训练 / 续训 / 验证 / 推理 / 对比命令、典型工作流与排错速查，并附命令与产物索引。
 
 ## 2026-10-26
 
