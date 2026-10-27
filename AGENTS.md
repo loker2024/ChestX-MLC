@@ -2,11 +2,11 @@
 
 ## 项目结构与模块组织
 
-本仓库用于 ChestX-MLC 胸片多标签分类。P1–P7 的代码、配置与文档已完成；P7 的对照实验和最终提交在训练环境（远程 GPU / 赛题服务器）执行，本机只做代码与测试验证。
+本仓库用于 ChestX-MLC 胸片多标签分类。P1–P8 的代码、配置与文档已完成；P7 的对照实验、P8 的耗时实测与最终提交在训练环境（远程 GPU / 赛题服务器）执行，本机只做代码与测试验证。
 
-- `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md`、调优记录 `docs/experiments.md` 与数据流图；实现前先阅读赛题文档与架构说明。
-- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层，并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py`、`run_compare.py` 五个入口。
-- `tests/`：pytest 测试与合成数据 fixture；当前覆盖标签、索引、数据集、数据体检、指标、模型、训练、配置、run 对比、提交与端到端链路。
+- `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md`、耗时自检说明 `docs/cost.md`、调优记录 `docs/experiments.md` 与数据流图；实现前先阅读赛题文档与架构说明。
+- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层（`infer/profiling.py` 放耗时评测口径），并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py`、`run_compare.py` 五个入口；仓库根目录的 `cost.py` 是赛题第 7 条耗时自检入口。
+- `tests/`：pytest 测试与合成数据 fixture；当前覆盖标签、索引、数据集、数据体检、指标、模型、训练、配置、run 对比、提交、耗时自检与端到端链路。
 - `configs/`：运行配置；`default.yaml` 是冻结的最终配置，`exp_*.yaml` 通过 `_base` 继承它，只写实验差异。
 - `requirements.txt`：Python 3.12 依赖及 macOS、Windows、Linux 安装说明。
 - `.gitignore`：排除数据、虚拟环境、模型权重及训练产物。
@@ -40,9 +40,14 @@ python src/run_train.py  --resume outputs/<run>
 python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
 python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
 python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
+python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 \
+    --config configs/default.yaml --checkpoint outputs/<run>/best.pt \
+    --report outputs/cost_report.json
 ```
 
 `run_infer.py` 默认输出全部 10 类概率；需要按阈值过滤时加 `--threshold 0.5`（阈值必须在 `[0, 1]`）。
+
+`cost.py` 按赛题第 7 条测单张端到端耗时：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮，先每张取 3 轮均值再对 100 张平均，与 100 ms 上限比较，并核对现场预测与 `submission.csv` 一致；参数与口径见 `docs/cost.md`。缺省会自动查找配置与 checkpoint，也可显式传 `--config` / `--checkpoint`；`--precision fp16` 时须在提交说明中声明。
 
 ## 编码风格与命名
 

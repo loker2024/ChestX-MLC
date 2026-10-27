@@ -43,7 +43,7 @@ class StudyDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         record = self.records[index]
-        images = [self.transform(_load_image(path)) for path in record.image_paths]
+        images = [self.transform(load_image(path)) for path in record.image_paths]
 
         item: dict[str, Any] = {
             "images": torch.stack(images),  # [n, 3, size, size]，n = 这次检查的图片数
@@ -54,11 +54,14 @@ class StudyDataset(Dataset):
         return item
 
 
-def _load_image(path: Path) -> Image.Image:
+def load_image(path: Path) -> Image.Image:
     """读一张图并统一成 RGB。
 
     用 with 打开是为了读完立刻释放文件句柄——全量数据几万张图、num_workers
     又有多个进程，句柄泄漏在长训练里会变成 "too many open files"。
+
+    推理脚本（infer.predict.predict_image / predict_study）也复用这个函数，
+    保证「数据集里读图」和「单张计时里读图」是同一段代码、同一种 RGB 转换。
     """
     with Image.open(path) as image:
         return image.convert("RGB")

@@ -24,6 +24,14 @@
 - `13:06`（新增）`docs/training_log.md`：新增训练记录文档。按骨干分二级标题，每节固定三件套——ASCII 全流程链路图（数据 → 聚合 → 模型 → 损失/指标 → 产物，逐环节标注实现文件与行号）、推理 / 评估 / 对比链路图、参数 → 生效位置索引表，并附可复制的记录模板；每次 run 用三级标题记录，原样贴入所用配置文件并链接 `configs/`，附运行命令、环境、产物路径与 `metrics.csv` 表；末尾以三级标题给出汇总表与判读口径，另设环境说明一节。
 - `13:37`（变更）`docs/training_log.md`：回填 RUN-001 `short_baseline` 实测结果——6 轮、最优 epoch 6、valid macro-AUC 0.7858、macro-F1@0.5 0.2796、耗时 28m41s，产物 `outputs/20261027-050417_short_baseline/`；汇总表同步填入该行，RUN-002 / RUN-003 标注为待运行。
 - `14:31`（变更）`docs/experiments.md`：新增「后续待验证优化项（未排期）」一节，登记视图元信息（`ViewPosition`）、阈值曲线选点、训练轮数、`pos_weight`、聚合方式消融、更高分辨率 / TTA 六项想法及各自改动点，明确均需等 25 轮基线出结果后一次只改一个变量做对照。
+- `16:52`（新增）`cost.py`：新增赛题第 7 条耗时自检入口，按 `python cost.py <submission.csv> <pictures_100> <pictures_5>` 调用；5 张预热后对 100 张图 `batch=1` 串行跑 3 轮，单张耗时先按 3 轮取均值、再对 100 张取平均并与 100 ms 上限比较；复用 `infer.predict` 的加载与推理函数，计时后按 study 聚合现场预测并与 `submission.csv` 比对，输出对齐规则示例的 `[CONCLUSION]` 行；支持 `--config` / `--checkpoint` 自动查找、`--device`、`--precision fp16`、`--rounds`、`--threshold`、`--tolerance` 与 `--report` JSON，退出码 0 / 1 / 2 区分成功、超限或不一致、参数或文件错误。
+- `16:52`（变更）`src/infer/predict.py`：新增 `build_eval_inference_transform`、`predict_image`（单图，计时用）、`predict_study`（study 聚合，一致性校验用），并把 `predict_loader` 重构为共用内部 `_forward_probabilities`，保证批量 loader 与单图 / 单 study 推理走同一套前向、聚合与 sigmoid。
+- `16:52`（新增）`src/infer/profiling.py`：新增耗时评测口径模块，提供图片发现与 `<subject_id>/<study_id>` 身份解析、提交文件读取及列名 / 取值 / 重复校验、阈值选择、study 预测比对、计时统计与结论格式化，集中常量 `COST_LIMIT_MS` / `DEFAULT_ROUNDS` / `DEFAULT_WARMUP_IMAGES` / `DEFAULT_TOLERANCE`；不导入 torch，便于单测。
+- `16:52`（变更）`src/data/dataset.py`：`_load_image` 改为公开 `load_image` 供推理脚本复用，行为不变。
+- `16:52`（新增）`tests/test_cost.py`：新增 34 个测试，覆盖图片发现与身份解析、提交文件五类异常、阈值选择、比对一致 / 概率差 / 缺 study / 过滤提交、计时统计算术与超限、结论格式化、`predict_image` 与 `predict_study` / `predict_loader` 数值一致，以及 `main` 端到端（`[CONCLUSION]`、超限返回 1、不一致返回 1、缺权重返回 2）与 `--report` 落盘。
+- `16:52`（新增）`docs/cost.md`：新增耗时自检说明，含调用方式与参数、配置与权重自动查找顺序、计时区间与 3 轮口径、与 `predict.py` 的复用关系、study 一致性比对前提（计时图需按 study 成组）、FP16 声明、JSON 报告字段、本地验证记录与提交清单。
+- `16:52`（变更）`docs/architecture.md`、`docs/plan0.md`、`AGENTS.md`：目录树与测试布局补 `cost.py` / `infer/profiling.py` / `tests/test_cost.py` / `docs/cost.md`，入口表与常用命令补 `cost.py`，实现计划新增 P8「耗时自检与提交包」及对应测试映射与退出标准。
+- `16:54`（新增）`train01.plan`：新增 RUN-001～004 训练执行计划（仓库根目录），含训练前置检查、RUN 矩阵（001R 重跑基线 / 002 `pos_weight` 短跑 / 003 25 轮正式基线 / 004A 延长到 40 轮 / 004B `pos_weight` 正式版）、逐 run 命令与判读门、RUN-001R 之后接 `cost.py` 的耗时自检流程（含按 study 整组抽计时图的硬规则）、决策门与时间线、风险与明确不做的方向；本文件只放计划、命令与判读门，实测结果仍回填 `docs/training_log.md`。
 
 ## 2026-10-26
 

@@ -20,6 +20,7 @@
 | P5 | 训练 | P2、P4 | 是 |
 | P6 | 推理与提交 | P5 | 是 |
 | P7 | 调优与冻结 | P6 | 否 |
+| P8 | 耗时自检与提交包 | P7 | 否 |
 
 关键路径：P1 → P2 → P4 → P5 → P6 → P7。P2 是不可跳过的关键节点，它冻结了训练与推理共用的 study 级数据契约。
 
@@ -180,6 +181,31 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 
 期望（在训练环境执行）：对比表可复现；最终 `submission.csv` 通过 `validate_submission`。
 
+## P8 耗时自检与提交包
+
+涉及文件：
+
+- `cost.py`（仓库根目录，赛题附录 A 要求提交包根目录含此文件）
+- `src/infer/profiling.py`：耗时评测的可测口径（图片发现与身份解析、提交文件读取校验、阈值选择、study 预测比对、计时统计、`[CONCLUSION]` 格式化）
+- `src/infer/predict.py`：新增 `build_eval_inference_transform`、`predict_image`、`predict_study`，与 `predict_loader` 共用内部前向
+- `src/data/dataset.py`：`load_image` 公开给推理复用
+- `tests/test_cost.py`、`docs/cost.md`
+
+产出：
+
+- `python cost.py <submission.csv> <pictures_100> <pictures_5>`：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮，单张耗时先按 3 轮取均值、再对 100 张平均，与 100 ms 上限比较。
+- 复用 `infer.predict` 的 `load_checkpoint_model` / `build_eval_inference_transform` / `predict_image` / `predict_study`，保证与 `run_infer.py` 同一套推理与聚合逻辑；计时后用 `predict_study` 聚合现场预测并与 `submission.csv` 比对。
+- 支持 `--precision fp16`（FP16 须在提交说明中声明）、`--report` 写出 JSON 明细；退出码 0 成功、1 超限或不一致、2 参数/文件/配置错误。
+
+验收：
+
+```bash
+python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 --config configs/default.yaml --checkpoint outputs/<final>/best.pt --report outputs/cost_report.json
+python -m pytest -q tests/test_cost.py
+```
+
+期望（在赛题指定硬件、加载最终权重后执行）：平均单张耗时 ≤100 ms，退出码 0，`[CONCLUSION]` 里与 `submission.csv` 不一致为 0。正式成绩以赛题服务器实测为准，本地数字只用于链路验证。
+
 ## 测试映射
 
 | 阶段 | 测试文件 | 覆盖点 |
@@ -190,6 +216,7 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 | P5 | `test_engine.py` / `test_resume.py` | 单 epoch 参数更新与 loss 有限、warmup、早停、评估指标、全 NaN AUC 报错；断点续训的进度与学习率衔接、CLI 补跑剩余 epoch |
 | P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、缺列报错、端到端闭环 |
 | P7 | `test_config.py` / `test_utils.py` / `test_run_train.py` / `test_run_compare.py` | 配置校验与 `_base` 继承、种子/设备/运行目录、训练 CLI 产物与日志、run 对比表 |
+| P8 | `test_cost.py` | 图片发现与 `<subject_id>/<study_id>` 解析、提交文件列名/取值/重复校验、阈值选择、study 预测比对、计时统计算术与超限、`predict_image`/`predict_study` 与 `predict_loader` 数值一致、CLI 端到端与退出码 |
 
 ## 退出标准
 
@@ -197,6 +224,7 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 - `check_data.py --full` 全部检查通过。
 - valid 上记录至少一组可复现的 macro-AUC / macro-F1。
 - 提交文件通过 `validate_submission`，格式与赛题要求一致。
+- 在赛题指定硬件上运行 `cost.py`：平均单张耗时 ≤100 ms，`[CONCLUSION]` 与 `submission.csv` 不一致 0。
 
 ## 备注
 
