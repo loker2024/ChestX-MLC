@@ -31,6 +31,7 @@
 - `16:52`（新增）`tests/test_cost.py`：新增 34 个测试，覆盖图片发现与身份解析、提交文件五类异常、阈值选择、比对一致 / 概率差 / 缺 study / 过滤提交、计时统计算术与超限、结论格式化、`predict_image` 与 `predict_study` / `predict_loader` 数值一致，以及 `main` 端到端（`[CONCLUSION]`、超限返回 1、不一致返回 1、缺权重返回 2）与 `--report` 落盘。
 - `16:52`（新增）`docs/cost.md`：新增耗时自检说明，含调用方式与参数、配置与权重自动查找顺序、计时区间与 3 轮口径、与 `predict.py` 的复用关系、study 一致性比对前提（计时图需按 study 成组）、FP16 声明、JSON 报告字段、本地验证记录与提交清单。
 - `16:52`（变更）`docs/architecture.md`、`docs/plan0.md`、`AGENTS.md`：目录树与测试布局补 `cost.py` / `infer/profiling.py` / `tests/test_cost.py` / `docs/cost.md`，入口表与常用命令补 `cost.py`，实现计划新增 P8「耗时自检与提交包」及对应测试映射与退出标准。
+- `16:56`（新增）`docs/比赛参赛规则.md`：收录赛题原文（含第 7 条耗时评测与附录 A 提交要求），作为 `cost.py` 耗时自检实现的规则依据。
 - `16:54`（新增）`train01.plan`：新增 RUN-001～004 训练执行计划（仓库根目录），含训练前置检查、RUN 矩阵（001R 重跑基线 / 002 `pos_weight` 短跑 / 003 25 轮正式基线 / 004A 延长到 40 轮 / 004B `pos_weight` 正式版）、逐 run 命令与判读门、RUN-001R 之后接 `cost.py` 的耗时自检流程（含按 study 整组抽计时图的硬规则）、决策门与时间线、风险与明确不做的方向；本文件只放计划、命令与判读门，实测结果仍回填 `docs/training_log.md`。
 
 ## 2026-10-26
