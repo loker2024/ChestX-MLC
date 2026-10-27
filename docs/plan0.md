@@ -1,6 +1,6 @@
 # 实现计划（plan0）
 
-本文件把 [architecture.md](architecture.md) 的结构落成可执行的实现顺序。阶段之间单向依赖，每个阶段都给出涉及文件、产出与验收命令，完成一个阶段再进入下一个。
+本文件保留 P1–P8 的历史实现计划与验收依据。当前架构、操作和实验执行分别见 [architecture.md](architecture.md)、[manual.md](manual.md) 和 [训练计划](train_plan01.md)；P7 对照实验和 P8 指定硬件实测仍需在训练环境完成。
 
 ## 前置确认
 

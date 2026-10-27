@@ -1,6 +1,6 @@
 # ChestX-MLC 训练计划（RUN-001～004）
 
-> 状态：待执行（2026-10-27 制定）
+> 状态：RUN-001 已记录；本计划从 RUN-001R 开始，后续结果见 [training_log.md](training_log.md)（2026-10-27 制定）
 > 执行环境：远程 GPU（RTX 3090 24G），仓库 `/root/ChestX-MLC`，数据软链 `/root/sj-tmp`
 > 本机（macOS）只做 pytest 与文档验证，不训练
 > 记录出口：每个 run 结束后回填 `docs/training_log.md`，本文件只放「计划 / 命令 / 判读门」
@@ -9,7 +9,7 @@
 
 ## 1. 用途与执行环境
 
-本文件是 RUN-001～004 的执行清单，按顺序照抄命令即可跑完第 7 阶段（P7 对照实验）。
+本文件是 RUN-001R～004 的执行清单，所有命令从训练环境的仓库根目录运行。各入口与参数见 [使用手册](manual.md)，耗时口径见 [cost.md](cost.md)。
 
 - **不做决策的地方**：本文件不记录实测数字与结论，那些写进 `docs/training_log.md`（每个 run 的 `metrics.csv`、阈值曲线、`run_compare/summary.md`）。
 - **对照原则**：002 和 004B 分别只改 `pos_weight`；004A 同时改最大轮数和早停耐心值，结果只能评价这套延长训练策略，不能单独归因于轮数。
@@ -21,7 +21,8 @@
 ## 2. 前置检查（训练前逐条过）
 
 ```bash
-# 1) 分支与工作区（禁止在 main 上 commit，提交在 loker 分支）
+# 1) 在仓库根目录检查分支与工作区（禁止在 main 上 commit）
+cd /root/ChestX-MLC
 git -C /root/ChestX-MLC status --short
 git -C /root/ChestX-MLC branch --show-current
 
@@ -80,7 +81,7 @@ python src/run_train.py --config configs/exp_short.yaml --seed 42 --tag short_ba
 
 **回归门**：末轮 `valid_macro_auc` 与旧 RUN-001 的 **0.7858** 偏差 **≤0.005**（即落在 0.7808～0.7908），且曲线形状一致（6 轮单调上升、最优 epoch = 6）。
 
-- 超门限（比如掉到 0.75 或涨到 0.82）→ **立即停下查因**，不要带着问题跑 002 / 003。查这几项：`check_data --full` 是否通过、`python -m pytest -q` 是否仍 154 passed / 3 skipped、GPU 型号与 `num_workers` 是否与首次一致、`example` 冒烟是否正常。
+- 超门限（比如掉到 0.75 或涨到 0.82）→ **立即停下查因**，不要带着问题跑 002 / 003。查这几项：`check_data --full` 是否通过、`python -m pytest -q` 是否通过（关注失败和跳过原因）、GPU 型号与 `num_workers` 是否与首次一致、`example` 冒烟是否正常。
 - 通过 → 立刻做阈值曲线，留作 001R vs 002 的对照：
 
 ```bash
@@ -109,7 +110,7 @@ python src/run_train.py --config configs/default.yaml --seed 42 --tag full_basel
 
 | `best_epoch` | 判定 | 004 走向 |
 |---|---|---|
-| ≥ 20 | 最后 1/5 仍在涨 → **未收敛** | 走 **004A**（40 轮） |
+| ≥ 20 | 最优轮次靠后，可能仍有提升空间 | 走 **004A**（40 轮） |
 | ≤ 15 | 若早停则仅能观察到最佳轮次后的已运行轮次，不能断言后 10 轮走势 | 002 有效则走 **004B**；否则走 004A 测试延长策略 |
 | 16～19 | 边缘 | 查看实际已运行轮次与停止原因；若未满 25 轮则无法推断缺失轮次，按 002 的结论选择 004A 或 004B |
 
@@ -151,8 +152,8 @@ python src/run_infer.py --config outputs/<001R>/config.yaml \
 
 - 来源：`example/test_example`（194 个 study / 283 张图，**每个 study 的图片都完整**，最多 3 张/study）。
 - 抽 **100 张**放 `outputs/cost_pics/pictures_100/<subject>/<study>/<pic>.jpg`，另抽 **5 张**预热图放 `outputs/cost_pics/pictures_5/<subject>/<study>/<pic>.jpg`。
-- 一致性检查通过配置中的完整测试集索引补齐同一 study 的图片；无需强制按 study 成组抽取，但必须提供对应的完整测试集 CSV 和图片。
-- 若计时样本涉及多图 study，单图候选结果的耗时不包含完整 study 聚合，脚本会返回 2 并报告最终耗时无法判定；须向主办方确认多图计时口径。
+- 优先提供配置对应的完整测试集 CSV 和图片；脚本会补齐同一 study 的图片，无需按 study 成组抽取。缺少索引时会降级为按抽样图片分组，比对可能不完整，报告 `final_timing_verifiable=false`。
+- 完整索引确认样本涉及多图 study，且一致性检查通过时，脚本返回 2 并报告最终耗时无法判定；若比对不一致则先返回 1。须向主办方确认多图计时口径。
 - 这 100 张属于计时样本，不入库、不进 `data/`。
 
 ### 5.3 运行与验收
@@ -165,31 +166,15 @@ python cost.py outputs/<001R>/submission.csv outputs/cost_pics/pictures_100 outp
 
 验收：
 
-- [ ] 全部样本均为单图 study 时退出码为 **0**；多图 study 返回 **2** 时记录无法判定，等待官方明确口径；
+- [ ] 完整索引确认全部样本均为单图 study、平均耗时不超限且一致性检查通过时，退出码为 **0**；多图 study 且比对一致时返回 **2**，等待官方明确口径。索引缺失时即使返回 0，也须标注结果未经完整索引核实；
 - [ ] `[CONCLUSION]` 行显示与 `submission.csv` **不一致 0 张**；
 - [ ] 记录实测设备与平均耗时；最终合规性以主办方指定硬件和复测结果为准。
 
 ---
 
-## 6. 决策门与时间线
+## 6. 执行顺序与预计时间
 
-```text
-D1（cost.py 已合并、远端可用）
-  ├─ 同步代码 → check_data --full → pytest 全绿
-  ├─ RUN-001R（≈30m）── 回归门不通过 → 停下查因，不继续
-  ├─ 通过 → cost.py 验证（≈10m）→ 记录耗时与一致性
-  ├─ RUN-002（≈30m）→ run_compare → 回填 001R / 002
-D2
-  ├─ RUN-003（≈2h）→ run_eval 阈值曲线 → 出 submission 仅本地校验
-  ├─ 按 best_epoch 判读 → 决定 004 走 A 还是 B
-D2/D3
-  ├─ RUN-004（A ≈3h10m / B ≈2h）→ 与 003 对比（A 为两个变量，B 为单变量）
-  └─ 定最终提交模型
-之后
-  └─ 最终 run_infer → cost.py 复验 → 正式提交（≤2 次/天，留 1 次撤销余量）
-```
-
-总 GPU 预算约 **5～6.5h**（001R 30m + 002 30m + 003 2h + 004 2～3h）。
+按 RUN-001R → 耗时自检 → RUN-002 → RUN-003 → RUN-004A 或 004B 执行；各阶段的判读门见第 4、5 节。按旧 RUN-001 的单轮耗时估算，总 GPU 时间约 5～6.5 小时，实际耗时以训练环境记录为准。
 
 ---
 
@@ -205,20 +190,6 @@ D2/D3
 
 ---
 
-## 8. 风险与不做的事
+## 8. 本轮约束
 
-**风险**
-
-- 远端 SSH 不通（记录里出现过 `Connection lost before handshake`）→ 先等恢复，恢复后第一件事是 `check_data --full`，再跑 001R。
-- `pos_weight` 可能训练不稳（loss 爆 / NaN）→ RUN-002 一旦异常即关闭该方向，不重试。
-- 每日仅 2 次提交、1 次撤销 → 003 / 004 都只在本地出 `submission.csv` 校验，择优后再提交，不要拿提交次数试错。
-- 复测机是 T4，性能只有 3090 的一半左右 → 任何分辨率 / 骨干升级先用 `cost.py` 实测再决定。
-
-**本轮明确不做**
-
-- 不改 `configs/default.yaml`（冻结配置）；
-- 不加 TTA、不升 448、不换更重骨干、不做多模型集成；
-- 不把 valid 并入训练（一旦并入，按规则第 3 条就不能再用它早停 / 选阈值）；
-- 不在 `main` 上提交，提交走 `loker` 分支。
-
-> 这些方向都排在 001～004 出结果之后，按 `docs/experiments.md`「后续待验证优化项」的约定一次只改一个变量。
+不修改冻结的 `configs/default.yaml`；不引入 TTA、更高分辨率、更重骨干或集成，也不将 valid 并入训练。其他优化方向见 [experiments.md](experiments.md)，须在基线完成后另行设计对照。

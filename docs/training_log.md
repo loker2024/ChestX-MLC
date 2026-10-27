@@ -7,88 +7,16 @@
 - 数字只从 `outputs/<run>/metrics.csv` 与 `run_compare` 生成的 `outputs/compare/summary.md` 复制，不手抄训练日志。
 - 每次 run 把实际使用的配置文件原样贴进代码块，并给出 `configs/` 链接；正文只写「相对父配置改了什么」。
 - 训练产物（`best.pt` / `last.pt` / `metrics.csv` / `train.log`）按约定不入库，只记录路径。
-- 换骨干或换输入尺寸就新增一个二级标题，各自带流程图、推理/评估/对比、调参索引，互不覆盖。
+- 换骨干或输入尺寸时新增二级标题；数据流和模块职责见 [architecture.md](architecture.md)，配置及运行命令见 [manual.md](manual.md)。
 
 ## ResNet-18 @320（timm `resnet18.a1_in1k`）
-
-### 流程图
-
-```text
-data/{train,valid}.csv + data/images/{train,valid}
-   │ read_split() 按 Study_id 聚合、校验同 study 标签一致、缺图报错
-   │ src/data/index.py:41 index_images / :70 read_split
-   ▼
-StudyRecord(study_id, subject_id, images[n], labels[10])
-   │ StudyDataset.__getitem__                       src/data/dataset.py:44
-   │ Letterbox(320) + ImageNet 归一化          src/data/transforms.py:21 / :60
-   ▼
-collate_studies（首尾相接，不补假图）               src/data/dataset.py:67
-   images[N,3,320,320]  offsets[B+1]  labels[B,10]  study_ids[B]
-   N = 本批 B 个 study 的真实图片数（B=16，平均约 26 张）
-   │
-   ▼ build_model                                      src/model/network.py:26
-resnet18.a1_in1k（11,181,642 参数）
-   conv1 → layer1..layer4 → avgpool → fc(512→10)
-   ▼ 逐图 forward ⇒ logits[N,10]
-   ▼ aggregate_logits：同 study 多图取均值           src/model/network.py:58
-study logits[B,10]
-   ├─ 训练：BCEWithLogitsLoss（pos_weight 可选）     src/model/losses.py:20
-   │        train_one_epoch：autocast → backward    src/train/engine.py:102
-   │        → clip_grad_norm_(5.0) → scaler.step     src/train/engine.py:129
-   └─ 验证：sigmoid → macro_auc / macro_f1      src/common/metrics.py:95 / :111
-            evaluate                                src/train/engine.py:147
-   ▼
-fit：AdamW(3e-4, 0.01) + warmup 2 + AMP + 早停     src/train/engine.py:189
-   ▼
-outputs/<YYYYmmdd-HHMMSS>_<tag>/
-   config.yaml · train.log · metrics.csv · last.pt（每轮）· best.pt（最优）
-```
-
-### 推理 / 评估 / 对比
-
-```text
-① 推理（出提交）
-run_infer.py --config … --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
-  build_loader("test")                     src/data/dataset.py:93
-  load_checkpoint_model(pretrained=False)  src/infer/predict.py:28
-  predict_loader → Study_id + p1..p10      src/infer/predict.py:47
-  build_submission_frame(threshold=None)   src/infer/submission.py:32
-  write_submission → validate_submission   src/infer/submission.py:83 / :95
-
-② 单 run 评估（阈值网格 + 逐类明细）
-run_eval.py --checkpoint … --thresholds 0.3,0.4,0.5,0.6,0.7
-  per_class_report + macro_f1_curve        src/common/metrics.py:27 / :142
-
-③ 多 run 对比（本文件的数字来源）
-run_compare.py --runs <run_a> <run_b> --thresholds …
-  evaluate_run → write_summary            src/run_compare.py:70 / :133
-  → outputs/compare/summary.{csv,md}
-```
-
-### 参数 → 生效位置（调参索引）
-
-| 想调的东西 | 配置项 | 生效位置 |
-|---|---|---|
-| 轮数 | `train.epochs` | `src/train/engine.py:189` |
-| 批大小 / 显存 | `train.batch_studies` | `src/data/dataset.py:117` |
-| 分辨率 / 速度 | `image.size` | `src/data/transforms.py:21` |
-| 损失加权 | `train.pos_weight` | `src/model/losses.py:20` |
-| 学习率 / 权重衰减 | `train.lr` / `train.weight_decay` | `src/train/engine.py:219` |
-| warmup | `train.warmup_epochs` | `src/train/engine.py:80` |
-| 混合精度 | `train.amp` | `src/train/engine.py:224` |
-| 梯度裁剪 | `train.grad_clip` | `src/train/engine.py:129` |
-| 数据吞吐（核数） | `train.num_workers` | `src/data/dataset.py:129` |
-| 早停 | `train.early_stop_patience` | `src/train/engine.py:189` |
-| 判定阈值 | `eval.threshold` | `src/common/metrics.py:111` |
-| 骨干 | `model.backbone` | `src/model/network.py:26` |
-| 预训练开关 | `model.pretrained` | `src/model/network.py:26` |
 
 ### 记录模板
 
 ~~~markdown
 ### RUN-00x <tag>（<配置文件>）
 
-配置 [configs/xxx.yaml](configs/xxx.yaml)，完整内容：
+配置 [configs/xxx.yaml](../configs/xxx.yaml)，完整内容：
 
 ```yaml
 <该配置文件原样贴入>
@@ -106,7 +34,7 @@ run_compare.py --runs <run_a> <run_b> --thresholds …
 
 metrics.csv（原样复制）：
 
-| epoch | lr | train_loss | valid_loss | macro_auc | macro_f1 |
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
 |---|---|---|---|---|---|
 
 **结论**：<AUC/F1 谁赢、下一步是否动默认值>
@@ -114,7 +42,7 @@ metrics.csv（原样复制）：
 
 ### RUN-001 short_baseline（`configs/exp_short.yaml`）
 
-配置 [configs/exp_short.yaml](configs/exp_short.yaml)，完整内容：
+配置 [configs/exp_short.yaml](../configs/exp_short.yaml)，完整内容：
 
 ```yaml
 # 快速筛查配置：把 epoch 数压短，只用来比较「哪个选项方向更好」，不追求最终成绩。
@@ -153,11 +81,11 @@ metrics.csv（原样复制）：
 | 5 | 3.00e-04 | 0.3030 | 0.3293 | 0.7818 | 0.2562 |
 | 6 | 3.00e-04 | 0.2944 | 0.3199 | 0.7858 | 0.2796 |
 
-**结论**：macro-AUC 六轮单调上升、最优即最后一轮（0.7858），说明 6 轮远未跑满收敛，短周期只适合判方向、不能当最终成绩；F1@0.5 仅 0.2796，与 macro-AUC 差距大，阈值默认 0.5 明显偏高（后续用 `run_compare` 的阈值曲线看最优点）。
+**结论**：macro-AUC 六轮单调上升、最优即最后一轮（0.7858），表明 6 轮时仍在改善，短周期适合筛查方向，是否收敛需结合更长训练验证；F1@0.5 为 0.2796；AUC 和 F1 衡量不同性质，不能凭两者数值差判断阈值高低，需结合 `run_compare` 的阈值曲线判断。
 
 ### RUN-002 short_pos_weight（`configs/exp_short_pos_weight.yaml`）
 
-配置 [configs/exp_short_pos_weight.yaml](configs/exp_short_pos_weight.yaml)，完整内容：
+配置 [configs/exp_short_pos_weight.yaml](../configs/exp_short_pos_weight.yaml)，完整内容：
 
 ```yaml
 # 筛查用的 pos_weight 配置：继承 exp_short.yaml（短周期），再打开 pos_weight。
@@ -192,7 +120,7 @@ metrics.csv（跑完从 run 目录复制）：
 
 ### RUN-003 full_baseline（`configs/default.yaml`）
 
-配置 [configs/default.yaml](configs/default.yaml)，完整内容：
+配置 [configs/default.yaml](../configs/default.yaml)，完整内容：
 
 ```yaml
 data:
@@ -240,7 +168,7 @@ seed: 42
 device: auto
 ```
 
-（以上为该文件的超参数部分；完整文件含逐字段中文注释，见 [configs/default.yaml](configs/default.yaml)。）
+（以上为该文件的超参数部分；完整文件含逐字段中文注释，见 [configs/default.yaml](../configs/default.yaml)。）
 
 | 项 | 值 |
 |---|---|
@@ -263,7 +191,7 @@ metrics.csv（跑完从 run 目录复制）：
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
 |---|---|---|---|---|---|---|---|---|
-| RUN-001 | `exp_short.yaml` | 短周期基准 | 6 | 6 | 0.7858 | 0.2796 | 28m41s | 未收敛，仅作方向基准 |
+| RUN-001 | `exp_short.yaml` | 短周期基准 | 6 | 6 | 0.7858 | 0.2796 | 28m41s | 末轮仍改善，仅作方向基准 |
 | RUN-002 | `exp_short_pos_weight.yaml` | +pos_weight | 6 | | | | | 待运行 |
 | RUN-003 | `default.yaml` | 25 轮冻结版 | 25 | | | | | 待运行 |
 

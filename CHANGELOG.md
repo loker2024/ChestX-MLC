@@ -41,6 +41,10 @@
 - `20:29`（修复）`cost.py`、`tests/test_cost.py`、`docs/cost.md`：完整测试集索引缺失时不再直接返回 2，改为打印 `[WARN]` 后退化为按 `pictures_100` 自身分组比对，评测环境仅凭 submission + 抽样图片 + 权重即可跑通；报告用 `final_timing_verifiable` 标注结论是否经完整索引核实，新增降级路径回归测试和口径说明。
 - `20:29`（变更）`docs/manual.md`：`compare/` 目录树、3.3 产物表、`--out` 说明、入口速查与 7.2 产物索引补上 `per_class.csv`。
 - `20:29`（修复）`CHANGELOG.md`：把 `16:54` 的 `train01.plan` 条目移到 `16:56` 之前，恢复同日由早到晚排序。
+- `20:33`（变更）`docs/manual.md`、`docs/architecture.md`、`docs/experiments.md`、`docs/training_log.md`、`docs/plan0.md`：精简重复命令、目录与流程说明，明确手册、架构、实验方案、实测记录和历史计划的职责，保留训练数据及提交限制，并修正训练记录中的配置链接。
+- `20:33`（修复）`docs/sju.md`：移除服务器操作笔记中的明文密码，保留连接步骤。
+- `20:41`（变更）`train01.plan`、`docs/train_plan01.md`：记录训练计划迁移至 docs 并精简重复的时间线和约束，保留各 run 命令与判读门；同步完整测试索引缺失时的耗时自检行为。
+- `20:41`（修复）`docs/manual.md`、`docs/architecture.md`、`docs/experiments.md`、`docs/plan0.md`、`docs/training_log.md`、`configs/default.yaml`：修正训练计划链接、实验配置字段与设备说明，澄清实验和指标判读。
 - `20:44`（修复）`docs/cost.md`：按实际实现澄清索引缺失时的判定、退出码优先级、比对图片数和计时报告字段。
 
 ## 2026-10-26

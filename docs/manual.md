@@ -12,7 +12,7 @@
 4. [运行指令](#4-运行指令)
 5. [典型工作流](#5-典型工作流)
 6. [排错速查](#6-排错速查)
-7. [附录：命令与产物速查](#7-附录命令与产物速查)
+7. [相关文档](#7-相关文档)
 
 ---
 
@@ -615,38 +615,7 @@ python -m pytest
 
 ## 5. 典型工作流
 
-以 P7 的对照实验为例，全部命令在仓库根目录执行：
-
-```bash
-# 0) 数据体检：确认路径、标签与划分
-python src/check_data.py --config configs/default.yaml --full
-
-# 1) 两个短周期对照：同一 seed，只差 pos_weight
-python src/run_train.py --config configs/exp_short.yaml --seed 42 --tag short_baseline
-python src/run_train.py --config configs/exp_short_pos_weight.yaml --seed 42 --tag short_pos_weight
-
-# 2) 在同一份 valid 上重算 macro-AUC 与多阈值 macro-F1
-python src/run_compare.py \
-    --runs outputs/<ts>_short_baseline outputs/<ts>_short_pos_weight \
-    --thresholds 0.3,0.4,0.5,0.6,0.7
-
-# 3) 按冻结配置训练最终模型
-python src/run_train.py --config configs/default.yaml --seed 42 --tag full_baseline
-
-# 4) 用最终 run 的配置与权重验证
-python src/run_eval.py \
-    --config outputs/<ts>_full_baseline/config.yaml \
-    --checkpoint outputs/<ts>_full_baseline/best.pt \
-    --thresholds 0.3,0.4,0.5,0.6,0.7
-
-# 5) 生成提交文件
-python src/run_infer.py \
-    --config outputs/<ts>_full_baseline/config.yaml \
-    --checkpoint outputs/<ts>_full_baseline/best.pt \
-    --out outputs/submission.csv
-```
-
-判读顺序：先看 macro-AUC（不受阈值影响，反映排序能力），再看 `f1@0.5` 与整条阈值曲线；只有当其他阈值在各 run 上都更好时，才考虑调整 `eval.threshold`。最终提交默认输出全部 10 类概率。
+按数据体检 → 对照训练 → 同一验证集评估 → 最终训练 → 推理提交的顺序执行。各入口命令见第 4 节；实验矩阵与判读见 [experiments.md](experiments.md)，具体执行步骤见 [训练计划](train_plan01.md)，实测结果见 [training_log.md](training_log.md)。
 
 ---
 
@@ -679,65 +648,15 @@ python src/run_infer.py \
 
 ---
 
-## 7. 附录：命令与产物速查
-
-### 7.1 命令速查
-
-```bash
-# 环境
-python3.12 -m venv .venv && source .venv/bin/activate
-python -m pip install -r requirements.txt && python -m pip check
-
-# 数据体检
-python src/check_data.py --config configs/default.yaml --full
-
-# 训练
-python src/run_train.py --config configs/default.yaml --seed 42 --tag full_baseline
-python src/run_train.py --config configs/exp_short.yaml --seed 42 --tag short_baseline
-
-# 续训
-python src/run_train.py --resume outputs/<run>
-python src/run_train.py --resume outputs/<run> --config configs/exp_long.yaml
-
-# 验证
-python src/run_eval.py --config outputs/<run>/config.yaml \
-    --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6,0.7
-
-# 推理 / 提交
-python src/run_infer.py --config outputs/<run>/config.yaml \
-    --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
-python src/run_infer.py --config outputs/<run>/config.yaml \
-    --checkpoint outputs/<run>/best.pt --out outputs/submission.csv --threshold 0.5
-
-# 多 run 对比
-python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> \
-    --thresholds 0.3,0.4,0.5,0.6,0.7
-
-# 测试
-python -m pytest
-```
-
-### 7.2 产物速查
-
-| 路径 | 说明 |
-| --- | --- |
-| `outputs/<run>/config.yaml` | 训练时的完整配置，复盘与后续评估的依据 |
-| `outputs/<run>/config_resume.yaml` | 续训时另存的配置（仅续训出现） |
-| `outputs/<run>/train.log` | 完整训练日志，续训追加 |
-| `outputs/<run>/metrics.csv` | 每 epoch 的 loss / AUC / F1 |
-| `outputs/<run>/best.pt` | valid macro-AUC 最优权重，用于验证与推理 |
-| `outputs/<run>/last.pt` | 完整训练状态，用于断点续训 |
-| `outputs/compare/summary.csv` | 多 run 对比表（机器可读） |
-| `outputs/compare/per_class.csv` | 各 run 的逐类 AUC / precision / recall / F1 |
-| `outputs/compare/summary.md` | 多 run 对比表（可贴文档） |
-| `outputs/submission.csv` | 默认提交文件 |
-
-### 7.3 相关文档
+## 7. 相关文档
 
 | 文档 | 内容 |
 | --- | --- |
 | [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md) | 任务、数据格式、评价指标与提交要求 |
-| [架构与文件结构](architecture.md) | 模块职责、接口、数据流与测试布局 |
-| [P7 调优记录](experiments.md) | 实验矩阵、复现命令与冻结结论 |
-| [实现计划](plan0.md) | P1–P7 的阶段划分与验收方式 |
+| [架构与文件结构](architecture.md) | 模块职责、接口与数据流 |
+| [P7 调优记录](experiments.md) | 实验矩阵、判读与冻结结论 |
+| [训练计划](train_plan01.md) | 训练步骤与判读门 |
+| [训练记录](training_log.md) | 各 run 的配置与实测结果 |
+| [耗时自检](cost.md) | 计时口径与限制 |
+| [实现计划](plan0.md) | P1–P8 的阶段划分与验收方式 |
 | `CHANGELOG.md` | 全部代码与文档改动记录 |

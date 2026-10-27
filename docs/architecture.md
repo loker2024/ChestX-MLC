@@ -2,7 +2,7 @@
 
 本文件记录 ChestX-MLC 的目标代码结构、模块边界与运行方式。赛题背景、数据格式与评测口径见 [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md)，数据流示意见 [胸片多标签分类数据流](胸片多标签分类数据流.svg)。
 
-> P1–P7 的代码与配置已按本文件落地；P7 对照实验在训练环境执行。实际改动与进度以 `CHANGELOG.md` 为准，调优结论与复现命令见 [experiments.md](experiments.md)。
+> P1–P8 的代码与配置已按本文件落地；P7 对照实验在训练环境执行。实际改动与进度以 `CHANGELOG.md` 为准，调优结论见 [experiments.md](experiments.md)，执行命令见 [train_plan01.md](train_plan01.md)。
 
 ## 1. 设计约束
 
@@ -15,81 +15,7 @@
 
 ## 2. 目录总览
 
-```text
-ChestX-MLC/
-├── AGENTS.md
-├── CHANGELOG.md
-├── cost.py              # 根目录入口：赛题第 7 条耗时自检
-├── requirements.txt
-├── .gitignore
-├── configs/
-│   ├── default.yaml
-│   ├── exp_short.yaml
-│   ├── exp_pos_weight.yaml
-│   └── exp_short_pos_weight.yaml
-├── docs/
-│   ├── 多目标胸部病变检测分类（ChestX-MLC）.md
-│   ├── 胸片多标签分类数据流.svg
-│   ├── architecture.md
-│   ├── cost.md
-│   └── experiments.md
-├── src/
-│   ├── common/
-│   │   ├── __init__.py
-│   │   ├── constants.py
-│   │   ├── config.py
-│   │   ├── utils.py
-│   │   ├── metrics.py
-│   │   └── checkpoint.py
-│   ├── data/
-│   │   ├── __init__.py
-│   │   ├── labels.py
-│   │   ├── index.py
-│   │   ├── transforms.py
-│   │   └── dataset.py
-│   ├── model/
-│   │   ├── __init__.py
-│   │   ├── network.py
-│   │   └── losses.py
-│   ├── train/
-│   │   ├── __init__.py
-│   │   └── engine.py
-│   ├── infer/
-│   │   ├── __init__.py
-│   │   ├── predict.py
-│   │   ├── profiling.py
-│   │   └── submission.py
-│   ├── check_data.py
-│   ├── run_train.py
-│   ├── run_eval.py
-│   ├── run_infer.py
-│   └── run_compare.py
-├── tests/
-│   ├── conftest.py
-│   ├── test_labels.py
-│   ├── test_index.py
-│   ├── test_dataset.py
-│   ├── test_check_data.py
-│   ├── test_metrics.py
-│   ├── test_model.py
-│   ├── test_engine.py
-│   ├── test_resume.py
-│   ├── test_submission.py
-│   ├── test_config.py
-│   ├── test_utils.py
-│   ├── test_run_train.py
-│   ├── test_run_compare.py
-│   ├── test_cost.py
-│   └── test_pipeline.py
-├── data/                # 不入库
-│   ├── train.csv
-│   ├── valid.csv
-│   ├── test.csv
-│   └── example/         # 本地联调用的小样本图片
-└── outputs/             # 不入库，运行时生成 best.pt、last.pt、metrics.csv 等
-```
-
-`src/.gitkeep` 已删除。当前不引入 `pyproject.toml`；若后续需要在赛题服务器上安装，再加包配置并把 `src` 设为包根。
+`src/` 按 `common`、`data`、`model`、`train`、`infer` 分层；五个运行入口位于 `src/`，`cost.py` 位于仓库根目录。`configs/` 存放配置，`tests/` 存放合成数据测试，`docs/` 存放说明。`data/` 和 `outputs/` 分别存放本地数据和运行产物，不入库。
 
 ## 3. 模块职责
 
@@ -152,8 +78,8 @@ ChestX-MLC/
 | `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit`；每轮结束写 `last.pt`，`--resume <run 目录或 last.pt>` 可从断点接着训练 |
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
-| `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
-| `cost.py`（仓库根目录） | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径 | `python cost.py <submission.csv> <pictures_100> <pictures_5>`，参数、完整测试集依赖和限制见 [cost.md](cost.md) |
+| `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `per_class.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
+| `cost.py`（仓库根目录） | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径。调用方式、索引降级行为和限制见 [cost.md](cost.md) |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -165,75 +91,9 @@ ChestX-MLC/
 - `__init__.py` 只放模块说明，不放业务逻辑或重型导入，避免 `import data` 就加载 torch/pandas。
 - 仓库根目录存在同名的 `data/` 数据目录，`src/data/__init__.py` 可避免命名空间包把两者合并。
 
-常用命令：
+运行命令和续训说明见 [使用手册](manual.md)；配置以 `configs/default.yaml` 及派生配置为准，测试从仓库根目录运行 `python -m pytest`，覆盖范围见 `tests/`。
 
-```bash
-python src/check_data.py --config configs/default.yaml --full
-python src/run_train.py  --config configs/default.yaml --seed 42
-python src/run_train.py  --resume outputs/<run>
-python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
-python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
-python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
-python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5
-python -m pytest
-```
-
-`--resume` 省略 `--config` 时沿用 `last.pt` 里存档的配置；需要延长轮数或改 `num_workers` 时再显式传 `--config`（本次实际生效的配置另存为 `config_resume.yaml`）。
-
-## 5. 配置骨架
-
-```yaml
-data:
-  train: {csv: data/train.csv, images: data/images/train}
-  valid: {csv: data/valid.csv, images: data/images/valid}
-  test:  {csv: data/test.csv,  images: data/images/test}
-image: {size: 320, letterbox: true, normalize: imagenet, hflip: false}
-model: {backbone: resnet18, pretrained: true, num_classes: 10}
-train:
-  epochs: 25
-  batch_studies: 16
-  lr: 3e-4
-  weight_decay: 0.01
-  pos_weight: false
-  warmup_epochs: 2
-  amp: true
-  grad_clip: 5.0
-  num_workers: 8
-  early_stop_patience: 5
-eval: {batch_studies: 32, threshold: 0.5}
-output: {run_dir: outputs}
-seed: 42
-device: auto
-```
-
-本地联调可把 `data.<split>.images` 指向 `data/example/train_example` 等示例目录；全量图片路径见第 8 节。
-
-实验配置用顶层 `_base` 继承默认配置，只写需要覆盖的字段；加载时先合并父配置再做 dataclass 校验，`_base` 的相对路径按当前配置文件所在目录解析。
-
-## 6. 测试布局
-
-| 文件 | 覆盖点 |
-|---|---|
-| `conftest.py` | 把 `src/` 加入 `sys.path`；用 `tmp_path` 构造合成 CSV 与多图 study 的小图片 |
-| `test_labels.py` | 分号解析、类别 10、重复/非法 token |
-| `test_index.py` | 前导零保留、多图 study 聚合、缺图报错、重复 Dicom_id 与患者一致性 |
-| `test_dataset.py` | 张量形状与取值范围、变长 collate、test 无标签 |
-| `test_check_data.py` | ID 格式与缺图、同 study 标签一致、跨 split 重叠 |
-| `test_metrics.py` | 与 sklearn 对齐、退化类 AUC 跳过、F1 仍计算、阈值解析与阈值网格、空输入校验 |
-| `test_model.py` | 参数规模、study 级均值聚合与梯度、`pos_weight` 计算 |
-| `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
-| `test_resume.py` | 断点续训：进度与最优快照恢复、学习率衔接、CLI 补跑剩余 epoch、缺 last.pt 报错 |
-| `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、UTF-8 回读 |
-| `test_config.py` | 默认配置、`_base` 继承与循环检测、未知字段、类型与范围校验、Path 序列化、`to_dict` 往返 |
-| `test_utils.py` | 随机种子、设备选择、运行目录与 tag 清洗 |
-| `test_run_train.py` | 训练 CLI 产物、seed 覆盖、预训练元数据与日志 |
-| `test_run_compare.py` | 每个 run 一行、pos_weight/seed 列、summary.csv 与 summary.md、缺文件报错 |
-| `test_cost.py` | 根目录 `cost.py` 与 `infer.profiling`：图片发现与 `<subject_id>/<study_id>` 解析、提交文件列名/取值/重复校验、阈值选择、study 预测比对（一致/概率差/缺 study/过滤提交）、计时统计算术与超限、`predict_image`/`predict_study` 与 `predict_loader` 数值一致、`main` 端到端与退出码 |
-| `test_pipeline.py` | 单步训练 loss 有限且参数更新、checkpoint 重载逐位一致、predict→submission 闭环 |
-
-测试只使用合成小图，不读取真实影像。
-
-## 7. 数据流与产物
+## 5. 数据流与产物
 
 1. `data.index.read_split` 读取 CSV 并递归索引图片，返回 `list[StudyRecord]`。
 2. `data.dataset.StudyDataset` 按 study 取图，`collate_studies` 拼成 `images / offsets / labels`。
@@ -241,18 +101,18 @@ device: auto
 4. `train.engine` 以 `BCEWithLogitsLoss` 训练，按 valid macro-AUC 保存最优权重。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
-7. 根目录 `cost.py` 加载同一份 checkpoint 与配置，按单图串行计时并补齐完整 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
+7. 根目录 `cost.py` 加载同一份 checkpoint 与配置，按单图串行计时，并在完整测试索引可用时补齐 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
 
-每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
+每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv`、`per_class.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 
-## 8. 待确认与已定事项
+## 6. 待确认与已定事项
 
 1. 全量图片根目录与训练设备（本地 GPU 或赛题 T4 镜像）。
 2. 提交策略（P7 已冻结）：默认输出全部 10 类概率（保留排序信息，利于 macro-AUC）；赛题示例默认以 0.5 为阈值，需要严格对齐示例时用 `run_infer.py --threshold 0.5`。阈值必须在 `[0, 1]`，过滤后每个 study 至少保留一行。最终配置为 `configs/default.yaml`，实验配置只通过 `_base` 继承它，见 [experiments.md](experiments.md)。
 3. 离线服务器能否携带 ImageNet 预训练权重；不能时回退随机初始化。
 4. 类别 10 是否为“无异常”；当前按普通类别处理。
 
-## 9. 变更约定
+## 7. 变更约定
 
 - 新增、修改或删除任何文件，都必须同步记录到 `CHANGELOG.md`（Asia/Shanghai，精确到分钟）。
 - 仅使用主办方允许的数据；禁止提交数据集、权重、密钥与训练产物。
