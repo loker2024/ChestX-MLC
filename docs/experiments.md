@@ -85,3 +85,17 @@ python src/run_infer.py --config configs/default.yaml \
    训练设备与预训练加载情况记在 checkpoint 的 `metadata` 里。
 4. **分工**：本机只跑 `python -m pytest` 和文档校验；训练相关命令都在训练环境执行，
    本文件随结果回填。
+
+## 后续待验证优化项（未排期）
+
+记录想法，不承诺优先级；每项都要等基线（25 轮 `default.yaml`）出结果后再单独做对照，
+一次只改一个变量，并附 `run_compare.py` 结果。
+
+| 优化项 | 预期收益 | 改动点 | 备注 |
+| --- | --- | --- | --- |
+| **视图元信息（ViewPosition）** | 中—高 | `StudyRecord` 加 `views`、`collate_studies` 透传、分类头拼接 one-hot 或改用视图条件聚合 | 正位 / 侧位显影不同，当前无差别均值会互相稀释；`Rows`/`Columns` 不建议用（易学设备偏差），`Subject_id` 严禁入特征 |
+| 阈值曲线选点 | 中 | 仅推理侧：`run_compare.py` 扫 0.3~0.7，必要时改 `eval.threshold` | RUN-001 出现 AUC 0.786 而 F1@0.5 仅 0.280，阈值偏高的可能性大 |
+| 训练轮数 | 中 | `train.epochs` 加到 10~25 | RUN-001 最优在最后一轮，6 轮未收敛 |
+| `pos_weight` | 待验证 | `train.pos_weight: true` | 已配好 `configs/exp_short_pos_weight.yaml`，等 RUN-002 |
+| 聚合方式消融 | 低—中 | `aggregate_logits` 增加「平均概率 / 最大 / 平均 logits」三种 | 当前实现是平均 logits 后 sigmoid（等价 G2 方案），可作为对照项记录 |
+| 更高分辨率 / TTA | 待评估 | `data.image_size`、`run_infer.py` 加翻转 TTA | 先测显存与耗时，3090 24G 下 448 可能吃紧 |
