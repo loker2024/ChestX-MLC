@@ -117,6 +117,28 @@ def _progress_from_checkpoint(checkpoint: dict[str, Any]) -> TrainProgress:
     )
 
 
+def _validate_resume_config(config: Config, saved: Config) -> None:
+    """只允许调整轮数和运行环境，保留训练及验证口径。"""
+    current_values = config.to_dict()
+    saved_values = saved.to_dict()
+    for values in (current_values, saved_values):
+        values.pop("device")
+        values.pop("output")
+        values["train"].pop("epochs")
+        values["train"].pop("num_workers")
+        values["eval"].pop("batch_studies")
+    differences = []
+    for section, value in current_values.items():
+        if isinstance(value, dict):
+            for field, field_value in value.items():
+                if field_value != saved_values[section][field]:
+                    differences.append(f"{section}.{field}")
+        elif value != saved_values[section]:
+            differences.append(section)
+    if differences:
+        raise ValueError("续训配置与断点不兼容：" + ", ".join(differences))
+
+
 def _write_metrics(path: Path, history: list[dict[str, float]]) -> None:
     """把当前全部 epoch 记录写成 metrics.csv（每轮重写，中断也不丢已完成的轮次）。"""
     if not history:
@@ -168,6 +190,8 @@ def run_training(
     `checkpoint` 是 `--resume` 读到的 last.pt；给了就从里面恢复权重、优化器
     状态和训练进度，接着跑剩下的 epoch。
     """
+    if checkpoint is not None:
+        _validate_resume_config(config, config_from_dict(checkpoint["config"]))
     pin_memory = device.type == "cuda"
     train_loader = build_loader(config, "train", train=True, pin_memory=pin_memory)
     val_loader = build_loader(config, "valid", pin_memory=pin_memory)
@@ -263,6 +287,9 @@ def main(argv: list[str] | None = None) -> None:
         config_source = config_path
     if args.seed is not None:
         config = replace(config, seed=args.seed)
+
+    if checkpoint is not None:
+        _validate_resume_config(config, config_from_dict(checkpoint["config"]))
 
     seed_everything(config.seed)
     device = resolve_device(config.device)

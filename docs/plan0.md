@@ -193,7 +193,7 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 
 产出：
 
-- `python cost.py <submission.csv> <pictures_100> <pictures_5>`：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮，单张耗时先按 3 轮取均值、再对 100 张平均，与 100 ms 上限比较。
+- `python cost.py <submission.csv> <pictures_100> <pictures_5>`：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮并测量写出；涉及多图 study 时，单图候选结果不等于最终聚合结果，不能据此判定最终耗时，详见 `docs/cost.md`。
 - 复用 `infer.predict` 的 `load_checkpoint_model` / `build_eval_inference_transform` / `predict_image` / `predict_study`，保证与 `run_infer.py` 同一套推理与聚合逻辑；计时后用 `predict_study` 聚合现场预测并与 `submission.csv` 比对。
 - 支持 `--precision fp16`（FP16 须在提交说明中声明）、`--report` 写出 JSON 明细；退出码 0 成功、1 超限或不一致、2 参数/文件/配置错误。
 
@@ -224,7 +224,7 @@ python -m pytest -q tests/test_cost.py
 - `check_data.py --full` 全部检查通过。
 - valid 上记录至少一组可复现的 macro-AUC / macro-F1。
 - 提交文件通过 `validate_submission`，格式与赛题要求一致。
-- 在赛题指定硬件上运行 `cost.py`：平均单张耗时 ≤100 ms，`[CONCLUSION]` 与 `submission.csv` 不一致 0。
+- 在赛题指定硬件上运行 `cost.py` 并记录一致性；多图 study 的最终耗时需确认主办方口径后复测，最终以主办方结果为准。
 
 ## 备注
 

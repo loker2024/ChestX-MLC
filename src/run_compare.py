@@ -14,16 +14,15 @@
 
 脚本对每个 run 做三件事：
 
-1. 用 run 目录里存档的 config.yaml 重建 valid 的 DataLoader。不能用当前的
-   configs/default.yaml：旧 run 的权重配上新配置（比如图像尺寸从 320 改成
-   384），指标就对不上了；
+1. 优先用 best.pt 内保存的配置重建 valid DataLoader，旧权重未含配置时才使用
+   run 目录的 config.yaml；
 2. 加载 best.pt 重新推理，在内存里重算 macro-AUC 和多阈值下的 macro-F1；
 3. 把配置要点（骨干、尺寸、seed、pos_weight…）和指标拼成一张表，同时写出
-   summary.csv（给脚本读）和 summary.md（贴进实验记录）。
+   summary.csv、per_class.csv 和 summary.md（含逐类结果）。
 
 为什么重算而不是抄训练日志里的 metrics.csv：不同 run 可能在不同时间、用不同
-代码训练过，日志里的数字口径未必一致。统一在这里用同一份 valid、同一套指标
-函数重算，差异才真的来自模型本身。
+代码训练过，日志里的数字口径未必一致。这里使用同一套指标函数重算；使用者须
+确认各 run 的 valid 是同一份数据，才能据此比较模型。
 """
 
 from __future__ import annotations
@@ -38,9 +37,9 @@ import pandas as pd
 import torch
 
 from common.checkpoint import load_checkpoint
-from common.config import load_config
+from common.config import config_from_dict, load_config
 from common.constants import CLASS_IDS, CSV_ENCODING
-from common.metrics import macro_auc, macro_f1_curve, parse_thresholds
+from common.metrics import macro_auc, macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
 from data.dataset import build_loader
 from infer.predict import load_checkpoint_model, predict_loader
@@ -67,16 +66,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def evaluate_run(run_dir: Path, thresholds: list[float], device: torch.device) -> dict[str, Any]:
-    """在一个 run 上重算指标，返回对比表里的一行。"""
+def evaluate_run(
+    run_dir: Path, thresholds: list[float], device: torch.device
+) -> tuple[dict[str, Any], pd.DataFrame]:
+    """在一个 run 上重算指标，返回汇总行与逐类报告。"""
     missing = [name for name in ("config.yaml", "best.pt") if not (run_dir / name).is_file()]
     if missing:
         raise FileNotFoundError(
             f"run 目录 {run_dir} 缺少 {missing}；它应该是 run_train.py 的输出目录"
         )
 
-    # 关键一步：用 run 自己存档的配置，而不是当前仓库里的默认配置。
-    config = load_config(run_dir / "config.yaml")
+    # 续训可能使用新配置；应与 best.pt 所保存的配置对齐。旧文件缺配置才回退。
+    checkpoint = load_checkpoint(run_dir / "best.pt", map_location="cpu")
+    raw_config = checkpoint.get("config")
+    config = (
+        load_config(run_dir / "config.yaml")
+        if raw_config is None
+        else config_from_dict(raw_config)
+    )
     loader = build_loader(config, "valid", pin_memory=device.type == "cuda")
     model = load_checkpoint_model(config, run_dir / "best.pt", device)
     predictions = predict_loader(model, loader, device)
@@ -87,11 +94,12 @@ def evaluate_run(run_dir: Path, thresholds: list[float], device: torch.device) -
 
     # checkpoint 里存了训练时的 seed、设备与最优 epoch，直接引用，省得从目录名
     # 或命令行回忆；旧 checkpoint 没有这些字段时退回配置里的值 / 显示「未知」。
-    checkpoint = load_checkpoint(run_dir / "best.pt", map_location="cpu")
     metadata = checkpoint.get("metadata") or {}
 
     row: dict[str, Any] = {
         "run": run_dir.name,
+        "config_source": "config.yaml（旧权重回退）" if raw_config is None else "best.pt",
+        "valid_csv": str(config.data.valid.csv),
         "backbone": config.model.backbone,
         "image_size": config.image.size,
         "pos_weight": _yes_no(config.train.pos_weight),
@@ -107,7 +115,10 @@ def evaluate_run(run_dir: Path, thresholds: list[float], device: torch.device) -
     curve = macro_f1_curve(y_true, y_score, thresholds)
     for threshold, f1 in zip(curve["threshold"], curve["macro_f1"]):
         row[f"f1@{threshold:g}"] = f1
-    return row
+    class_report = per_class_report(y_true, y_score, config.eval.threshold)
+    class_report.insert(0, "run", run_dir.name)
+    class_report.insert(2, "threshold", config.eval.threshold)
+    return row, class_report
 
 
 def _yes_no(value: Any) -> str:
@@ -131,24 +142,35 @@ def _to_markdown(table: pd.DataFrame) -> str:
 
 
 def write_summary(
-    table: pd.DataFrame, out_dir: Path, thresholds: list[float], evaluate_device: torch.device
+    table: pd.DataFrame,
+    per_class: pd.DataFrame,
+    out_dir: Path,
+    thresholds: list[float],
+    evaluate_device: torch.device,
 ) -> tuple[Path, Path]:
-    """把对比表落成 summary.csv 与 summary.md，返回这两个文件的路径。"""
+    """写出汇总及逐类报告，返回汇总 CSV 与 Markdown 路径。"""
     out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / "summary.csv"
     md_path = out_dir / "summary.md"
     table.to_csv(csv_path, index=False, encoding=CSV_ENCODING)
+    per_class.to_csv(out_dir / "per_class.csv", index=False, encoding=CSV_ENCODING)
 
     lines = [
         "# 训练 run 对比",
         "",
         f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}",
         f"- 评估设备：{evaluate_device}",
-        "- 评估数据：各 run 自己 split 配置里的 valid（study 数见表格）",
+        "- 评估数据：各 run 配置里的 valid；请核对路径和数据内容一致后再比较（study 数见表格）",
         "- 指标：macro-AUC 与各阈值下的 macro-F1，均在本地重算",
         f"- 阈值网格：{', '.join(f'{value:g}' for value in thresholds)}",
         "",
         _to_markdown(table),
+        "",
+        "## 逐类指标",
+        "",
+        "F1、precision、recall 使用各 run 配置的 threshold；AUC 与阈值无关。",
+        "",
+        _to_markdown(per_class),
         "",
     ]
     md_path.write_text("\n".join(lines), encoding=CSV_ENCODING)
@@ -161,11 +183,13 @@ def main(argv: list[str] | None = None) -> None:
     device = resolve_device(args.device)
 
     rows: list[dict[str, Any]] = []
+    reports: list[pd.DataFrame] = []
     for run in args.runs:
         run_dir = Path(run)
         print(f"评估 {run_dir} ...")
-        row = evaluate_run(run_dir, thresholds, device)
+        row, class_report = evaluate_run(run_dir, thresholds, device)
         rows.append(row)
+        reports.append(class_report)
         # 每个 run 算完先打印一行，跑多个 run 时能立刻看出哪个有问题。
         f1_text = ", ".join(
             f"{column}={value:.4f}" for column, value in row.items() if column.startswith("f1@")
@@ -173,11 +197,14 @@ def main(argv: list[str] | None = None) -> None:
         print(f"  macro-AUC {row['macro_auc']:.4f} | {f1_text}")
 
     table = pd.DataFrame(rows)
-    csv_path, md_path = write_summary(table, Path(args.out), thresholds, device)
+    csv_path, md_path = write_summary(
+        table, pd.concat(reports, ignore_index=True), Path(args.out), thresholds, device
+    )
     print()
     print(_to_markdown(table))
     print()
     print(f"已写出：{csv_path}")
+    print(f"已写出：{Path(args.out) / 'per_class.csv'}")
     print(f"已写出：{md_path}")
 
 

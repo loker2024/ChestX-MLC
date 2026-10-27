@@ -47,7 +47,7 @@ python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_
 
 `run_infer.py` 默认输出全部 10 类概率；需要按阈值过滤时加 `--threshold 0.5`（阈值必须在 `[0, 1]`）。
 
-`cost.py` 按赛题第 7 条测单张端到端耗时：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮，先每张取 3 轮均值再对 100 张平均，与 100 ms 上限比较，并核对现场预测与 `submission.csv` 一致；参数与口径见 `docs/cost.md`。缺省会自动查找配置与 checkpoint，也可显式传 `--config` / `--checkpoint`；`--precision fp16` 时须在提交说明中声明。
+`cost.py` 对 100 张图 `batch=1` 串行跑 3 轮并校验与 `submission.csv` 的一致性；单图结果计时包含写出，多图 study 的最终聚合耗时无法按现有规则明确判定。它依赖配置中的完整测试集索引补齐图片，参数与限制见 `docs/cost.md`；`--precision fp16` 时须在提交说明中声明。
 
 ## 编码风格与命名
 

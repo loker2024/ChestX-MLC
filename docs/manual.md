@@ -288,6 +288,7 @@ outputs/
 │   └── last.pt
 ├── compare/                          # run_compare.py 的输出
 │   ├── summary.csv
+│   ├── per_class.csv
 │   └── summary.md
 ├── submission.csv                    # run_infer.py 的默认提交文件
 └── example_submission.csv            # 示例数据冒烟时的提交文件（示例）
@@ -314,13 +315,13 @@ outputs/
 
 | 文件 | 何时产生 | 内容与用途 |
 | --- | --- | --- |
-| `config.yaml` | 训练开始时 | 合并 `_base` 并经校验后的**完整**配置。后续复盘、`run_eval`、`run_infer`、`run_compare` 都应以它为准，不要用当前仓库的默认配置替代。 |
+| `config.yaml` | 训练开始时 | 合并 `_base` 并经校验后的初始完整配置。续训后还需核对 `config_resume.yaml` 和 checkpoint 中存档的配置。 |
 | `config_resume.yaml` | 使用 `--resume` 时 | 本次续训实际生效的配置（省略 `--config` 时就是 checkpoint 里存档的配置）。原来的 `config.yaml` 保留不动，便于对照“最初配置”和“续训配置”。 |
 | `train.log` | 训练开始时创建，续训时追加 | 终端 stdout 与 stderr 的完整副本。包含配置来源、run 目录、设备、seed、预训练是否加载、每个 epoch 一行指标、早停/中断提示。 |
 | `metrics.csv` | 每个 epoch 结束时重写 | 每个 epoch 一行的训练/验证指标，见 3.4。中断时保留最后一个完整 epoch。 |
 | `best.pt` | 训练**正常结束后** | valid macro-AUC 最高的权重。推理、验证、对比都使用它。训练被中断时不会生成。 |
 | `last.pt` | 每个 epoch 结束时 | 可续训的完整状态：权重、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史。文件明显大于 `best.pt`。 |
-| `summary.csv` / `summary.md` | `run_compare.py` 运行后 | 多个 run 的指标对比表，见 3.6。 |
+| `summary.csv` / `per_class.csv` / `summary.md` | `run_compare.py` 运行后 | 多个 run 的指标对比表与逐类指标，见 3.6。 |
 | `submission.csv` | `run_infer.py` 运行后 | 赛题提交文件，长表格式，见 3.7。 |
 
 > `best.pt` 只在训练结束时落盘，是为了保证它始终是一个完整文件，不会出现“写到一半”的坏权重。若训练中断，请用 `last.pt` 续训，训练完成后自然会生成 `best.pt`。
@@ -364,7 +365,8 @@ outputs/
 | 文件 | 内容 |
 | --- | --- |
 | `summary.csv` | 每个 run 一行的机器可读表格。 |
-| `summary.md` | 同一张表的 Markdown 版本，附生成时间、评估设备、阈值网格，可直接贴进实验记录。 |
+| `per_class.csv` | 各 run 的逐类 AUC、precision、recall 和 F1。 |
+| `summary.md` | 汇总表和逐类表的 Markdown 版本，附生成时间、评估设备和阈值网格。 |
 
 `summary.csv` 的列包括：
 
@@ -373,7 +375,7 @@ run, backbone, image_size, pos_weight, seed, epochs, best_epoch,
 pretrained, train_device, valid_studies, macro_auc, f1@0.3, f1@0.4, ...
 ```
 
-其中 `pos_weight`、`pretrained` 显示为“是/否/未知”，`train_device` 来自 checkpoint 的 `metadata.device`。`macro_auc` 与各阈值下的 F1 都是在运行时用每个 run 自己的 `config.yaml` 重建 valid 后重新计算的，不抄训练日志。
+其中 `pos_weight`、`pretrained` 显示为“是/否/未知”，`train_device` 来自 checkpoint 的 `metadata.device`。对比优先使用 `best.pt` 中的配置重建 valid；旧权重没有存档配置时回退到 `config.yaml`，表中标注配置来源与验证集路径。比较前还需确认验证集内容一致。
 
 ### 3.7 `submission.csv` 格式
 
@@ -491,7 +493,7 @@ python src/run_train.py --resume outputs/20261027-101500_full_baseline/last.pt
 
 - 复用原 run 目录，不新建目录；`train.log` **追加**写入，并插入 `===== 续训 ... =====` 分隔行。
 - 从 `last.pt` 恢复模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优权重、历史记录与早停计数，接着跑剩余 epoch。
-- 省略 `--config` 时，沿用 `last.pt` 里存档的配置；显式传 `--config` 时，用新配置继续。无论是否传 `--config`，续训实际生效的配置都会另存为 `config_resume.yaml`，原 `config.yaml` 不动。
+- 省略 `--config` 时，沿用 `last.pt` 里存档的配置；显式传 `--config` 时，只允许修改 `train.epochs`、`train.num_workers`、`eval.batch_studies`、`device` 和 `output`，其余差异会报错。续训配置另存为 `config_resume.yaml`，原 `config.yaml` 不动。
 - 如果该 run 已跑满 `train.epochs`，不会重复训练，只重新导出 `best.pt`。
 - 训练被 Ctrl+C 中断时，最多丢失当前这一轮；用上面的 `--resume` 命令继续。
 - 续训保存的是模型、优化器、调度器、AMP 与训练进度，不含随机数生成器状态；恢复后数据打乱与增强会从 `seed` 重新开始，指标可能与“不中断一次跑完”有细微差异。正式对比仍应以完整 run 为准。
@@ -502,7 +504,7 @@ python src/run_train.py --resume outputs/20261027-101500_full_baseline/last.pt
 python src/run_train.py --resume outputs/<run> --config configs/exp_long.yaml
 ```
 
-`exp_long.yaml` 只需在 `_base: default.yaml` 的基础上把 `train.epochs` 调大。**续训时不要改 `model.backbone`、`model.num_classes`、`image.size`、`image.normalize`、`image.letterbox`**，否则权重或输入口径对不上，指标也不可比。
+`exp_long.yaml` 只需在原训练配置的基础上把 `train.epochs` 调大。学习率、权重衰减、数据与预处理等训练口径不可通过续训配置更改；需要改变这些参数时应新建 run。
 
 > 只有训练过程中生成的 `last.pt` 才能续训。`best.pt` 没有优化器、调度器和 `extras`，拿它续训会报错。
 
@@ -586,10 +588,10 @@ python src/run_compare.py \
 | --- | --- | --- |
 | `--runs` | 必填 | 一个或多个 run 目录，每个目录必须同时有 `config.yaml` 与 `best.pt`。 |
 | `--thresholds` | `0.3,0.4,0.5,0.6,0.7` | 计算各阈值下 macro-F1 的网格，每个阈值须在 `[0, 1]`。 |
-| `--out` | `outputs/compare` | `summary.csv` / `summary.md` 的输出目录。 |
+| `--out` | `outputs/compare` | `summary.csv` / `per_class.csv` / `summary.md` 的输出目录。 |
 | `--device` | `auto` | 评估设备；与 run 里的配置无关。 |
 
-脚本对每个 run：用该 run 的 `config.yaml` 重建 valid loader → 加载 `best.pt` 重算 macro-AUC 与多阈值 F1 → 汇总配置要点（骨干、尺寸、`pos_weight`、seed、最优 epoch、训练设备）为一行。因为统一重算，不同时间的 run 才具有可比性。参与对比的 run 应让 `data.valid` 指向同一份验证数据，否则指标不是同一口径。
+脚本对每个 run：优先用 `best.pt` 的配置重建 valid loader → 重算 macro-AUC、多阈值 F1 和逐类指标 → 汇总配置要点。参与对比的 run 必须使用同一份验证数据，否则指标不是同一口径。
 
 ### 4.6 测试
 
@@ -607,7 +609,7 @@ python -m pytest
 | `src/run_train.py` | 无 | `--config`、`--seed`、`--tag`、`--resume` | run 目录：`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`last.pt` |
 | `src/run_eval.py` | `--checkpoint` | `--config`、`--split`、`--thresholds` | 终端指标与逐类明细 |
 | `src/run_infer.py` | `--checkpoint` | `--config`、`--out`、`--threshold` | `submission.csv` |
-| `src/run_compare.py` | `--runs` | `--thresholds`、`--out`、`--device` | `summary.csv`、`summary.md` |
+| `src/run_compare.py` | `--runs` | `--thresholds`、`--out`、`--device` | `summary.csv`、`per_class.csv`、`summary.md` |
 
 ---
 
@@ -726,6 +728,7 @@ python -m pytest
 | `outputs/<run>/best.pt` | valid macro-AUC 最优权重，用于验证与推理 |
 | `outputs/<run>/last.pt` | 完整训练状态，用于断点续训 |
 | `outputs/compare/summary.csv` | 多 run 对比表（机器可读） |
+| `outputs/compare/per_class.csv` | 各 run 的逐类 AUC / precision / recall / F1 |
 | `outputs/compare/summary.md` | 多 run 对比表（可贴文档） |
 | `outputs/submission.csv` | 默认提交文件 |
 

@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+import yaml
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -314,6 +315,67 @@ def test_select_prediction_rows_rejects_bad_shape() -> None:
         select_prediction_rows(np.zeros(9), threshold=0.5)
 
 
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -0.1, 1.1])
+def test_compare_rejects_invalid_live_probabilities(bad: float) -> None:
+    table = SubmissionTable(probabilities={"study_a": {i: 0.5 for i in range(1, 11)}})
+    values = np.full(10, 0.5)
+    values[0] = bad
+    with pytest.raises(ValueError, match="概率"):
+        compare_study_predictions({"study_a": values}, table, threshold=0.5)
+
+
+def test_read_submission_rejects_conflicting_subjects(tmp_path: Path) -> None:
+    path = _write_submission(tmp_path / "bad.csv", [["a", "s", "1", "0.5"], ["b", "s", "2", "0.5"]],
+                             ["Subject_id", "Study_id", "Predict_class", "Probability"])
+    with pytest.raises(ValueError, match="Subject_id"):
+        read_submission(path)
+
+
+def test_timing_writes_output(env: dict, tmp_path: Path) -> None:
+    output = tmp_path / "prediction.csv"
+    cost._time_one_image(env["model"], env["images"] / IMAGE_RELATIVES[2],
+                         env["transform"], env["device"], None, output)
+    rows = list(csv.DictReader(output.open(encoding="utf-8", newline="")))
+    assert len(rows) == 10
+    assert rows[0]["Subject_id"] == "subject_00001"
+    assert rows[0]["Study_id"] == "study_00001"
+
+
+def test_main_partial_study_uses_complete_test_set(env: dict, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from shutil import copyfile, copytree
+    complete = tmp_path / "complete"
+    copytree(env["images"], complete)
+    Image.new("RGB", (64, 48), (0, 0, 0)).save(complete / IMAGE_RELATIVES[1])
+    probabilities = predict_study(env["model"], [complete / name for name in IMAGE_RELATIVES[:2]],
+                                  env["transform"], env["device"])
+    frame = pd.read_csv(env["submission"], dtype=str, keep_default_na=False)
+    for index in range(10):
+        frame.loc[(frame["Study_id"] == "study_00000") & (frame["Predict_class"] == str(index + 1)), "Probability"] = str(probabilities[index])
+    submission = tmp_path / "submission.csv"
+    frame.to_csv(submission, index=False)
+    config = tmp_path / "config.yaml"
+    config.write_text(env["config_path"].read_text().replace(str(env["images"]), str(complete)))
+    sampled = tmp_path / "sampled"
+    target = sampled / IMAGE_RELATIVES[0]
+    target.parent.mkdir(parents=True)
+    copyfile(env["images"] / IMAGE_RELATIVES[0], target)
+    args = _cli_arguments(env, submission)
+    args[1] = str(sampled)
+    args[args.index("--config") + 1] = str(config)
+    assert cost.main(args) == 2
+    output = capsys.readouterr().out
+    assert "不一致 0" in output
+    assert "无法判定" in output
+
+
+def test_main_rejects_wrong_subject(env: dict, tmp_path: Path) -> None:
+    frame = pd.read_csv(env["submission"], dtype=str, keep_default_na=False)
+    frame.loc[frame["Study_id"] == "study_00000", "Subject_id"] = "wrong"
+    path = tmp_path / "wrong.csv"
+    frame.to_csv(path, index=False)
+    assert cost.main(_cli_arguments(env, path)) == 1
+
+
 def _probabilities(*values: float) -> np.ndarray:
     assert len(values) == 10
     return np.asarray(values, dtype=float)
@@ -468,8 +530,18 @@ def _cli_arguments(env: dict, submission: Path | None = None) -> list[str]:
     ]
 
 
-def test_main_end_to_end(env: dict, capsys: pytest.CaptureFixture[str]) -> None:
-    assert cost.main(_cli_arguments(env)) == 0
+def _single_image_args(env: dict, tmp_path: Path) -> list[str]:
+    from shutil import copyfile
+    sample = tmp_path / IMAGE_RELATIVES[2]
+    sample.parent.mkdir(parents=True)
+    copyfile(env["images"] / IMAGE_RELATIVES[2], sample)
+    args = _cli_arguments(env)
+    args[1] = str(tmp_path)
+    return args
+
+
+def test_main_end_to_end(env: dict, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cost.main(_single_image_args(env, tmp_path)) == 0
     output = capsys.readouterr().out
     assert "[CONCLUSION]" in output
     assert "未超过上限" in output
@@ -480,7 +552,7 @@ def test_main_end_to_end(env: dict, capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_main_writes_report(env: dict, tmp_path: Path) -> None:
     report_path = tmp_path / "report.json"
-    assert cost.main(_cli_arguments(env) + ["--report", str(report_path)]) == 0
+    assert cost.main(_single_image_args(env, tmp_path) + ["--report", str(report_path)]) == 0
     payload = report_path.read_text(encoding="utf-8")
     assert '"within_limit": true' in payload
     assert '"inconsistent_studies": 0' in payload
@@ -495,11 +567,61 @@ def test_main_detects_inconsistent_submission(env: dict, tmp_path: Path) -> None
 
 
 def test_main_detects_slow_inference(
+    env: dict, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cost, "_time_one_image", lambda *args, **kwargs: 250.0)
+    assert cost.main(_single_image_args(env, tmp_path)) == 1
+    assert "超过上限" in capsys.readouterr().err
+
+
+def test_slow_multi_image_candidate_does_not_claim_final_timeout(
     env: dict, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(cost, "_time_one_image", lambda *args, **kwargs: 250.0)
-    assert cost.main(_cli_arguments(env)) == 1
-    assert "超过上限" in capsys.readouterr().err
+    assert cost.main(_cli_arguments(env)) == 2
+    assert "无法判定最终端到端耗时" in capsys.readouterr().err
+
+
+def test_load_complete_test_index_returns_none_when_missing(
+    env: dict, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = replace(
+        env["config"],
+        data=replace(
+            env["config"].data,
+            test=replace(
+                env["config"].data.test,
+                csv=tmp_path / "no_such.csv",
+                images=tmp_path / "no_such_images",
+            ),
+        ),
+    )
+    assert cost.load_complete_test_index(config) is None
+    assert "退化为按 pictures_100 自身分组" in capsys.readouterr().out
+
+
+def test_main_falls_back_without_complete_test_index(
+    env: dict, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """评测环境没有测试集文件时，按抽样目录自身分组跑完，报告标注不可核实。"""
+    raw = yaml.safe_load(env["config_path"].read_text(encoding="utf-8"))
+    raw["data"]["test"]["csv"] = str(tmp_path / "no_such.csv")
+    raw["data"]["test"]["images"] = str(tmp_path / "no_such_images")
+    config_path = tmp_path / "no_index.yaml"
+    config_path.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+
+    report = tmp_path / "report.json"
+    arguments = _single_image_args(env, tmp_path)
+    arguments[arguments.index("--config") + 1] = str(config_path)
+    arguments += ["--report", str(report)]
+
+    assert cost.main(arguments) == 0
+    output = capsys.readouterr().out
+    assert "退化为按 pictures_100 自身分组" in output
+    assert "不一致 0 张" in output
+    payload = report.read_text(encoding="utf-8")
+    assert '"final_timing_verifiable": false' in payload
+    assert '"within_limit": true' in payload
 
 
 def test_main_missing_checkpoint_returns_2(env: dict, tmp_path: Path) -> None:

@@ -211,9 +211,8 @@ def fit(
 
     断点续训：把上次的 `progress` 连同三个 `*_state`（优化器 / 调度器 / AMP）
     一起传进来，训练就从 `progress.epoch + 1` 接着跑，最优权重、历史记录和
-    早停计数都沿用旧值。`on_epoch_end` 在每轮结束、`scheduler.step()` 之前调用，
-    调用方据此把 last.pt 落盘——此时调度器尚未推进，恢复后下一轮的学习率
-    才会和原来完全一致。
+    早停计数都沿用旧值。`on_epoch_end` 在调度器推进后调用，保存的状态可直接
+    用于下一轮；旧版断点的调度器尚未推进，恢复时按已完成轮次补上一步。
     """
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -233,6 +232,8 @@ def fit(
 
     criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
     progress = TrainProgress() if progress is None else progress
+    if scheduler_state is not None and scheduler.last_epoch == progress.epoch - 1:
+        scheduler.step()  # 旧版 last.pt 是在 scheduler.step() 之前保存的。
     # best_state 记录当前最优权重；续训时沿用存档里的，不能拿当前权重覆盖。
     # 若整场 AUC 都无效，函数末尾会显式报错，而不是保存随机权重。
     if progress.best_state is None:
@@ -277,6 +278,7 @@ def fit(
             progress.stale_epochs += 1
 
         progress.epoch = epoch
+        scheduler.step()
         if on_epoch_end is not None:
             on_epoch_end(progress, runtime)
 
@@ -286,8 +288,6 @@ def fit(
         if not improved and patience and progress.stale_epochs >= patience:
             print(f"连续 {progress.stale_epochs} 个 epoch 没有提升，提前结束训练")
             break
-
-        scheduler.step()
 
     if progress.best_epoch == 0:
         raise RuntimeError(

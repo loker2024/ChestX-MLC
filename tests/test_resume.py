@@ -18,10 +18,11 @@ import pytest
 import torch
 
 import run_train
-from common.checkpoint import load_checkpoint
+from common.checkpoint import load_checkpoint, save_checkpoint
 from common.config import Config, load_config
 from data.dataset import build_loader
 from model.network import build_model
+import train.engine as training_engine
 from train.engine import fit
 
 
@@ -65,13 +66,13 @@ def test_resume_continues_history_and_learning_rate(config_path: Path) -> None:
     full = fit(config, build_model(config), train_loader, val_loader, device)
     expected_lrs = [record["lr"] for record in full["history"]]
 
-    # 跑到第 2 轮结束时“被打断”，保存可续训的状态。
+    # warmup 尚未结束时中断，恢复后下一轮必须达到完整学习率。
     torch.manual_seed(0)
     model = build_model(config)
     captured: dict[str, object] = {}
 
     def stop_after_second_epoch(progress, runtime) -> None:
-        if progress.epoch == 2:
+        if progress.epoch == 1:
             captured.update(
                 progress=progress,
                 optimizer=runtime.optimizer.state_dict(),
@@ -96,6 +97,72 @@ def test_resume_continues_history_and_learning_rate(config_path: Path) -> None:
     assert [record["epoch"] for record in resumed["history"]] == [1, 2, 3, 4]
     assert [record["lr"] for record in resumed["history"]] == pytest.approx(expected_lrs)
     assert resumed["progress"].epoch == 4
+
+
+def test_legacy_scheduler_checkpoint_advances_before_resuming(config_path: Path) -> None:
+    config = _make_config(config_path, epochs=4, warmup_epochs=2)
+    train_loader, val_loader = _loaders(config)
+    model = build_model(config)
+    captured = {}
+
+    def stop(progress, runtime) -> None:
+        # Recreate old last.pt: old hook was invoked before scheduler.step().
+        scheduler = runtime.scheduler.state_dict()
+        scheduler["last_epoch"] = progress.epoch - 1
+        optimizer = runtime.optimizer.state_dict()
+        optimizer["param_groups"][0]["lr"] = config.train.lr / 2
+        captured.update(progress=progress, optimizer=optimizer, scheduler=scheduler)
+        raise _StopTraining
+
+    with pytest.raises(_StopTraining):
+        fit(config, model, train_loader, val_loader, torch.device("cpu"), on_epoch_end=stop)
+    resumed = fit(
+        config, model, train_loader, val_loader, torch.device("cpu"),
+        progress=captured["progress"], optimizer_state=captured["optimizer"],
+        scheduler_state=captured["scheduler"],
+    )
+    assert resumed["history"][1]["lr"] == pytest.approx(config.train.lr)
+
+
+def test_early_stop_checkpoint_scheduler_is_ready_for_next_epoch(config_path: Path, monkeypatch) -> None:
+    config = _make_config(config_path, epochs=5, warmup_epochs=3)
+    config = replace(config, train=replace(config.train, early_stop_patience=1))
+    train_loader, val_loader = _loaders(config)
+    model = build_model(config)
+    captured = {}
+    monkeypatch.setattr(training_engine, "evaluate", lambda *args: {"loss": 1.0, "macro_auc": 0.5, "macro_f1": 0.5})
+
+    def capture(progress, runtime) -> None:
+        captured.update(progress=progress, optimizer=runtime.optimizer.state_dict(), scheduler=runtime.scheduler.state_dict())
+
+    fit(config, model, train_loader, val_loader, torch.device("cpu"), on_epoch_end=capture)
+    assert captured["progress"].epoch == 2
+    assert captured["scheduler"]["last_epoch"] == 2
+    resumed = fit(
+        config, model, train_loader, val_loader, torch.device("cpu"),
+        progress=captured["progress"], optimizer_state=captured["optimizer"],
+        scheduler_state=captured["scheduler"],
+    )
+    assert resumed["history"][2]["lr"] == pytest.approx(config.train.lr)
+
+
+def test_checkpoint_save_failure_preserves_previous_file(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "last.pt"
+    model = torch.nn.Linear(2, 1)
+    save_checkpoint(path, model, epoch=1)
+    original_save = torch.save
+
+    def fail_after_partial_write(payload, target):
+        with open(target, "wb") as handle:
+            handle.write(b"incomplete")
+        raise OSError("disk full")
+
+    monkeypatch.setattr(torch, "save", fail_after_partial_write)
+    with pytest.raises(OSError, match="disk full"):
+        save_checkpoint(path, model, epoch=2)
+    monkeypatch.setattr(torch, "save", original_save)
+    assert load_checkpoint(path)["epoch"] == 1
+    assert list(tmp_path.iterdir()) == [path]
 
 
 def test_resume_keeps_best_epoch_from_before_interruption(config_path: Path) -> None:
@@ -197,6 +264,31 @@ def test_run_train_resume_finishes_remaining_epochs(tmp_path: Path, labeled_spli
     log = (run_dir / "train.log").read_text(encoding="utf-8")
     assert "续训" in log
     assert "从断点继续" in log
+
+
+@pytest.mark.parametrize("field,value", [("lr", "0.01"), ("weight_decay", "0.2"), ("pos_weight", "true")])
+def test_resume_rejects_changed_training_hyperparameters(
+    tmp_path: Path, labeled_split: dict, field: str, value: str
+) -> None:
+    run_root = tmp_path / "outputs"
+    first = _write_config(tmp_path, labeled_split, run_root, epochs=1)
+    run_train.main(["--config", str(first)])
+    run_dir = next(run_root.iterdir())
+    changed = _write_config(tmp_path, labeled_split, run_root, epochs=3, name="changed.yaml")
+    text = changed.read_text(encoding="utf-8")
+    changed.write_text(text.replace("train:\n  epochs:", f"train:\n  {field}: {value}\n  epochs:"), encoding="utf-8")
+    with pytest.raises(ValueError, match=field):
+        run_train.main(["--config", str(changed), "--resume", str(run_dir)])
+    assert not (run_dir / "config_resume.yaml").exists()
+
+
+def test_run_training_rejects_incompatible_resume_config(tmp_path: Path, config_path: Path) -> None:
+    config = _make_config(config_path, epochs=1)
+    run_train.run_training(config, torch.device("cpu"), tmp_path)
+    incompatible = replace(config, train=replace(config.train, lr=config.train.lr * 2))
+    checkpoint = load_checkpoint(tmp_path / "last.pt")
+    with pytest.raises(ValueError, match="train.lr"):
+        run_train.run_training(incompatible, torch.device("cpu"), tmp_path, checkpoint=checkpoint)
 
 
 def test_resume_without_config_reuses_saved_config(tmp_path: Path, labeled_split: dict) -> None:

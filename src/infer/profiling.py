@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import csv
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -108,6 +108,7 @@ class SubmissionTable:
     """submission.csv 解析结果：study -> {类别 ID: 概率}。"""
 
     probabilities: Mapping[str, dict[int, float]]
+    subjects: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def study_ids(self) -> tuple[str, ...]:
@@ -139,11 +140,15 @@ def read_submission(path: str | Path) -> SubmissionTable:
             )
 
         probabilities: dict[str, dict[int, float]] = {}
+        subjects: dict[str, str] = {}
         for line_number, row in enumerate(reader, start=2):
             subject_id = (row.get("Subject_id") or "").strip()
             study_id = (row.get("Study_id") or "").strip()
             if not subject_id or not study_id:
                 raise ValueError(f"{path}:{line_number} 的 Subject_id/Study_id 为空")
+            if study_id in subjects and subjects[study_id] != subject_id:
+                raise ValueError(f"{path}:{line_number} 的 study {study_id} 对应多个 Subject_id")
+            subjects[study_id] = subject_id
 
             try:
                 class_id = int((row.get("Predict_class") or "").strip())
@@ -180,7 +185,7 @@ def read_submission(path: str | Path) -> SubmissionTable:
 
     if not probabilities:
         raise ValueError(f"{path} 里没有任何预测行")
-    return SubmissionTable(probabilities=probabilities)
+    return SubmissionTable(probabilities=probabilities, subjects=subjects)
 
 
 def select_prediction_rows(
@@ -195,6 +200,8 @@ def select_prediction_rows(
     values = np.asarray(probabilities, dtype=float)
     if values.shape != (NUM_CLASSES,):
         raise ValueError(f"概率向量长度必须是 {NUM_CLASSES}，实际 shape 为 {values.shape}")
+    if not np.isfinite(values).all() or (values < 0).any() or (values > 1).any():
+        raise ValueError("概率必须为 [0, 1] 内的有限数")
     if not (math.isfinite(threshold) and 0.0 <= threshold <= 1.0):
         raise ValueError(f"threshold 必须落在 [0, 1]，当前为 {threshold!r}")
 
@@ -254,6 +261,7 @@ def compare_study_predictions(
     threshold: float,
     tolerance: float = DEFAULT_TOLERANCE,
     image_counts: Mapping[str, int] | None = None,
+    study_subjects: Mapping[str, str] | None = None,
 ) -> ComparisonReport:
     """把现场算出的 study 概率与 submission.csv 比对。
 
@@ -282,6 +290,8 @@ def compare_study_predictions(
                 f"study {study_id} 的概率向量长度必须是 {NUM_CLASSES}，"
                 f"实际 shape 为 {probabilities.shape}"
             )
+        if not np.isfinite(probabilities).all() or (probabilities < 0).any() or (probabilities > 1).any():
+            raise ValueError(f"study {study_id} 的概率必须为 [0, 1] 内的有限数")
         image_count = int(counts.get(study_id, 0))
         entry = submission.probabilities.get(study_id)
 
@@ -293,6 +303,10 @@ def compare_study_predictions(
                     image_count=image_count,
                 )
             )
+            continue
+
+        if study_subjects is not None and submission.subjects.get(study_id) != study_subjects.get(study_id):
+            issues.append(ComparisonIssue(study_id, "Subject_id 与测试集不一致", image_count=image_count))
             continue
 
         if len(entry) == NUM_CLASSES:
@@ -418,6 +432,7 @@ def format_conclusion(
     *,
     precision: str,
     warmup_images: int,
+    final_timing: bool = True,
 ) -> str:
     """生成规则示例要求的单行 `[CONCLUSION]` 结论。
 
@@ -429,11 +444,12 @@ def format_conclusion(
     """
     if warmup_images <= 0:
         raise ValueError(f"warmup_images 必须为正数，当前为 {warmup_images!r}")
-    status = "未超过上限" if timing.within_limit else "超过上限"
+    status = ("未超过上限" if timing.within_limit else "超过上限") if final_timing else "多图 study 最终耗时无法判定"
+    timing_kind = "单张端到端墙钟时间" if final_timing else "单张候选结果墙钟时间"
     return (
         f"[CONCLUSION] 结论：{timing.images} 张样本、batch=1 串行、"
-        f"连续 {timing.rounds} 轮；单张端到端墙钟时间先按每张 {timing.rounds} 轮取均值，"
-        f"再对 {timing.images} 张取平均，最终平均耗时 {timing.mean_ms:.1f} ms，{status}；"
+        f"连续 {timing.rounds} 轮；{timing_kind}先按每张 {timing.rounds} 轮取均值，"
+        f"再对 {timing.images} 张取平均，平均耗时 {timing.mean_ms:.1f} ms，{status}；"
         f"预测结果与 submission.csv 比对 {comparison.checked_images} 张图片"
         f"（{comparison.checked_studies} 个 study），不一致 "
         f"{comparison.inconsistent_images} 张；推理精度 {precision}；"

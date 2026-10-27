@@ -153,7 +153,7 @@ ChestX-MLC/
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 | `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
-| `cost.py`（仓库根目录） | 赛题第 7 条耗时自检：100 张图 `batch=1` 串行 × 3 轮、5 张预热、测单张端到端耗时并核对与 `submission.csv` 的一致性 | `python cost.py <submission.csv> <pictures_100> <pictures_5>`，可选 `--config` / `--checkpoint` / `--device` / `--precision` / `--rounds` / `--threshold` / `--tolerance` / `--report`；详见 [cost.md](cost.md) |
+| `cost.py`（仓库根目录） | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径 | `python cost.py <submission.csv> <pictures_100> <pictures_5>`，参数、完整测试集依赖和限制见 [cost.md](cost.md) |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -241,7 +241,7 @@ device: auto
 4. `train.engine` 以 `BCEWithLogitsLoss` 训练，按 valid macro-AUC 保存最优权重。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
-7. 根目录 `cost.py` 按赛题第 7 条复测：加载同一份 checkpoint 与配置，5 张预热后对 100 张图 `batch=1` 串行跑 3 轮，单张耗时取 3 轮均值再对 100 张平均；随后用 `predict_study` 聚合现场预测并与 `submission.csv` 比对，可写出 JSON 报告（[cost.md](cost.md)）。
+7. 根目录 `cost.py` 加载同一份 checkpoint 与配置，按单图串行计时并补齐完整 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
 
 每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 

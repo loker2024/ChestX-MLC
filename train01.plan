@@ -12,7 +12,7 @@
 本文件是 RUN-001～004 的执行清单，按顺序照抄命令即可跑完第 7 阶段（P7 对照实验）。
 
 - **不做决策的地方**：本文件不记录实测数字与结论，那些写进 `docs/training_log.md`（每个 run 的 `metrics.csv`、阈值曲线、`run_compare/summary.md`）。
-- **一次只改一个变量**：除 RUN-001R 的「重跑」外，每个 run 相对父配置只差一处，保证结果可归因。
+- **对照原则**：002 和 004B 分别只改 `pos_weight`；004A 同时改最大轮数和早停耐心值，结果只能评价这套延长训练策略，不能单独归因于轮数。
 - **提交节奏**：每日最多 2 次提交、仅 1 次撤销。本计划里 003 / 004 都只在本地出 `submission.csv` 校验，择优后才正式提交。
 - **规则约束**（`docs/比赛参赛规则.md`）：主指标 Macro-AUC（F1 仅并列时用）；主办方 T4 16G 按 batch=1 复测，单张 ≤100 ms；valid 保留用于早停与选阈值，未并入训练。第 3 条：一旦把 valid 并入训练，就不得再用 valid 做早停 / 阈值选择——本计划不触发该条。
 
@@ -43,7 +43,7 @@ python src/check_data.py --config configs/default.yaml --full
 |---|---|---|---|---|---|---|---|
 | **RUN-001R**（重跑） | `configs/exp_short.yaml` | 无（与旧 RUN-001 同配置同 seed，只换代码版本） | 6 | 0（关） | ≈30m | `short_baseline_r2` | 回归验证 + `cost.py` 载体 + 阈值曲线 |
 | **RUN-002** | `configs/exp_short_pos_weight.yaml` | `train.pos_weight: true` | 6 | 0 | ≈30m | `short_pos_weight` | pos_weight 方向判断 |
-| **RUN-003** | `configs/default.yaml`（冻结） | 轮数 6→25，其余同 001R | 25 | 5 | ≈2h00m | `full_baseline` | 正式基线 + 提交候选 |
+| **RUN-003** | `configs/default.yaml`（冻结） | 轮数 6→25，早停 0→5 | 25 | 5 | ≈2h00m | `full_baseline` | 正式基线 + 提交候选 |
 | **RUN-004A**（默认分支） | 计划内新增 `configs/exp_full_long.yaml` | `train.epochs: 25→40`、`train.early_stop_patience: 5→8` | 40 | 8 | ≈3h10m | `full_long` | 验证「还没收敛」是否还有收益 |
 | **RUN-004B**（备选分支） | `configs/exp_pos_weight.yaml` | `train.pos_weight: true`（25 轮版） | 25 | 5 | ≈2h00m | `pos_weight` | pos_weight 放大到正式训练 |
 
@@ -56,7 +56,7 @@ python src/check_data.py --config configs/default.yaml --full
 ```yaml
 # 延长训练：在冻结配置上只把轮数 25→40、早停 5→8。
 # 动机：RUN-001 六轮仍单调上升、最优在最后一轮；RUN-003 满 25 轮后若最优仍在
-# 末段，用这份配置确认是「未收敛」还是「已平台化」；与 RUN-003 只差轮数，可归因。
+# 末段，用这份配置评价延长训练策略；同时调整轮数和早停，不单独归因于轮数。
 _base: default.yaml
 
 train:
@@ -95,7 +95,7 @@ python src/run_train.py --config configs/exp_short_pos_weight.yaml --seed 42 --t
 python src/run_compare.py --runs outputs/<001R> outputs/<002> --thresholds 0.2,0.3,0.4,0.5,0.6,0.7
 ```
 
-**判读门**：macro-AUC 提升 **≥ +0.005**，且 `run_compare/summary.md` 的逐类表里没有「少量稀有类暴涨、多数丰富类明显掉」——两条同时满足才判 `pos_weight` **有效**，作为 004B 的候选；否则维持 `pos_weight: false`，004 固定走 004A。
+**判读门**：macro-AUC 提升 **≥ +0.005**，且 `outputs/compare/summary.md` 的逐类表里没有「少量稀有类暴涨、多数丰富类明显掉」——两条同时满足才判 `pos_weight` **有效**，作为 004B 的候选；否则维持 `pos_weight: false`，004 固定走 004A。逐类数据也保存在 `outputs/compare/per_class.csv`，F1 等指标的阈值见表中 `threshold`。
 
 - 若出现 loss NaN / 明显不收敛：记「`pos_weight` 在 320 分辨率、当前 lr 下训练不稳」，直接关闭该方向，不重试、不占后续 GPU 时间。
 
@@ -105,13 +105,13 @@ python src/run_compare.py --runs outputs/<001R> outputs/<002> --thresholds 0.2,0
 python src/run_train.py --config configs/default.yaml --seed 42 --tag full_baseline
 ```
 
-**判读门**（看 `metrics.csv` 的 `best_epoch`）：
+**判读门**：从 `best.pt` 的 `epoch` 字段或 `run_compare` 汇总表读取 `best_epoch`；`metrics.csv` 用于查看实际运行的各轮 `valid_macro_auc`。默认 patience=5，早停后不会有最佳轮次之后的第 6～10 轮，不能把缺失轮次当作平台期。
 
 | `best_epoch` | 判定 | 004 走向 |
 |---|---|---|
 | ≥ 20 | 最后 1/5 仍在涨 → **未收敛** | 走 **004A**（40 轮） |
-| ≤ 15 且后 10 轮基本平 | **25 轮够用** | 走 **004B**（若 002 判 pos_weight 有效）；否则 004 改跑 004A 作排除实验 |
-| 16～19 | 边缘 | 看后 5 轮 `valid_macro_auc` 斜率：仍在涨 → 004A，已平 → 004B |
+| ≤ 15 | 若早停则仅能观察到最佳轮次后的已运行轮次，不能断言后 10 轮走势 | 002 有效则走 **004B**；否则走 004A 测试延长策略 |
+| 16～19 | 边缘 | 查看实际已运行轮次与停止原因；若未满 25 轮则无法推断缺失轮次，按 002 的结论选择 004A 或 004B |
 
 003 跑完无论走哪条，先出一次全类概率提交做本地校验（**不提交**）：
 
@@ -126,7 +126,7 @@ python src/run_infer.py --config configs/default.yaml \
 python src/run_train.py --config configs/exp_full_long.yaml --seed 42 --tag full_long
 ```
 
-**判读门**：比 003 的 macro-AUC **≥ +0.005** → 40 轮版作为最终提交候选，并在 `docs/experiments.md` 记录「25 轮未跑满」；否则维持 25 轮，把 `exp_full_long.yaml` 标注为「延长无收益」保留，不再重复。
+**判读门**：比 003 的 macro-AUC **≥ +0.005** → 40 轮策略作为最终提交候选；否则维持 25 轮基线。记录两组实际训练轮数及停止原因；这个对比同时改变最大轮数和早停耐心值，不能单独归因于任何一个参数。
 
 ### RUN-004B —— pos_weight 正式版（备选分支）
 
@@ -147,11 +147,12 @@ python src/run_infer.py --config outputs/<001R>/config.yaml \
     --checkpoint outputs/<001R>/best.pt --out outputs/<001R>/submission.csv
 ```
 
-### 5.2 准备计时图片（必须按 study 整组抽）
+### 5.2 准备计时图片
 
 - 来源：`example/test_example`（194 个 study / 283 张图，**每个 study 的图片都完整**，最多 3 张/study）。
 - 抽 **100 张**放 `outputs/cost_pics/pictures_100/<subject>/<study>/<pic>.jpg`，另抽 **5 张**预热图放 `outputs/cost_pics/pictures_5/<subject>/<study>/<pic>.jpg`。
-- **硬规则：一个 study 只能整组抽或整组不抽。** 只抽某 study 的部分图时，`predict_study` 拿到的均值 ≠ `submission.csv` 里该 study「全部图片」聚合的均值，`cost.py` 会报概率不一致——那是选图造成的假不一致，不是代码问题。
+- 一致性检查通过配置中的完整测试集索引补齐同一 study 的图片；无需强制按 study 成组抽取，但必须提供对应的完整测试集 CSV 和图片。
+- 若计时样本涉及多图 study，单图候选结果的耗时不包含完整 study 聚合，脚本会返回 2 并报告最终耗时无法判定；须向主办方确认多图计时口径。
 - 这 100 张属于计时样本，不入库、不进 `data/`。
 
 ### 5.3 运行与验收
@@ -164,10 +165,9 @@ python cost.py outputs/<001R>/submission.csv outputs/cost_pics/pictures_100 outp
 
 验收：
 
-- [ ] 退出码 **0**；
+- [ ] 全部样本均为单图 study 时退出码为 **0**；多图 study 返回 **2** 时记录无法判定，等待官方明确口径；
 - [ ] `[CONCLUSION]` 行显示与 `submission.csv` **不一致 0 张**；
-- [ ] 记录 3090 上的平均单张耗时，并注明 **主办方 T4 约为其 2～3×**；
-- [ ] 判断：320 分辨率 + resnet18 在 100 ms 预算内安全；448 分辨率风险高，本轮不试。
+- [ ] 记录实测设备与平均耗时；最终合规性以主办方指定硬件和复测结果为准。
 
 ---
 
@@ -183,7 +183,7 @@ D2
   ├─ RUN-003（≈2h）→ run_eval 阈值曲线 → 出 submission 仅本地校验
   ├─ 按 best_epoch 判读 → 决定 004 走 A 还是 B
 D2/D3
-  ├─ RUN-004（A ≈3h10m / B ≈2h）→ 与 003 单变量对比
+  ├─ RUN-004（A ≈3h10m / B ≈2h）→ 与 003 对比（A 为两个变量，B 为单变量）
   └─ 定最终提交模型
 之后
   └─ 最终 run_infer → cost.py 复验 → 正式提交（≤2 次/天，留 1 次撤销余量）
@@ -201,7 +201,7 @@ D2/D3
 2. `metrics.csv`（epoch / lr / train_loss / valid_loss / valid_macro_auc / valid_macro_f1）；
 3. 判读结论——**只写「是否达到第 4 节的判读门」**，例如「001R 达回归门，ΔAUC = +0.0004」，不写「效果不错」这类形容词。
 
-对照类结论（002 vs 001R、004 vs 003）附 `run_compare/summary.md` 的逐类表，避免只看宏平均。
+对照类结论（002 vs 001R、004 vs 003）附 `outputs/compare/summary.md` 的逐类表，避免只看宏平均；覆盖输出目录前先保存该次报告。
 
 ---
 

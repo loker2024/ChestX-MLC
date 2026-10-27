@@ -5,6 +5,8 @@ checkpoint 里不只存权重，还可以存优化器状态、epoch、指标、�
 复现和排错时不用再翻当时的命令行。
 """
 
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -51,7 +53,14 @@ def save_checkpoint(
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save(payload, path)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    os.close(descriptor)
+    temporary_path = Path(temporary_name)
+    try:
+        torch.save(payload, temporary_path)
+        temporary_path.replace(path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     return path
 
 

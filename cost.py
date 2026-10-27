@@ -11,8 +11,8 @@
 
 口径（对应规则第 7 条）：
 
-1. batch=1 串行，每张图的计时区间是「读文件 + 预处理 + 前向 + sigmoid + 后处理」
-   的全部墙钟时间，模型加载/首次初始化不计入；
+1. batch=1 串行，每张图计时包括读文件、预处理、前向、后处理和 CSV 写出，
+   模型加载/首次初始化不计入；多图 study 的单图结果只是候选，无法判定最终耗时；
 2. 先跑 5 张预热图（不计入成绩），再把 100 张图连续重复 3 轮；
 3. 每张图先对 3 轮取均值，再对 100 张取平均，与 100ms 上限比较；
 4. 前后调用与 `run_infer.py` 完全相同的推理函数（`infer.predict`），
@@ -21,7 +21,13 @@
 精度：默认 fp32；GPU 上可用 `--precision fp16`（FP16 需在提交说明里声明）。
 
 退出码：0 表示平均耗时未超上限且预测与 submission.csv 一致；1 表示超限或
-不一致；2 表示参数/文件/配置错误。
+不一致；2 表示参数/文件/配置错误或多图 study 最终耗时无法判定。
+
+完整测试集索引（配置里的 `data.test.csv` / `data.test.images`）可用时，脚本会
+核对抽样图的 Subject_id 与文件名，并补齐同 study 的其他图片后再比对；赛题附录 A
+的提交包不要求携带测试集，评测环境通常读不到这些文件，此时退化为按
+`pictures_100` 自身分组判断，打印 `[WARN]` 后继续，报告里
+`final_timing_verifiable=false` 表示该结论未经完整索引核实。
 
 附加参数（可选）：`--config`、`--checkpoint`、`--device`、`--precision`、
 `--rounds`、`--threshold`、`--tolerance`、`--report`。默认情况下会依次尝试
@@ -34,11 +40,13 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import os
 import sys
 import time
+import tempfile
 from pathlib import Path
 from typing import Sequence
 
@@ -54,6 +62,9 @@ import torch  # noqa: E402
 from common.checkpoint import load_checkpoint  # noqa: E402
 from common.config import Config, config_from_dict, load_config  # noqa: E402
 from common.utils import resolve_device  # noqa: E402
+from data.index import StudyRecord, read_split  # noqa: E402
+from common.constants import CLASS_IDS  # noqa: E402
+from infer.submission import SUBMISSION_COLUMNS  # noqa: E402
 from infer.predict import (  # noqa: E402
     build_eval_inference_transform,
     load_checkpoint_model,
@@ -71,6 +82,7 @@ from infer.profiling import (  # noqa: E402
     format_conclusion,
     group_images_by_study,
     list_images,
+    parse_image_identity,
     read_submission,
     select_prediction_rows,
     summarize_timings,
@@ -184,6 +196,32 @@ def resolve_config(
     )
 
 
+def load_complete_test_index(config: Config) -> dict[str, StudyRecord] | None:
+    """读取配置里的完整测试集索引（study -> 记录）；读不到时返回 None。
+
+    赛题附录 A 的提交包不要求携带测试集，评测环境直接跑 `cost.py` 时通常没有
+    `data.test.csv` 与测试图片。这时只能退化为按 `pictures_100` 自身分组判断，
+    无法确认抽样目录之外是否还有同 study 图片，结果只能作为候选；调用方据此把
+    报告里的 `final_timing_verifiable` 标为 false。
+    """
+    test = config.data.test
+    if not Path(test.csv).is_file() or not Path(test.images).is_dir():
+        print(
+            f"[WARN] 找不到完整测试集索引（{test.csv} / {test.images}），"
+            "退化为按 pictures_100 自身分组比对，单图耗时只能作为候选结果"
+        )
+        return None
+    try:
+        records = read_split(test.csv, test.images, labeled=False)
+    except (FileNotFoundError, OSError) as error:
+        print(
+            f"[WARN] 无法读取完整测试集索引（{error}），"
+            "退化为按 pictures_100 自身分组比对，单图耗时只能作为候选结果"
+        )
+        return None
+    return {record.study_id: record for record in records}
+
+
 def _synchronize(device: torch.device) -> None:
     """把异步加速设备上的工作排空，保证计时区间包住全部计算。
 
@@ -211,17 +249,26 @@ def _time_one_image(
     image_path: Path,
     transform,
     device: torch.device,
-    threshold: float,
+    threshold: float | None,
+    output_path: Path,
 ) -> float:
     """测一张图的端到端毫秒数（读图 + 预处理 + 前向 + sigmoid + 后处理）。
 
-    后处理调用 `select_prediction_rows`，与 `build_submission_frame` 同口径；
-    真正写 CSV 的 I/O 由评测方统一计，不在单张样本的推理耗时里重复。
+    写出包含患者、检查、类别与概率的 CSV；多图检查此处只是单图候选结果。
     """
     _synchronize(device)
     started = time.perf_counter()
     probabilities = predict_image(model, image_path, transform, device)
-    select_prediction_rows(probabilities, threshold)
+    if any(not math.isfinite(float(value)) or not 0 <= float(value) <= 1 for value in probabilities):
+        raise ValueError(f"图片 {image_path} 的概率必须为 [0, 1] 内的有限数")
+    rows = ([(class_id, float(probabilities[class_id - 1])) for class_id in CLASS_IDS]
+            if threshold is None else select_prediction_rows(probabilities, threshold))
+    identity = parse_image_identity(image_path)
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, lineterminator="\n")
+        writer.writerow(SUBMISSION_COLUMNS)
+        writer.writerows((identity.subject_id, identity.study_id, class_id, probability)
+                         for class_id, probability in rows)
     _synchronize(device)
     return (time.perf_counter() - started) * 1000.0
 
@@ -236,6 +283,8 @@ def _format_report(
     comparison: ComparisonReport,
     images: Sequence[Path],
     warmup: Sequence[Path],
+    final_timing: bool,
+    final_timing_verifiable: bool,
 ) -> dict:
     """汇总成可写入 JSON 的报告（提交材料里可附上）。"""
     return {
@@ -256,7 +305,8 @@ def _format_report(
             "max": timing.max_ms,
             "total": timing.total_ms,
             "limit": timing.limit_ms,
-            "within_limit": timing.within_limit,
+            "within_limit": timing.within_limit if final_timing else None,
+            "final_timing_verifiable": final_timing_verifiable,
         },
         "comparison": {
             "filtered_submission": comparison.filtered_submission,
@@ -294,6 +344,49 @@ def _run(args: argparse.Namespace) -> int:
     if args.rounds <= 0:
         raise ValueError(f"--rounds 必须为正整数，当前为 {args.rounds}")
 
+    groups = group_images_by_study(images)
+    # 完整 test 索引能证明 study 的图片集合，并把抽样目录里没被抽到的同 study 图片补上；
+    # 评测环境没有测试集文件时退化为按抽样目录自身分组，只作为候选结果。
+    records_by_study = load_complete_test_index(config)
+    if records_by_study is not None:
+        for path in images:
+            identity = parse_image_identity(path)
+            record = records_by_study.get(identity.study_id)
+            if (
+                record is None
+                or record.subject_id != identity.subject_id
+                or path.stem not in {candidate.stem for candidate in record.image_paths}
+            ):
+                raise ValueError(f"计时图片 {path} 与完整测试集索引不一致，无法验证")
+        final_timing = all(
+            len(records_by_study[study_id].image_paths) == 1 for study_id in groups
+        )
+        expected_counts = {
+            study_id: len(records_by_study[study_id].image_paths) for study_id in groups
+        }
+        full_paths_by_study = {
+            study_id: [
+                {candidate.stem: candidate for candidate in groups[study_id]}.get(
+                    candidate.stem, candidate
+                )
+                for candidate in records_by_study[study_id].image_paths
+            ]
+            for study_id in groups
+        }
+        study_subjects = {
+            study_id: records_by_study[study_id].subject_id for study_id in groups
+        }
+    else:
+        # 只能相信抽样目录本身：每个 study 只出现一次就当作单图 study。
+        final_timing = all(len(paths) == 1 for paths in groups.values())
+        expected_counts = {study_id: len(paths) for study_id, paths in groups.items()}
+        full_paths_by_study = dict(groups)
+        study_subjects = {
+            study_id: parse_image_identity(paths[0]).subject_id
+            for study_id, paths in groups.items()
+        }
+    final_timing_verifiable = records_by_study is not None
+
     model = _load_model(config, checkpoint_path, device, args.precision)
     transform = build_eval_inference_transform(config)
 
@@ -317,17 +410,34 @@ def _run(args: argparse.Namespace) -> int:
         select_prediction_rows(probabilities, threshold)
     print(f"[INFO] 预热完成：{len(warmup)} 张图（不计入成绩）")
 
+    # 提交文件里某个 study 少于 10 行，说明提交时按阈值过滤过，写出的行也要过滤；
+    # 否则按全 10 类写出，保证与 submission.csv 的口径一致。
+    row_thresholds = {
+        path: (
+            threshold
+            if len(submission.probabilities.get(parse_image_identity(path).study_id, {}))
+            < len(CLASS_IDS)
+            else None
+        )
+        for path in images
+    }
+
     # 正式计时：外层 3 轮、内层 100 张，batch=1 串行，与规则一致。
     round_times_ms: list[list[float]] = []
-    for round_index in range(args.rounds):
-        times = [
-            _time_one_image(model, path, transform, device, threshold) for path in images
-        ]
-        round_times_ms.append(times)
-        print(
-            f"[INFO] 第 {round_index + 1}/{args.rounds} 轮完成："
-            f"本轮均值 {sum(times) / len(times):.3f} ms"
-        )
+    with tempfile.TemporaryDirectory(prefix="chestx-cost-") as directory:
+        output_path = Path(directory) / "prediction.csv"
+        for round_index in range(args.rounds):
+            times = [
+                _time_one_image(
+                    model, path, transform, device, row_thresholds[path], output_path
+                )
+                for path in images
+            ]
+            round_times_ms.append(times)
+            print(
+                f"[INFO] 第 {round_index + 1}/{args.rounds} 轮完成："
+                f"本轮均值 {sum(times) / len(times):.3f} ms"
+            )
     timing = summarize_timings(round_times_ms, limit_ms=COST_LIMIT_MS)
 
     print(
@@ -338,17 +448,17 @@ def _run(args: argparse.Namespace) -> int:
 
     # 一致性校验：把 100 张图按 study 分组，用同一套推理函数聚合，再和提交文件比对。
     # 这一步不计时（规则只要求提交结果一致，不要求它属于耗时区间）。
-    groups = group_images_by_study(images)
     study_probabilities = {
         study_id: predict_study(model, paths, transform, device)
-        for study_id, paths in groups.items()
+        for study_id, paths in full_paths_by_study.items()
     }
     comparison = compare_study_predictions(
         study_probabilities,
         submission,
         threshold=threshold,
         tolerance=args.tolerance,
-        image_counts={study_id: len(paths) for study_id, paths in groups.items()},
+        image_counts=expected_counts,
+        study_subjects=study_subjects,
     )
     print(
         f"[INFO] 一致性：比对 {comparison.checked_images} 张图 / "
@@ -365,6 +475,7 @@ def _run(args: argparse.Namespace) -> int:
             comparison,
             precision=args.precision,
             warmup_images=len(warmup),
+            final_timing=final_timing,
         )
     )
 
@@ -381,21 +492,26 @@ def _run(args: argparse.Namespace) -> int:
             comparison,
             images,
             warmup,
+            final_timing,
+            final_timing_verifiable,
         )
         report_path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         print(f"[INFO] 明细报告：{report_path}")
 
-    if not timing.within_limit:
-        print(
-            f"[ERROR] 平均单张耗时 {timing.mean_ms:.3f} ms 超过上限 {timing.limit_ms:.0f} ms",
-            file=sys.stderr,
-        )
-        return 1
     if not comparison.consistent:
         print(
             f"[ERROR] 预测结果与 submission.csv 有 {comparison.inconsistent_studies} 个 study 不一致",
+            file=sys.stderr,
+        )
+        return 1
+    if not final_timing:
+        print("[ERROR] 含多图 study：单图候选结果耗时不含完整聚合，无法判定最终端到端耗时", file=sys.stderr)
+        return 2
+    if not timing.within_limit:
+        print(
+            f"[ERROR] 平均单张耗时 {timing.mean_ms:.3f} ms 超过上限 {timing.limit_ms:.0f} ms",
             file=sys.stderr,
         )
         return 1

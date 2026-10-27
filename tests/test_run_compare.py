@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+import torch
 import yaml
 
 import run_compare
@@ -108,3 +109,53 @@ def test_missing_run_artifacts_raise(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="缺少"):
         run_compare.main(["--runs", str(empty), "--out", str(tmp_path / "out"), "--device", "cpu"])
+
+
+def test_compare_uses_checkpoint_config_after_resume(tmp_path, run_pair):
+    run_a, _ = run_pair
+    archived = yaml.safe_load((run_a / "config.yaml").read_text(encoding="utf-8"))
+    archived["train"]["pos_weight"] = True
+    archived["train"]["epochs"] = 99
+    (run_a / "config.yaml").write_text(yaml.safe_dump(archived), encoding="utf-8")
+
+    out = tmp_path / "compare"
+    run_compare.main(["--runs", str(run_a), "--out", str(out), "--device", "cpu"])
+
+    summary = pd.read_csv(out / "summary.csv")
+    assert summary.loc[0, "pos_weight"] == "否"
+    assert summary.loc[0, "epochs"] != 99
+
+
+def test_compare_exports_per_class_results(tmp_path, run_pair):
+    out = tmp_path / "compare"
+    run_compare.main(["--runs", *(str(run) for run in run_pair), "--out", str(out), "--device", "cpu"])
+
+    per_class = pd.read_csv(out / "per_class.csv")
+    assert len(per_class) == 20
+    assert per_class.groupby("run")["class_id"].nunique().to_dict() == {"run_a": 10, "run_b": 10}
+    assert {"support", "auc", "precision", "recall", "f1"} <= set(per_class.columns)
+    assert "逐类" in (out / "summary.md").read_text(encoding="utf-8")
+
+
+def test_compare_uses_archived_config_for_old_checkpoint(tmp_path, run_pair):
+    run_a, _ = run_pair
+    checkpoint_path = run_a / "best.pt"
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    checkpoint.pop("config")
+    torch.save(checkpoint, checkpoint_path)
+    out = tmp_path / "compare"
+
+    run_compare.main(["--runs", str(run_a), "--out", str(out), "--device", "cpu"])
+
+    assert pd.read_csv(out / "summary.csv").loc[0, "pos_weight"] == "否"
+
+
+def test_compare_rejects_invalid_checkpoint_config(tmp_path, run_pair):
+    run_a, _ = run_pair
+    checkpoint_path = run_a / "best.pt"
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    checkpoint["config"] = {"unknown": True}
+    torch.save(checkpoint, checkpoint_path)
+
+    with pytest.raises(ValueError, match="unknown"):
+        run_compare.main(["--runs", str(run_a), "--out", str(tmp_path / "out"), "--device", "cpu"])

@@ -52,8 +52,10 @@ python src/run_infer.py --config configs/default.yaml \
     --checkpoint outputs/<final>/best.pt --out outputs/submission.csv
 ```
 
-`run_compare.py` 读的是每个 run 目录里存档的 `config.yaml`，而不是仓库当前的默认配置，
-所以之后改默认值也不会「穿越式」改写旧 run 的指标。
+`run_compare.py` 优先读取 `best.pt` 内保存的配置，旧 checkpoint 没有配置时才回退到
+run 目录的 `config.yaml`。续训后因此不会误用初次训练的配置。它分别按各 run 的配置读取
+valid，比较前应确认各配置指向同一份验证数据；`summary.md` 和 `per_class.csv` 还提供
+逐类 AUC、precision、recall、F1 与阈值，便于检查稀有类和常见类是否同时改善。
 
 ## 结果
 
