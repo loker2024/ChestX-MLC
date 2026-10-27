@@ -46,3 +46,7 @@ wandb/
 # ---- 预测结果 ----
 predictions/
 submission_*.csv
+
+# ---- 本地示例与私密笔记 ----
+/example
+docs/sju.md
