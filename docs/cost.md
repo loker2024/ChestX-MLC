@@ -35,13 +35,13 @@ python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_
 
 ### 1.2 退出码与日志
 
-- 退出码 `0`：计时样本均为单图 study，平均耗时未超 100 ms 且预测与 `submission.csv` 一致；
-- 退出码 `1`：超限或存在不一致的 study；
+- 退出码 `0`：按可用索引或抽样分组判断计时样本均为单图 study，平均耗时未超 100 ms 且预测与 `submission.csv` 一致；索引缺失时此判断未经完整索引核实；
+- 退出码 `1`：存在不一致的 study，或最终单图耗时可判定且超限；一致性失败优先于多图耗时判定；
 - 退出码 `2`：参数、文件、配置或权重错误，或样本包含多图 study 导致最终端到端耗时无法判定（打印 `[ERROR]`）。
 
 完整测试集索引不可用（赛题附录 A 的提交包不要求携带测试集，评测环境常见）不算错误：脚本打印 `[WARN]` 后退化为按 `pictures_100` 自身分组比对，退出码仍按上面三条判定，报告里 `final_timing_verifiable` 为 `false`。
 
-日志前缀：`[INFO]` 过程信息、`[WARN]` 非致命提示（如图片数不足 100 / 不足 5 张、CPU 上跑 fp16）、`[ERROR]` 失败原因。最后一行固定输出 `[CONCLUSION]`，格式对齐规则里的日志示例，便于直接粘贴到提交材料。
+日志前缀：`[INFO]` 过程信息、`[WARN]` 非致命提示（如图片数不足 100 / 不足 5 张、CPU 上跑 fp16）、`[ERROR]` 失败原因。脚本输出 `[CONCLUSION]`，格式对齐规则里的日志示例；指定 `--report` 时其后还会输出报告路径。
 
 ## 2. 配置与权重的自动查找
 
@@ -86,7 +86,7 @@ python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_
 - 提交文件输出全部 10 类时：逐类比较概率绝对差，最大差 `<= --tolerance` 记为一致；
 - 提交文件按阈值过滤过时（某个 study 少于 10 行）：先按 `--threshold` 对现场概率做同样的过滤，比较保留的类别集合，再比较交集类别的概率；
 - 提交文件里缺少某个 study：记为不一致；
-- 报告里的 `checked_images` 是参与比对的图片数（即 `pictures_100` 的图片总数）。
+- 报告里的 `checked_images` 是参与比对的 study 的图片数之和；完整索引可用时包含为这些 study 补齐的图片，因此可能超过 `pictures_100` 的图片数。
 
 比对同时检查样本路径、完整测试集与提交文件中的 `Subject_id`，并拒绝非有限或超出 [0, 1] 的现场概率。完整测试集缺失时退化为只按 `pictures_100` 自身分组比对，此时无法发现抽样目录之外的同 study 图片，可能出现假不一致，结果只作候选。提交文件必须由同一份权重和配置生成；额外读取的同 study 图片仅用于一致性检查，不计入上述单图计时。
 
@@ -101,7 +101,7 @@ JSON 顶层键：
 - `checkpoint` / `device` / `precision` / `threshold`：本次实际使用的权重与推理设置；
 - `config`：本次生效配置（`Config.to_dict()`）；
 - `pictures_100` / `warmup_images`：计时图与预热图数量；
-- `timing_ms`：`rounds`、`images`、`mean`、`median`、`p95`、`min`、`max`、`total`、`limit`、`within_limit`、`final_timing_verifiable`（多图 study 或完整索引不可用时为 false；`within_limit` 在多图时为 null）；
+- `timing_ms`：`rounds`、`images`、`mean`、`median`、`p95`、`min`、`max`、`total`、`limit`、`within_limit`、`final_timing_verifiable`（仅完整测试集索引不可用时为 false；多图 study 的 `within_limit` 为 null，即使索引可用且 `final_timing_verifiable` 为 true，最终多图耗时仍无法判定）；
 - `comparison`：`filtered_submission`、`checked_studies`、`checked_images`、`inconsistent_studies`、`inconsistent_images`、`max_abs_diff`、`tolerance`、`issues`（每个不一致 study 的 `study_id` / `reason` / `max_abs_diff`）。
 
 报告可用于提交材料附录或赛后复盘。
