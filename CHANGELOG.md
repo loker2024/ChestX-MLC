@@ -21,6 +21,8 @@
 - `08:59`（变更）`tests/test_config.py`：补 `config_from_dict` 的 `to_dict` 往返与空字典报错两例。
 - `08:59`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`：补 `--resume` 命令、`last.pt` / `config_resume.yaml` 产物说明、`fit` 新签名与 `train.engine` 职责，并把断点续训加入 P5 验收与测试映射。
 - `10:25`（新增）`docs/manual.md`：新增 `loker` 分支使用手册，分环境与数据准备、配置字段与 `_base` 继承、`outputs/` 目录与 `best.pt` / `last.pt` / `metrics.csv` 等产物、训练 / 续训 / 验证 / 推理 / 对比命令、典型工作流与排错速查，并附命令与产物索引。
+- `13:06`（新增）`docs/training_log.md`：新增训练记录文档。按骨干分二级标题，每节固定三件套——ASCII 全流程链路图（数据 → 聚合 → 模型 → 损失/指标 → 产物，逐环节标注实现文件与行号）、推理 / 评估 / 对比链路图、参数 → 生效位置索引表，并附可复制的记录模板；每次 run 用三级标题记录，原样贴入所用配置文件并链接 `configs/`，附运行命令、环境、产物路径与 `metrics.csv` 表；末尾以三级标题给出汇总表与判读口径，另设环境说明一节。
+- `13:37`（变更）`docs/training_log.md`：回填 RUN-001 `short_baseline` 实测结果——6 轮、最优 epoch 6、valid macro-AUC 0.7858、macro-F1@0.5 0.2796、耗时 28m41s，产物 `outputs/20261027-050417_short_baseline/`；汇总表同步填入该行，RUN-002 / RUN-003 标注为待运行。
 
 ## 2026-10-26
 
