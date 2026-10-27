@@ -174,6 +174,18 @@ def load_config(path: str | Path = "configs/default.yaml") -> Config:
     return _build_dataclass(Config, raw, where="配置根节点")
 
 
+def config_from_dict(raw: dict[str, Any]) -> Config:
+    """把 `Config.to_dict()` 的结果还原成 Config，用于从 checkpoint 续训。
+
+    checkpoint 里存的是 `config.to_dict()`（Path 已转成字符串），结构与 YAML
+    读出的字典一致，所以直接走同一套 dataclass 校验，字段缺失或类型不对
+    都会在这里报错，而不是训练到一半才发现。
+    """
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("checkpoint 里的配置为空或不是键值映射，无法恢复训练")
+    return _build_dataclass(Config, raw, where="checkpoint 配置根节点")
+
+
 def _load_yaml(path: Path, seen: tuple[Path, ...] = ()) -> dict[str, Any]:
     """读一份 YAML，并按 `_base` 继承链合并成完整字典。
 

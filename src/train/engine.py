@@ -9,6 +9,10 @@
         按 macro-AUC 决定要不要“记住”这一轮的权重
         连续若干轮都没有变好，就提前结束
 
+断点续训：进度（已完成轮次、最优快照、历史记录、早停计数）放在 `TrainProgress`，
+优化器 / 学习率调度 / AMP scaler 放在 `TrainRuntime`；`fit` 接受前者和三个
+`*_state` 接着跑，并通过 `on_epoch_end` 每轮把状态交给调用方落盘。
+
 几个容易踩坑的地方（下面的注释还会再提）：
 - 模型吃的是“单张图”，但标签和 AUC 是“按检查（study）”算的，所以先把同一
   study 的多张图 logits 用 `aggregate_logits` 平均成一个向量，再算 loss 和指标。
@@ -21,7 +25,8 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -34,6 +39,37 @@ from common.config import Config
 from common.metrics import macro_auc, macro_f1
 from model.losses import build_loss
 from model.network import aggregate_logits
+
+
+@dataclass
+class TrainProgress:
+    """可以脱离进程保存、之后再接上的训练进度。
+
+    这里只放“纯 Python 对象”——权重快照 `best_state` 是 CPU 上的张量字典，
+    其余都是数字、字典和列表，所以调用方可以原样塞进 checkpoint。
+    优化器 / 学习率调度 / AMP scaler 的状态在 `TrainRuntime` 里，由回调按需取。
+    """
+
+    epoch: int = 0  # 已完成的 epoch 数，下一轮从 epoch + 1 开始
+    best_auc: float = float("nan")
+    best_epoch: int = 0
+    best_metrics: dict[str, float] = field(default_factory=dict)
+    best_state: dict[str, torch.Tensor] | None = None
+    history: list[dict[str, float]] = field(default_factory=list)
+    stale_epochs: int = 0  # 连续多少个 epoch 没有提升
+
+
+@dataclass
+class TrainRuntime:
+    """训练期间才有状态的对象，每个 epoch 结束时交给回调去序列化。"""
+
+    optimizer: Optimizer
+    scheduler: LambdaLR
+    scaler: torch.amp.GradScaler
+
+
+# 每轮训练结束后调用，参数是当前进度和带状态的运行时对象。
+EpochEndHook = Callable[[TrainProgress, TrainRuntime], None]
 
 
 def _amp_enabled(config: Config, device: torch.device) -> bool:
@@ -156,6 +192,12 @@ def fit(
     train_loader: DataLoader,
     val_loader: DataLoader,
     device: torch.device,
+    *,
+    progress: TrainProgress | None = None,
+    optimizer_state: dict[str, Any] | None = None,
+    scheduler_state: dict[str, Any] | None = None,
+    scaler_state: dict[str, Any] | None = None,
+    on_epoch_end: EpochEndHook | None = None,
 ) -> dict[str, Any]:
     """完整训练流程：逐 epoch 训练 / 验证，按 valid macro-AUC 保留最优权重。
 
@@ -165,6 +207,13 @@ def fit(
         best_macro_auc 最优的 valid macro-AUC
         best_metrics  最优那一轮的完整验证指标
         best_state    最优那一轮的权重（在 CPU 上），训练结束由调用方加载回模型
+        progress      结束时的进度对象，续训时原样传回来即可
+
+    断点续训：把上次的 `progress` 连同三个 `*_state`（优化器 / 调度器 / AMP）
+    一起传进来，训练就从 `progress.epoch + 1` 接着跑，最优权重、历史记录和
+    早停计数都沿用旧值。`on_epoch_end` 在每轮结束、`scheduler.step()` 之前调用，
+    调用方据此把 last.pt 落盘——此时调度器尚未推进，恢复后下一轮的学习率
+    才会和原来完全一致。
     """
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -173,17 +222,23 @@ def fit(
     )
     scheduler = _build_scheduler(optimizer, config.train.warmup_epochs)
     scaler = torch.amp.GradScaler(device.type, enabled=_amp_enabled(config, device))
+    # 先恢复优化器再恢复调度器：LambdaLR 的 last_epoch 决定下一轮的学习率。
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
+    if scheduler_state is not None:
+        scheduler.load_state_dict(scheduler_state)
+    if scaler_state is not None:
+        scaler.load_state_dict(scaler_state)
+    runtime = TrainRuntime(optimizer=optimizer, scheduler=scheduler, scaler=scaler)
+
     criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
+    progress = TrainProgress() if progress is None else progress
+    # best_state 记录当前最优权重；续训时沿用存档里的，不能拿当前权重覆盖。
+    # 若整场 AUC 都无效，函数末尾会显式报错，而不是保存随机权重。
+    if progress.best_state is None:
+        progress.best_state = _snapshot(model)
 
-    # best_state 记录当前最优权重；若整场 AUC 都无效，下面会显式报错而不是保存随机权重。
-    best_state = _snapshot(model)
-    best_auc = float("nan")
-    best_epoch = 0
-    best_metrics: dict[str, float] = {}
-    history: list[dict[str, float]] = []
-    stale_epochs = 0  # 连续多少个 epoch 没有提升
-
-    for epoch in range(1, config.train.epochs + 1):
+    for epoch in range(progress.epoch + 1, config.train.epochs + 1):
         # 学习率在训练这一步用的是“当前值”，所以先记下来再更新。
         lr = optimizer.param_groups[0]["lr"]
         train_loss = train_one_epoch(
@@ -192,7 +247,7 @@ def fit(
         valid_metrics = evaluate(config, model, val_loader, criterion, device)
         auc = valid_metrics["macro_auc"]
 
-        history.append(
+        progress.history.append(
             {
                 "epoch": epoch,
                 "lr": lr,
@@ -209,33 +264,42 @@ def fit(
         )
 
         # 第一轮（best_auc 是 NaN）只要 AUC 有效就算提升；之后必须严格变大。
-        improved = not math.isnan(auc) and (math.isnan(best_auc) or auc > best_auc)
+        improved = not math.isnan(auc) and (
+            math.isnan(progress.best_auc) or auc > progress.best_auc
+        )
         if improved:
-            best_auc = auc
-            best_epoch = epoch
-            best_metrics = valid_metrics
-            best_state = _snapshot(model)
-            stale_epochs = 0
+            progress.best_auc = auc
+            progress.best_epoch = epoch
+            progress.best_metrics = valid_metrics
+            progress.best_state = _snapshot(model)
+            progress.stale_epochs = 0
         else:
-            stale_epochs += 1
-            # early_stop_patience=0 表示关闭早停。
-            patience = config.train.early_stop_patience
-            if patience and stale_epochs >= patience:
-                print(f"连续 {stale_epochs} 个 epoch 没有提升，提前结束训练")
-                break
+            progress.stale_epochs += 1
+
+        progress.epoch = epoch
+        if on_epoch_end is not None:
+            on_epoch_end(progress, runtime)
+
+        # early_stop_patience=0 表示关闭早停。早停也要先落盘再退出，
+        # 否则最后一轮的指标和进度会丢。
+        patience = config.train.early_stop_patience
+        if not improved and patience and progress.stale_epochs >= patience:
+            print(f"连续 {progress.stale_epochs} 个 epoch 没有提升，提前结束训练")
+            break
 
         scheduler.step()
 
-    if best_epoch == 0:
+    if progress.best_epoch == 0:
         raise RuntimeError(
             "验证集所有类别的 AUC 都是 NaN（可能全为阳性或全为阴性），无法挑选最优权重；"
             "请检查 valid 划分或增加验证样本"
         )
 
     return {
-        "history": history,
-        "best_epoch": best_epoch,
-        "best_macro_auc": best_auc,
-        "best_metrics": best_metrics,
-        "best_state": best_state,
+        "history": progress.history,
+        "best_epoch": progress.best_epoch,
+        "best_macro_auc": progress.best_auc,
+        "best_metrics": progress.best_metrics,
+        "best_state": progress.best_state,
+        "progress": progress,
     }

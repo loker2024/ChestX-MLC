@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from common.config import load_config
+from common.config import config_from_dict, load_config
 
 BASE = """data:
   train: {csv: data/train.csv, images: data/images/train}
@@ -53,6 +53,21 @@ def test_to_dict_converts_paths_to_strings(tmp_path):
     assert exported["data"]["train"]["csv"] == "data/train.csv"
     assert exported["output"]["run_dir"] == "outputs"
     assert isinstance(exported["seed"], int)
+
+
+def test_config_from_dict_roundtrip(tmp_path):
+    """checkpoint 里存的 to_dict() 必须能原样还原，否则续训会读错超参。"""
+    config = load_config(_write(tmp_path))
+
+    restored = config_from_dict(config.to_dict())
+
+    assert restored == config
+    assert isinstance(restored.data.train.csv, Path)
+
+
+def test_config_from_dict_rejects_empty():
+    with pytest.raises(ValueError, match="无法恢复"):
+        config_from_dict({})
 
 
 def test_unknown_top_level_field_raises(tmp_path):

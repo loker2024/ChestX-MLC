@@ -8,6 +8,19 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-10-27
+
+- `08:32`（新增）`configs/exp_example.yaml`：示例数据冒烟配置，用 `_base: default.yaml` 继承冻结配置，只把 `data.<split>` 的 `csv` / `images` 指向 `data/example`，其余超参与默认配置完全一致；文件头注明示例数据只有 39 个训练 study / 84 个验证 study，指标仅用于验证链路。
+- `08:32`（新增）`data/example/{train,valid,test}.csv`：从全量标注中按样例图片名筛出的子集标注（59 / 127 / 283 行，39 / 84 / 194 个 study），列与全量 CSV 保持一致，供 `configs/exp_example.yaml` 直接训练；`data/` 已在 `.gitignore` 中，不入库。
+- `08:34`（新增）`outputs/20261027-083159_example/`、`outputs/example_submission.csv`：示例数据首次跑通全链路，训练 21 epoch 后早停（最优 epoch 16，valid macro-AUC 0.5649），推理产出 194 个 study × 10 类共 1,940 行提交文件；训练产物按约定不入库。
+- `08:59`（新增）`src/train/engine.py`：新增 `TrainProgress`（已完成轮次、最优快照、历史记录、早停计数）与 `TrainRuntime`（优化器 / 学习率调度器 / AMP scaler）；`fit` 增加关键字参数 `progress`、`optimizer_state`、`scheduler_state`、`scaler_state` 与 `on_epoch_end`，可从断点接续训练，并在早停前先回调落盘，返回值追加 `progress`。
+- `08:59`（变更）`src/common/checkpoint.py`：`save_checkpoint` 新增 `scheduler`、`scaler`、`extras` 三个可选字段，用于保存学习率进度、AMP 缩放系数与训练进度；旧 `best.pt` 读取时对应键为 `None`，不影响推理。
+- `08:59`（新增）`src/common/config.py`：新增 `config_from_dict`，把 checkpoint 里 `to_dict()` 存档的配置还原成 `Config` 并走同一套校验，供续训重建训练环境。
+- `08:59`（新增）`src/run_train.py`：新增 `--resume`（可给 run 目录或 `last.pt`），每个 epoch 结束写 `last.pt` 与 `metrics.csv`；续训复用原 run 目录、追加写 `train.log`、本次配置另存 `config_resume.yaml`，并跳过预训练权重加载；Ctrl+C 时提示续训命令，被中断最多丢当前这一轮。
+- `08:59`（新增）`tests/test_resume.py`：覆盖中断后进度与最优快照恢复、学习率与一次跑完的轨迹一致、CLI 补跑剩余 epoch 且不新建目录、省略 `--config` 时沿用存档配置，以及缺 `last.pt`、`last.pt` 无 `extras` 的报错。
+- `08:59`（变更）`tests/test_config.py`：补 `config_from_dict` 的 `to_dict` 往返与空字典报错两例。
+- `08:59`（变更）`AGENTS.md`、`docs/architecture.md`、`docs/plan0.md`：补 `--resume` 命令、`last.pt` / `config_resume.yaml` 产物说明、`fit` 新签名与 `train.engine` 职责，并把断点续训加入 P5 验收与测试映射。
+
 ## 2026-10-26
 
 - `18:26`（新增）`src/infer/__init__.py`：声明 infer 包，只保留模块说明，不导入 torch / pandas 等重型依赖。

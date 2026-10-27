@@ -18,27 +18,35 @@ def save_checkpoint(
     model: torch.nn.Module,
     *,
     optimizer: torch.optim.Optimizer | None = None,
+    scheduler: Any | None = None,
+    scaler: Any | None = None,
     epoch: int | None = None,
     metrics: dict[str, float] | None = None,
     config: Config | None = None,
     seed: int | None = None,
     metadata: dict[str, Any] | None = None,
+    extras: dict[str, Any] | None = None,
 ) -> Path:
     """把训练状态保存到 path，返回实际写入的路径。
 
     只有 model 是必填的：训练中途存快照时把优化器和 epoch 也带上，
     恢复训练才能接上学习率调度和动量；只做推理时可以只保存权重。
+    断点续训还会带上 `scheduler`（学习率走到了哪）、`scaler`（AMP 的缩放系数）
+    和 `extras`（训练进度、最优权重快照等不固定结构的内容）。
 
     父目录不存在会自动创建，所以 `outputs/<run>/best.pt` 这种路径不用手动建目录。
     """
     payload = {
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict() if optimizer is not None else None,
+        "scheduler": scheduler.state_dict() if scheduler is not None else None,
+        "scaler": scaler.state_dict() if scaler is not None else None,
         "epoch": epoch,
         "metrics": metrics,
         "config": config.to_dict() if config is not None else None,
         "seed": seed,
         "metadata": metadata,
+        "extras": extras,
     }
 
     path = Path(path)

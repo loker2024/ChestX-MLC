@@ -12,7 +12,7 @@
 - `.gitignore`：排除数据、虚拟环境、模型权重及训练产物。
 - `CHANGELOG.md`：统一变更日志（即本仓库的 changelog）。
 
-新增实现时，将可复用代码放入 `src/`，测试放入 `tests/`，配置放入 `configs/`。`.gitkeep` 仅用于让 Git 跟踪空目录，目录已有实际文件后应删除。数据放在已忽略的 `data/` 或 `datasets/`；训练产物（含 `best.pt`）放在每次运行新建的 `outputs/<时间戳>_<tag>/`，不再使用单独的 `checkpoints/`。
+新增实现时，将可复用代码放入 `src/`，测试放入 `tests/`，配置放入 `configs/`。`.gitkeep` 仅用于让 Git 跟踪空目录，目录已有实际文件后应删除。数据放在已忽略的 `data/` 或 `datasets/`；训练产物（含 `best.pt`、续训用的 `last.pt`）放在每次运行新建的 `outputs/<时间戳>_<tag>/`，不再使用单独的 `checkpoints/`。
 
 ## 环境搭建与开发命令
 
@@ -36,6 +36,7 @@ python -c "import torch; print(torch.__version__); print('CUDA:', torch.cuda.is_
 ```bash
 python src/check_data.py --config configs/default.yaml --full
 python src/run_train.py  --config configs/default.yaml --seed 42
+python src/run_train.py  --resume outputs/<run>
 python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
 python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
 python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7

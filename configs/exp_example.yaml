@@ -1,0 +1,24 @@
+# 示例数据冒烟配置：只把 data 指向 data/example 的小样本，其余超参与 default.yaml 一致。
+#
+# 用法（在仓库根目录执行）：
+#     python src/check_data.py --config configs/exp_example.yaml --full
+#     python src/run_train.py  --config configs/exp_example.yaml --tag example
+#     python src/run_eval.py   --config configs/exp_example.yaml \
+#         --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6,0.7
+#     python src/run_infer.py  --config configs/exp_example.yaml \
+#         --checkpoint outputs/<run>/best.pt --out outputs/example_submission.csv
+#
+# 示例数据只有 39 个训练 study / 84 个验证 study，指标只用于确认链路通不通，
+# 不能当成模型效果，也不参与 default.yaml 的调参决策。
+_base: default.yaml
+
+data:
+  train:
+    csv: data/example/train.csv
+    images: data/example/train_example
+  valid:
+    csv: data/example/valid.csv
+    images: data/example/valid_example
+  test:
+    csv: data/example/test.csv
+    images: data/example/test_example

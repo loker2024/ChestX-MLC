@@ -70,6 +70,7 @@ ChestX-MLC/
 │   ├── test_metrics.py
 │   ├── test_model.py
 │   ├── test_engine.py
+│   ├── test_resume.py
 │   ├── test_submission.py
 │   ├── test_config.py
 │   ├── test_utils.py
@@ -81,7 +82,7 @@ ChestX-MLC/
 │   ├── valid.csv
 │   ├── test.csv
 │   └── example/         # 本地联调用的小样本图片
-└── outputs/             # 不入库，运行时生成 best.pt、metrics.csv 等
+└── outputs/             # 不入库，运行时生成 best.pt、last.pt、metrics.csv 等
 ```
 
 `src/.gitkeep` 已删除。当前不引入 `pyproject.toml`；若后续需要在赛题服务器上安装，再加包配置并把 `src` 设为包根。
@@ -129,7 +130,7 @@ ChestX-MLC/
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `engine.py` | 单 epoch 训练与验证、AMP、梯度裁剪、学习率调度、早停、逐 epoch 记录 | `fit(cfg, model, train_loader, val_loader, device) -> dict`（`history / best_epoch / best_macro_auc / best_metrics / best_state`） |
+| `engine.py` | 单 epoch 训练与验证、AMP、梯度裁剪、学习率调度、早停、逐 epoch 记录、断点续训 | `fit(cfg, model, train_loader, val_loader, device, *, progress, optimizer_state, scheduler_state, scaler_state, on_epoch_end) -> dict`（`history / best_epoch / best_macro_auc / best_metrics / best_state / progress`）；`TrainProgress` 存进度与最优快照，`TrainRuntime` 暴露优化器/调度器/AMP 供回调落盘 |
 
 ### 3.5 infer：推理与提交
 
@@ -143,7 +144,7 @@ ChestX-MLC/
 | 文件 | 职责 |
 |---|---|
 | `check_data.py` | 数据体检：CSV 字段、ID 前导零、图片齐全、跨 split 无重叠、标签分布；`--full` 检查全量数据 |
-| `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit` |
+| `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit`；每轮结束写 `last.pt`，`--resume <run 目录或 last.pt>` 可从断点接着训练 |
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 | `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
@@ -163,11 +164,14 @@ ChestX-MLC/
 ```bash
 python src/check_data.py --config configs/default.yaml --full
 python src/run_train.py  --config configs/default.yaml --seed 42
+python src/run_train.py  --resume outputs/<run>
 python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
 python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
 python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
 python -m pytest
 ```
+
+`--resume` 省略 `--config` 时沿用 `last.pt` 里存档的配置；需要延长轮数或改 `num_workers` 时再显式传 `--config`（本次实际生效的配置另存为 `config_resume.yaml`）。
 
 ## 5. 配置骨架
 
@@ -211,8 +215,9 @@ device: auto
 | `test_metrics.py` | 与 sklearn 对齐、退化类 AUC 跳过、F1 仍计算、阈值解析与阈值网格、空输入校验 |
 | `test_model.py` | 参数规模、study 级均值聚合与梯度、`pos_weight` 计算 |
 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup 学习率、早停、评估指标 |
+| `test_resume.py` | 断点续训：进度与最优快照恢复、学习率衔接、CLI 补跑剩余 epoch、缺 last.pt 报错 |
 | `test_submission.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、UTF-8 回读 |
-| `test_config.py` | 默认配置、`_base` 继承与循环检测、未知字段、类型与范围校验、Path 序列化 |
+| `test_config.py` | 默认配置、`_base` 继承与循环检测、未知字段、类型与范围校验、Path 序列化、`to_dict` 往返 |
 | `test_utils.py` | 随机种子、设备选择、运行目录与 tag 清洗 |
 | `test_run_train.py` | 训练 CLI 产物、seed 覆盖、预训练元数据与日志 |
 | `test_run_compare.py` | 每个 run 一行、pos_weight/seed 列、summary.csv 与 summary.md、缺文件报错 |
@@ -229,7 +234,7 @@ device: auto
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
 
-每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml` 与 `train.log`；`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
+每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 
 ## 8. 待确认与已定事项
 

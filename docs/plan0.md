@@ -120,13 +120,14 @@ python -c "import sys; sys.path.insert(0, 'src'); import torch; from common.conf
 
 产出：
 
-- `fit(cfg, model, train_loader, val_loader, device) -> dict`：单 epoch 训练/验证、AMP、梯度裁剪、warmup、早停、逐 epoch 记录。
-- 训练入口：读配置、构建 loader 与模型、按 valid macro-AUC 保存 `best.pt`。
+- `fit(cfg, model, train_loader, val_loader, device, *, progress, optimizer_state, scheduler_state, scaler_state, on_epoch_end) -> dict`：单 epoch 训练/验证、AMP、梯度裁剪、warmup、早停、逐 epoch 记录，并支持从 `TrainProgress` 接续训练。
+- 训练入口：读配置、构建 loader 与模型、按 valid macro-AUC 保存 `best.pt`；每轮结束写 `last.pt`，`--resume` 可从断点继续。
 
 验收：
 
 1. 冒烟：临时配置指向 `data/example`，`epochs=1`、`batch_studies=2`，确认 loss 有限、参数有更新、checkpoint 可保存并重载。
 2. 全量：`python src/run_train.py --config configs/default.yaml --seed 42`，记录设备、耗时与每 epoch 指标。
+3. 续训：训练中途 Ctrl+C 后 `python src/run_train.py --resume outputs/<run>`，确认从下一个 epoch 接着跑，`metrics.csv` 与 `train.log` 累积而不重置。
 
 ## P6 推理与提交
 
@@ -186,7 +187,7 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 | P1 | `tests/conftest.py` | `src/` 入 `sys.path`，合成 CSV 与小图 fixture |
 | P2 | `test_labels.py` / `test_index.py` / `test_dataset.py` | 标签解析、前导零、多图聚合、缺图、重复 Dicom_id、患者一致性、变长 collate |
 | P4 | `test_metrics.py` / `test_model.py` | sklearn 对齐、退化类 AUC 跳过但 F1 仍计算、阈值与空输入、参数规模、study 聚合、pos_weight 设备 |
-| P5 | `test_engine.py` | 单 epoch 参数更新与 loss 有限、warmup、早停、评估指标、全 NaN AUC 报错 |
+| P5 | `test_engine.py` / `test_resume.py` | 单 epoch 参数更新与 loss 有限、warmup、早停、评估指标、全 NaN AUC 报错；断点续训的进度与学习率衔接、CLI 补跑剩余 epoch |
 | P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、缺列报错、端到端闭环 |
 | P7 | `test_config.py` / `test_utils.py` / `test_run_train.py` / `test_run_compare.py` | 配置校验与 `_base` 继承、种子/设备/运行目录、训练 CLI 产物与日志、run 对比表 |
 
