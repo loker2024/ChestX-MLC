@@ -48,6 +48,13 @@
 - `15:36`（变更）`cost.py` → `src/cost.py`：迁移耗时自检入口并适配仓库与提交包根目录的路径；更新 `tests/test_cost.py`、`src/infer/predict.py`、`src/infer/profiling.py`、`AGENTS.md`、`docs/architecture.md`、`docs/cost.md`、`docs/plan0.md`、`docs/train_plan01.md` 的测试、入口及打包说明。
 
 
+- `20:55`（新增）`Submission.md`、`outputs/submission_B1-320-study_74.41.csv`：记录外部工作簿 B1-320-study 的官方提交得分 74.41，并归档原始预测文件；CSV 按规则仅保存在本地。
+- `20:58`（变更）`Submission.md`：补充桌面工作簿中 B1-320-Study 的验证指标、训练参数、数据规模、对照结果与实验分析，并区分验证指标和官方提交得分。
+- `20:59`（变更）`Submission.md`：将工作簿实验记录合并至 B1-320-study 条目，移除单独的小节。
+- `21:01`（变更）`Submission.md`：按工作簿的实验名称、实验性能、实验参数和实验分析四列组织实验记录，保留提交信息。
+
+- `23:24`（修复）`Submission.md`：移除文件末尾多余空行，消除提交前的空白检查错误。
+
 ## 2026-10-27
 
 - `08:32`（新增）`configs/exp_example.yaml`：示例数据冒烟配置，用 `_base: default.yaml` 继承冻结配置，只把 `data.<split>` 的 `csv` / `images` 指向 `data/example`，其余超参与默认配置完全一致；文件头注明示例数据只有 39 个训练 study / 84 个验证 study，指标仅用于验证链路。
