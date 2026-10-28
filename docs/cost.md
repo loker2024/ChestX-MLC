@@ -57,7 +57,7 @@ python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_
 单张图的计时区间（对应规则「从读取图片文件到写出最终预测结果，包含预处理与后处理」）：
 
 1. 同步加速设备（CUDA / MPS）后取 `perf_counter`；
-2. `infer.predict.predict_image`：读图（PIL；灰度图保留 `L` 模式）→ eval 预处理（letterbox 在 `L` 模式上 resize、之后转 RGB，再用 `_NormalizedTensor` 归一化）→ 单图张量搬设备 → 前向 → `aggregate_logits` → `sigmoid` → 转回 CPU `float32`；
+2. `infer.predict.predict_image`：读图（PIL）→ eval 预处理（letterbox / resize / normalize / ToTensor）→ 单图张量搬设备 → 前向 → `aggregate_logits` → `sigmoid` → 转回 CPU `float32`；
 3. 按提交文件对应 study 的模式输出全部类别或按阈值筛选；写入包含患者、检查、类别和概率的临时 CSV，文件关闭后再次同步设备并取 `perf_counter`。临时文件在计时结束后自动清理。
 
 计时循环外层 3 轮、内层 100 张，每个列表的耗时结构为 `round_times_ms[round][image]`；`summarize_timings` 先对每张图按 3 轮取均值，再对 100 张取均值，同时给出中位数、p95、最小、最大与总耗时。100 ms 上限比较的是「100 张均值」。
@@ -65,16 +65,6 @@ python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_
 预热：正式计时前把 `pictures_5` 的每张图各跑一遍（同样走 `predict_image` + 后处理），首次前向触发的 kernel 编译/缓存与初始化开销落在预热里，不计入成绩。
 
 对于单图 study，这包含读取、预测、后处理和结果写出。对于多图 study，单图结果只是中间候选，不能代替完整 study 聚合后的提交结果；当前计时数字无法证明最终端到端耗时，脚本会明确报告“无法判定”，并返回 2。赛题对单图计时与多图聚合之间的计费口径未作明确说明，须与主办方确认后在指定硬件上重新实测。
-
-### 3.1 预处理实现与等价性（2026-10-28 提速）
-
-计时主要由解码与预处理占据（预处理优化把单张均值从 112.46 ms 压到 46.40 ms，前向部分未改动），因此在不改数值口径的前提下重写了推理侧的读图与预处理路径：
-
-- **读图**：`load_image(path, convert_rgb=False)` 让灰度图保留 `L` 模式。测试集 `pictures_100` 抽样实测均为单通道 JPEG（`L` 模式），尺寸以 2544×3056 为主、长宽比不一；单图推理时由 `Letterbox` 在 `L` 模式上按最长边 resize、之后再转 RGB。缩放是逐通道的线性运算，单通道插值后复制成三通道，与先复制成三通道再逐通道插值逐像素相同，但插值运算量约为后者 1/3。
-- **归一化**：`T.ToTensor() + T.Normalize()` 换成等价的 `_NormalizedTensor`（`np.asarray(..., float32) / 255` → `torch.from_numpy().permute(2, 0, 1)` → 减均值除方差），逐元素相同，省一次模块调用与中间张量。
-- **训练口径不变**：`StudyDataset` 仍走 `load_image(path)`（`convert_rgb=True`）与同一个 `build_train_transform`，RUN-003 / RUN-004 的输入数值不受影响。
-
-等价性验证（2026-10-28 远端用真实测试图复测）：本机 `pytest` 176 passed / 3 skipped；对 `pictures_100` 真实图分别以 `L` 原模式（20 张）和转 `RGB`（10 张）输入，新旧 `Letterbox` + 归一化得到的输入张量最大绝对差均为 **0.0**（输入完全相同，同图推理概率因此一致）；`cost.py` 一致性比对 100 张 0 不一致（`max_abs_diff` 1.43e-04）。
 
 ## 4. 与 `predict.py` 的一致性要求
 
@@ -120,7 +110,6 @@ JSON 顶层键：
 
 - 合成数据单元测试：`tests/test_cost.py`（不在测试里读取真实影像），覆盖图片发现与身份解析、提交文件校验、阈值选择、一致性比对、计时统计算术、`predict_image` 与 `predict_loader` / `predict_study` 的数值等价，以及 `main` 端到端（含 `[CONCLUSION]`、超限返回 1、不一致返回 1、缺权重返回 2、多图 study 返回 2、抽样 study 按完整索引补齐），并覆盖完整索引缺失时退化为抽样分组、报告 `final_timing_verifiable=false` 的路径。
 - 真实结构端到端（2026-10-27，本机 Apple Silicon CPU，随机初始化 resnet18，`image.size=320`，示例数据 100 张 / 69 个 study）：旧版脚本曾报告单张均值 39.7 ms；该次未计入结果写出，且多图聚合不在单张计时内，不能作为现有口径的实测成绩。正式成绩须在赛题指定硬件、加载训练好的最终权重后测。
-- 真实结构端到端（2026-10-28，RTX 3090 24G / CUDA 12.2 / fp32，`image.size=320`，RUN-001R `best.pt`，`data/cost/pictures_100` 100 张单图 study，`--rounds 3`）：预处理优化前平均 112.46 ms（超限；该次只保留了终端 `[CONCLUSION]` 输出，未落 JSON 报告），按 §3.1 优化后平均 **46.40 ms**、中位 47.73 ms、p95 55.45 ms（未超限），完整数据见 `outputs/cost_report.json` 的 `timing_ms`；两次终端 `[CONCLUSION]` 均报告与 `submission.csv` 比对不一致 0 张；优化后一次已落盘 `outputs/cost_report.json`（`inconsistent_studies` 0，`max_abs_diff` 1.43e-04）。主办方按 T4 16G 复测，数字不能直接换算，正式成绩仍以赛题服务器实测为准。
 
 ## 9. 提交清单（附录 A）
 

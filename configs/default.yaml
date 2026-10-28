@@ -45,7 +45,7 @@ train:
   warmup_epochs: 2
   amp: true                  # 混合精度，仅 CUDA 生效
   grad_clip: 5.0
-  num_workers: 8
+  num_workers: 16
   early_stop_patience: 5     # valid macro-AUC 连续 5 个 epoch 不提升就停；0 关闭
 
 # 验证与推理。
