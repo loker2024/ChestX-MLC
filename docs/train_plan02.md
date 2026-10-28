@@ -1,4 +1,4 @@
-在 RUN-003 的基础上，只改变学习率调度策略，训练一次（新增 `configs/exp_cosine.yaml`，只写 `lr_scheduler: cosine` 与 `lr_min: 1e-5`，其余字段继承 `default.yaml`）。
+历史实验：在 RUN-003 的基础上，只改变学习率调度策略。当前 `configs/exp_cosine.yaml` 显式关闭 `pos_weight`，以保留当时设置；其他字段继承当前 `default.yaml`。
 
 | 配置项 | RUN-003-A |
 |---|---|

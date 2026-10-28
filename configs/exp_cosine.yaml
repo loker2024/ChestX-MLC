@@ -1,13 +1,15 @@
-# RUN-003-A 对照配置：在冻结配置上只改学习率调度策略。
+# RUN-003-A 历史对照配置：当时相对默认配置修改了学习率调度策略。
 #
-# 差异只有两项：前 2 轮线性 warmup（沿用 default.yaml 的 warmup_epochs: 2），
+# 当时的设置：前 2 轮线性 warmup（沿用 default.yaml 的 warmup_epochs: 2），
 # 之后按余弦衰减到 1e-5；其余（25 轮、early-stop patience 5、pos_weight 关闭、
-# num_workers 16）全部继承 default.yaml，用来和 RUN-003 做单变量对照。
+# num_workers 16）继承 default.yaml，用来和 RUN-003 做单变量对照。
+# 当前 default.yaml 也使用 cosine，但已打开 pos_weight；此文件保留历史实验设置。
 #
 # 用法（在仓库根目录执行）：
 #     python src/run_train.py --config configs/exp_cosine.yaml --seed 42 --tag run003a_cosine
 _base: default.yaml
 
 train:
+  pos_weight: false
   lr_scheduler: cosine
   lr_min: 0.00001

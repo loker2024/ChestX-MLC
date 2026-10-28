@@ -46,13 +46,18 @@
 - `15:31`（变更）`.gitignore`：忽略仓库根目录 `source/`，避免将文献 PDF 和本地索引加入 Git。
 - `15:34`（变更）`src/model/network.py`：更新模块和建模函数说明，明确按配置选择 timm 骨干、逐图输出及 study 聚合，并澄清预训练加载行为。
 - `15:36`（变更）`cost.py` → `src/cost.py`：迁移耗时自检入口并适配仓库与提交包根目录的路径；更新 `tests/test_cost.py`、`src/infer/predict.py`、`src/infer/profiling.py`、`AGENTS.md`、`docs/architecture.md`、`docs/cost.md`、`docs/plan0.md`、`docs/train_plan01.md` 的测试、入口及打包说明。
-
-
 - `20:55`（新增）`Submission.md`、`outputs/submission_B1-320-study_74.41.csv`：记录外部工作簿 B1-320-study 的官方提交得分 74.41，并归档原始预测文件；CSV 按规则仅保存在本地。
 - `20:58`（变更）`Submission.md`：补充桌面工作簿中 B1-320-Study 的验证指标、训练参数、数据规模、对照结果与实验分析，并区分验证指标和官方提交得分。
 - `20:59`（变更）`Submission.md`：将工作簿实验记录合并至 B1-320-study 条目，移除单独的小节。
 - `21:01`（变更）`Submission.md`：按工作簿的实验名称、实验性能、实验参数和实验分析四列组织实验记录，保留提交信息。
 
+- `21:35`（变更）`configs/default.yaml`、`configs/exp_cosine.yaml`、`docs/manual.md`、`docs/experiments.md`、`tests/test_config.py`：默认训练配置改为 warmup 后余弦学习率衰减，最低学习率 0.00001；保留旧配置缺省字段的 warmup 兼容行为，更新历史实验说明并验证默认配置。
+
+- `22:38`（变更）`configs/default.yaml`、`configs/exp_short.yaml`、`configs/exp_cosine.yaml`、`docs/manual.md`、`docs/model_flow.md`、`docs/experiments.md`、`docs/train_plan02.md`、`tests/test_config.py`：默认训练配置启用 `pos_weight`，历史短周期基线与余弦对照显式关闭以保留对照口径；同步说明实验结果、继承关系及旧配置兼容行为。
+
+- `23:22`（新增）`docs/train_plan04.md`：制定 ResNet-50 与 DenseNet-121 两组训练计划，记录配置核对、训练及比较命令、预训练加载检查和赛题部署验证限制。
+- `23:22`（变更）`docs/experiments.md`：登记两组待执行实验并链接训练计划；实测结果仍待训练后回填。
+- `23:24`（修复）`docs/manual.md`：将骨干训练计划的过期“待定”描述更新为 `docs/train_plan04.md` 链接，执行时间仍待确定。
 - `23:24`（修复）`Submission.md`：移除文件末尾多余空行，消除提交前的空白检查错误。
 
 ## 2026-10-27

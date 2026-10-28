@@ -9,5 +9,6 @@ _base: default.yaml
 
 train:
   epochs: 6
+  pos_weight: false        # 保留短周期未加权基线，供 exp_short_pos_weight 对照
   warmup_epochs: 2
   early_stop_patience: 0   # 只跑 6 轮，不早停，保证两组对照跑满同样的轮数

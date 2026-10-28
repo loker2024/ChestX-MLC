@@ -114,9 +114,9 @@ train:
 
 | 文件 | 用途 | 继承关系 | 与默认配置的主要差异 |
 | --- | --- | --- | --- |
-| `configs/default.yaml` | P7 冻结的最终配置，正式训练与提交使用 | 无 | 25 epoch、`pos_weight: false` |
-| `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停 |
-| `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 对照 | `_base: default.yaml` | `pos_weight: true` |
+| `configs/default.yaml` | P7 冻结的最终配置，正式训练与提交使用 | 无 | 25 epoch、`pos_weight: true` |
+| `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停和 `pos_weight` |
+| `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 实验配置 | `_base: default.yaml` | 显式设置 `pos_weight: true`，与当前默认一致 |
 | `configs/exp_short_pos_weight.yaml` | 短周期 `pos_weight` 对照 | `_base: exp_short.yaml` | 在短周期基础上打开 `pos_weight` |
 | `configs/exp_densenet121.yaml` | DenseNet-121 骨干对照，训练待排期 | `_base: default.yaml` | `backbone: densenet121.ra_in1k` |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，训练待排期 | `_base: default.yaml` | `backbone: resnet50` |
@@ -137,7 +137,7 @@ default.yaml
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
 
 新增骨干配置复用 `timm.create_model` 和现有 study 聚合逻辑，继承 320 输入、
-`pretrained: true` 与 `pos_weight: false`。训练计划和执行时间待定；训练环境需核查
+`pretrained: true` 与 `pos_weight: true`。训练计划见 [train_plan04.md](train_plan04.md)，执行时间待定；训练环境需核查
 实际加载的预训练权重、许可证和来源，查看日志确认「预训练权重: 已加载」。验证与推理
 须使用对应训练配置和 checkpoint；模型大小及 T4 端到端耗时尚待实测。
 
@@ -205,8 +205,10 @@ data:
 | `train.batch_studies` | 整数 | `16` | `>= 1` | 每个 batch 的**检查数**，不是图片数；实际图片数是一次检查的 1–7 张之和。显存不足时优先调小。 |
 | `train.lr` | 浮点 | `0.0003` | `> 0` | AdamW 基础学习率。必须用小数写法，不要写 `3e-4`。 |
 | `train.weight_decay` | 浮点 | `0.01` | `>= 0` | AdamW 权重衰减。 |
-| `train.pos_weight` | 布尔 | `false` | `true` / `false` | 按训练集类别频率给 BCE 正样本加权（`负样本数 / 正样本数`），缓解稀有类被压低。是否有效要用对比实验判断。 |
+| `train.pos_weight` | 布尔 | `true` | `true` / `false` | 默认配置按训练集类别频率给 BCE 正样本加权（`负样本数 / 正样本数`）；未指定字段时兼容旧配置，使用 `false`。 |
 | `train.warmup_epochs` | 整数 | `2` | `0 <= warmup < epochs` | 线性 warmup 轮数，按 epoch 逐步把学习率升到 `lr`。默认下第 1 轮为 `lr/2`、第 2 轮为 `lr`。 |
+| `train.lr_scheduler` | 字符串 | `cosine` | `warmup` / `cosine` | 默认配置在预热后余弦衰减；`warmup` 在预热后保持学习率。未指定字段时兼容旧配置，使用 `warmup`。 |
+| `train.lr_min` | 浮点 | `0.00001` | `0 <= lr_min <= lr` | 余弦调度的最低学习率；提前停止时可能尚未到达。 |
 | `train.amp` | 布尔 | `true` | `true` / `false` | 混合精度。仅在 CUDA 上生效，CPU / MPS 上自动等价于关闭。 |
 | `train.grad_clip` | 浮点 | `5.0` | `>= 0` | 梯度范数裁剪上限；`0` 表示不裁剪。 |
 | `train.num_workers` | 整数 | `8` | `>= 0` | DataLoader 工作进程数，train / valid / test 共用。Windows 或调试时可设为 `0`。 |

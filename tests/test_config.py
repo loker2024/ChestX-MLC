@@ -40,6 +40,9 @@ def test_default_config_loads():
 
     assert config.model.backbone == "resnet18"
     assert config.image.size == 320
+    assert config.train.pos_weight is True
+    assert config.train.lr_scheduler == "cosine"
+    assert config.train.lr_min == pytest.approx(1e-5)
     assert config.eval.threshold == 0.5
     assert config.output.run_dir == Path("outputs")
     assert "checkpoint_dir" not in config.to_dict()["output"]
