@@ -30,6 +30,7 @@
 - `10:30`（变更）`docs/experiments.md`、`docs/train_plan01.md`、`docs/plan0.md`：同步 RUN-003 完成状态（epoch 8 达峰、13 轮早停、按判读门走 004A）；待验证项「训练轮数」改为已验证（轮数不是瓶颈）、「阈值曲线选点」补 25 轮正式模型复核结果（F1 峰值仍在 0.2，0.4219）。
 - `10:30`（新增）`outputs/submission_run003.csv`：用 RUN-003 `best.pt` 生成全类概率提交文件（1,414 studies × 10 类 = 14,140 行，仅本地校验，未提交）。
 - `10:45`（变更）`configs/default.yaml`、`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan01.md`、`docs/plan0.md`、`CHANGELOG.md`：按「以远程为准」同步 GitHub 提交（`9de5f85`）时，上述文档的 RUN-003 记录被远端旧版覆盖；现依据本机备份 `/tmp/chestx_local_run003.patch` 恢复——`num_workers: 16`、RUN-003 正式结果（13 轮早停、best epoch 8、macro-AUC 0.7887 / F1@0.5 0.2655、38 分钟、`submission_run003.csv`）及三份文档的完成状态，重新提交并推送。
+- `11:39`（新增）`docs/train_plan02.md`、`docs/train_plan03.md`：记录 RUN-003-A 余弦学习率调度对照计划，以及 RUN-002-A / RUN-002-B 的完整周期 `pos_weight` 双种子训练计划。
 
 
 ## 2026-10-27
