@@ -38,6 +38,8 @@
 - `11:48`（变更）`docs/train_plan02.md`、`docs/train_plan03.md`：plan02 补 `configs/exp_cosine.yaml` 与执行命令（`--tag run003a_cosine`）；两份计划均注明 `num_workers: 16` 继承自 `default.yaml`。
 - `13:35`（变更）`docs/多目标胸部病变检测分类（ChestX-MLC）.md`：按赛题最新提交格式更新示例表，新增第 5 列 `Gate` 并补字段说明——类别阈值默认为 0.5，若需要自定义阈值，可以在最后一列填入，否则该列不填。
 - `13:35`（变更）`docs/manual.md`：§3.7 `submission.csv` 格式表补可选 `Gate` 列及说明（类别阈值默认 0.5，不填即用默认值），并注明当前 `run_infer` 仍按四列输出、`validate_submission` / `read_submission` 严格校验四列，启用 `Gate` 前需同步放开校验（尚未实现）。
+- `13:41`（变更）`docs/training_log.md`：回填三组串行训练实测——RUN-003-A（余弦调度，10 轮早停、best epoch 5、macro-AUC 0.7852 / F1@0.5 0.2855、29m47s）、RUN-002-A（`pos_weight` + seed 42，10 轮早停、best epoch 5、0.7872 / 0.4045、30m34s）、RUN-002-B（`pos_weight` + seed 2026，12 轮早停、best epoch 7、0.7871 / 0.4198、45m58s）；原样贴入配置与 `metrics.csv`，记录命令、起止时间（UTC / 北京）与产物目录；RUN-003-A 补与 RUN-003 的逐类 AUC 对比表，两组 `pos_weight` 补阈值曲线（峰在 0.5–0.6，上限与基线 @0.2 持平）说明；汇总表补三行，环境表注明 seed 2026。
+- `13:41`（变更）`docs/experiments.md`：实验矩阵补 RUN-003-A / RUN-002-A / RUN-002-B 三行；「执行与结果」补两条结论（余弦调度无 AUC 增益但更快、完整周期 `pos_weight` 双 seed 判无效且 F1 提升属阈值校准）；冻结结论注明 `lr_scheduler` 维持 `warmup`；待验证项新增「学习率调度」行，并按实测更新阈值曲线选点与 `pos_weight` 两行。
 
 
 ## 2026-10-27
