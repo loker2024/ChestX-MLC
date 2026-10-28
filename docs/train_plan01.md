@@ -1,6 +1,6 @@
 # ChestX-MLC 训练计划（RUN-001～004）
 
-> 状态：RUN-001 已记录；本计划从 RUN-001R 开始，后续结果见 [training_log.md](training_log.md)（2026-10-27 制定）
+> 状态：RUN-001 / 001R / 002 / 003 已记录；RUN-003 于 epoch 8 达峰（macro-AUC 0.7887）、第 13 轮早停（`num_workers` 16）。结果见 [training_log.md](training_log.md)（2026-10-27 制定，2026-10-28 更新状态）
 > 执行环境：远程 GPU（RTX 3090 24G），仓库 `/root/ChestX-MLC`，数据软链 `/root/sj-tmp`
 > 本机（macOS）只做 pytest 与文档验证，不训练
 > 记录出口：每个 run 结束后回填 `docs/training_log.md`，本文件只放「计划 / 命令 / 判读门」
@@ -33,7 +33,7 @@ python -c "import torch; print(torch.__version__); print('CUDA:', torch.cuda.is_
 python src/check_data.py --config configs/default.yaml --full
 ```
 
-- `num_workers: 8` 是 `configs/default.yaml` 的默认值，若训练机核数不同，先用 `nproc` 确认，不对就临时改配置（改完记得只影响该 run，不要污染 `default.yaml`）。
+- `num_workers: 16` 已按训练机 `nproc=16` 写入 `configs/default.yaml`（原默认 8）；不同训练机核数不同时先用 `nproc` 确认，临时改配置只影响该 run。
 - 若 `cost.py` 相关改动（`src/infer/predict.py`、`src/data/dataset.py` 的 `load_image`）尚未同步到远端，先同步再跑 001R，否则 001R 的 checkpoint 与 `cost.py` 验证用的不是同一版代码。
 
 ---
@@ -107,6 +107,8 @@ python src/run_train.py --config configs/default.yaml --seed 42 --tag full_basel
 ```
 
 **判读门**：从 `best.pt` 的 `epoch` 字段或 `run_compare` 汇总表读取 `best_epoch`；`metrics.csv` 用于查看实际运行的各轮 `valid_macro_auc`。默认 patience=5，早停后不会有最佳轮次之后的第 6～10 轮，不能把缺失轮次当作平台期。
+
+**实测**（2026-10-28）：best_epoch **8**，macro-AUC **0.7887**，第 13 轮早停；按上表属「≤ 15 且早停」分支，RUN-002 已判无效 → 004 走 **004A（40 轮延长）**。
 
 | `best_epoch` | 判定 | 004 走向 |
 |---|---|---|

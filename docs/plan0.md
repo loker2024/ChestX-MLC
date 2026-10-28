@@ -1,6 +1,6 @@
 # 实现计划（plan0）
 
-本文件保留 P1–P8 的历史实现计划与验收依据。当前架构、操作和实验执行分别见 [architecture.md](architecture.md)、[manual.md](manual.md) 和 [训练计划](train_plan01.md)；P7 对照实验和 P8 指定硬件实测仍需在训练环境完成。
+本文件保留 P1–P8 的历史实现计划与验收依据。当前架构、操作和实验执行分别见 [architecture.md](architecture.md)、[manual.md](manual.md) 和 [训练计划](train_plan01.md)。进度（2026-10-28）：P7 的 RUN-001R 回归重跑、RUN-002 `pos_weight` 对照与 RUN-003 正式基线（13 轮早停，best epoch 8，macro-AUC 0.7887）均已完成并回填 [training_log.md](training_log.md)；P8 耗时自检已在 RTX 3090 上实测（单张 46.40 ms，未超 100 ms 上限），正式成绩仍以赛题服务器实测为准。
 
 ## 前置确认
 

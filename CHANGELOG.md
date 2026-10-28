@@ -8,6 +8,30 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-10-28
+
+- `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。
+- `09:06`（变更）`docs/experiments.md`：实验矩阵标注 RUN 编号并补 001R 行；「执行与结果」补三条对照结论（001R 回归通过、`pos_weight` 无效、F1 差异属阈值效应）；待验证项的阈值曲线 / 训练轮数 / `pos_weight` 三行按实测更新；冻结结论注明 `pos_weight: false` 已有 RUN-002 支持。
+- `09:16`（变更）`src/data/dataset.py`、`src/data/transforms.py`、`src/infer/predict.py`：推理预处理提速（不改数值）。`load_image` 增加 `convert_rgb` 参数，推理入口传 `False` 保留灰度 `L` 模式；`Letterbox` 对 `L` 模式先在单通道 resize、再转 RGB（缩放是逐通道线性运算，与先转 RGB 再 resize 逐像素等价）；`ToTensor + Normalize` 换成等价的手写 `_NormalizedTensor`。训练路径仍走 `convert_rgb=True`，训练输入数值不变。本机 `pytest` 176 passed / 3 skipped，新旧实现逐像素差 0。
+- `09:16`（变更）`docs/cost.md`：回填 3090 实测——同一 `best.pt` 与 `submission.csv`，单张均值由 112.46 ms 降到 **46.40 ms**（上限 100 ms），中位 47.73 ms、p95 55.45 ms，100 张 0 不一致；`cost.md` 新增 §3.1 记录提速实现与等价性验证，§8 补实测记录。
+- `09:25`（变更）`docs/training_log.md`：补 RUN-003 `full_baseline` 现状（01:13:55 启动、epoch 1 于 01:18 完成后暂停、`last.pt` 已落盘可 `--resume` 续训）与首轮 `metrics.csv`，注明续训命令；记录模板表头保持与 `metrics.csv` 一致的 `valid_macro_auc` / `valid_macro_f1`（对应 `src/train/engine.py` 的 history 键名，console 打印时才用 `macro_auc` / `macro_f1`）；RUN-001R 补 F1@0.5 的 0.2651（`metrics.csv`）/ 0.2649（`run_compare` 重算）口径说明，RUN-002 补 macro-AUC 0.7882（`metrics.csv`）/ 0.7881（重算）口径说明并新增十类逐类 AUC 对比表；汇总表 RUN-003 行改为首轮实测并补两条口径脚注。
+- `09:25`（变更）`docs/experiments.md`：实验环境表设备改为 RTX 3090 24G（复用同一实例，本机只做代码与文档验证）；实验矩阵由 tag 列改为 RUN 编号 + tag + 配置，补 RUN-003 与 004A / 004B 行；「执行与结果」补第四条结论「执行顺序与计划不同」（001R 与 002 并行、`run_compare` → 提交 → 耗时自检 → 003）。
+- `09:25`（变更）`docs/cost.md`：§3.1 删除无实测依据的「前向不到 10 ms」说法，改为以优化前后 112.46 → 46.40 ms 的差值说明预处理占主要耗时；§8 标注 112.46 ms 只保留终端 `[CONCLUSION]` 输出、未落 JSON 报告，46.40 ms 一组数据指向 `outputs/cost_report.json` 的 `timing_ms`。
+- `09:25`（变更）`docs/model_flow.md`：补训练 / 推理两条读图路径的等价说明（训练统一转 RGB；推理与耗时自检对灰度图保留 `L` 模式先 resize 再转 RGB）及 `_NormalizedTensor` 与 `ToTensor + Normalize` 的等价关系。
+- `09:25`（变更）`docs/train_plan01.md`：状态行更新为「RUN-001 / 001R / 002 已记录，RUN-003 进行中（epoch 1 后暂停，可续训）」。
+- `09:25`（修复）`CHANGELOG.md`：修正 `09:06` / `09:16` 两条与实际改动不符的描述——`training_log.md` 未记录 `cost.py` 的 112.46 ms（该数字只在 `cost.md`「本地验证记录」），`09:16` 条目也不再声称改过 `training_log.md`；同时复核本机 `python -m pytest` 为 176 passed / 3 skipped，与 `09:16` 条目一致。
+- `09:27`（变更）`docs/plan0.md`：开头的进度行由「P7 对照实验和 P8 指定硬件实测仍需在训练环境完成」改为实测现状（RUN-001R 回归与 RUN-002 `pos_weight` 对照已回填 `training_log.md`、RUN-003 启动后 epoch 1 暂停待续训、P8 耗时自检在 3090 实测 46.40 ms 未超限），与 `docs/train_plan01.md` 的状态行一致。
+- `09:27`（修复）`docs/training_log.md`、`docs/cost.md`：核对 `src/train/engine.py:257-258` 的 history 键名后，把误改为 `macro_auc` / `macro_f1` 的 `metrics.csv` 表头回滚为 `valid_macro_auc` / `valid_macro_f1`（与 `docs/manual.md` / `docs/train_plan01.md` 及实际产物一致），并在 RUN-001R 段注明两者是同一个量；`cost.md` §8 的比对结论改为「两次终端 `[CONCLUSION]` 均报告不一致 0 张，只有优化后一次落盘 `cost_report.json`（`max_abs_diff` 1.43e-04）」，不再把未落盘的 112.46 ms 那次也写成有 JSON 佐证。
+- `09:29`（修复）`docs/cost.md`：§3.1 按远端复测结果收窄表述——抽样测试图为 `L` 模式、尺寸以 2544×3056 为主而非全部如此；等价性写明实测规模（20 张 `L` 原模式 + 10 张转 `RGB` 输入，新旧预处理得到的输入张量最大绝对差均为 0.0），删去无独立记录的「概率最大差 0」说法；同时确认 `outputs/` 下只有优化后的 `cost_report.json`，112.46 ms 那次仍无 JSON 落盘。
+- `09:34`（变更）`configs/default.yaml`：`train.num_workers` 由 8 提高到 16，与训练机 `nproc=16` 对齐；`num_workers` 不影响 shuffle 顺序（每 epoch 只在主进程固定消耗一次随机种子），AUC 可与前序 run 直接对比，但每个 worker 的数据增强序列会变（worker 种子 = base_seed + worker_id），与续训口径无关——本次为从头训练。
+- `09:34`（移除）`outputs/20261028-011355_full_baseline/`、`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan01.md`、`docs/plan0.md`：删除 RUN-003 暂停残留（远端 `last.pt` / `metrics.csv` / `train.log` / `config.yaml` 整目录）及文档中的「epoch 1 后暂停、可续训」记录与首轮数值，改为「从头训练 25 轮、结束后回填」；同步更新三份文档的状态行与执行顺序说明。
+- `09:34`（变更）远端 RUN-003 重跑：`configs/default.yaml` 保持 `num_workers: 16`，从头训练至 `outputs/20261028-013241_full_baseline/`（训练中，25 轮）。
+- `10:30`（变更）`docs/training_log.md`：回填 RUN-003 `full_baseline` 正式结果——25 轮上限下 epoch 8 达峰（macro-AUC 0.7887、F1@0.5 0.2655），第 13 轮因连续 5 轮无提升早停，总耗时约 38 分钟（`num_workers` 16，单轮约 3.3 分钟）；贴入 13 轮 `metrics.csv`、逐类 AUC 与 RUN-001R 对比表；结论记「AUC Δ−0.0016 未达增益门，25 轮上限 + 早停未带来 AUC 增益，训练轮数不是瓶颈」，汇总表更新 RUN-003 行并补提交文件路径。
+- `10:30`（变更）`docs/experiments.md`、`docs/train_plan01.md`、`docs/plan0.md`：同步 RUN-003 完成状态（epoch 8 达峰、13 轮早停、按判读门走 004A）；待验证项「训练轮数」改为已验证（轮数不是瓶颈）、「阈值曲线选点」补 25 轮正式模型复核结果（F1 峰值仍在 0.2，0.4219）。
+- `10:30`（新增）`outputs/submission_run003.csv`：用 RUN-003 `best.pt` 生成全类概率提交文件（1,414 studies × 10 类 = 14,140 行，仅本地校验，未提交）。
+- `10:45`（变更）`configs/default.yaml`、`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan01.md`、`docs/plan0.md`、`CHANGELOG.md`：按「以远程为准」同步 GitHub 提交（`9de5f85`）时，上述文档的 RUN-003 记录被远端旧版覆盖；现依据本机备份 `/tmp/chestx_local_run003.patch` 恢复——`num_workers: 16`、RUN-003 正式结果（13 轮早停、best epoch 8、macro-AUC 0.7887 / F1@0.5 0.2655、38 分钟、`submission_run003.csv`）及三份文档的完成状态，重新提交并推送。
+
+
 ## 2026-10-27
 
 - `08:32`（新增）`configs/exp_example.yaml`：示例数据冒烟配置，用 `_base: default.yaml` 继承冻结配置，只把 `data.<split>` 的 `csv` / `images` 指向 `data/example`，其余超参与默认配置完全一致；文件头注明示例数据只有 39 个训练 study / 84 个验证 study，指标仅用于验证链路。
