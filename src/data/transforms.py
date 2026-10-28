@@ -7,8 +7,9 @@
 返回的 transform 输入是 PIL Image，输出是 [3, size, size] 的 float32 张量。
 """
 
-from typing import Callable
+from typing import Callable, Sequence
 
+import numpy as np
 import torch
 from PIL import Image
 from torchvision import transforms as T
@@ -32,14 +33,20 @@ class Letterbox:
         self.fill = fill
 
     def __call__(self, image: Image.Image) -> Image.Image:
-        # 赛题图片按 RGB 读取；万一遇到灰度或带 alpha 的图，先统一成三通道。
-        image = image.convert("RGB")
+        # 灰度图保留 L 模式先 resize，之后才转 RGB：缩放是逐通道的线性运算，
+        # 先 resize 后 convert 与先 convert 后 resize 逐像素等价（实测张量差为 0），
+        # 但单通道插值只需约 1/3 的运算量，单张推理的读图+预处理明显更快。
+        if image.mode != "L":
+            # 其他模式（RGB / RGBA / P 等）先统一成三通道，避免 alpha 参与缩放。
+            image = image.convert("RGB")
         width, height = image.size
 
         scale = self.size / max(width, height)
         new_width = max(1, round(width * scale))  # 至少 1 像素，否则 resize 会报错
         new_height = max(1, round(height * scale))
         resized = image.resize((new_width, new_height), Image.Resampling.BILINEAR)
+        if resized.mode != "RGB":
+            resized = resized.convert("RGB")
 
         canvas = Image.new("RGB", (self.size, self.size), (self.fill,) * 3)
         canvas.paste(resized, ((self.size - new_width) // 2, (self.size - new_height) // 2))
@@ -90,12 +97,30 @@ def build_train_transform(size: int, cfg: ImageConfig) -> Callable[[Image.Image]
     return T.Compose(steps)
 
 
+class _NormalizedTensor:
+    """PIL 图 -> [3, size, size] float32 张量，并按 mean/std 归一化。
+
+    等价于 `T.ToTensor()` + `T.Normalize(mean, std)`（同一套 float32 运算，
+    实测逐元素相同），但少一次模块调用与中间张量；单图推理计时里这部分
+    开销不可忽略。`mean=(0,0,0) / std=(1,1,1)` 时就是「只把像素缩到 0~1」。
+    """
+
+    def __init__(self, mean: Sequence[float], std: Sequence[float]) -> None:
+        self._mean = torch.tensor(mean, dtype=torch.float32).view(3, 1, 1)
+        self._std = torch.tensor(std, dtype=torch.float32).view(3, 1, 1)
+
+    def __call__(self, image: Image.Image) -> torch.Tensor:
+        pixels = np.asarray(image, dtype=np.float32) / 255.0
+        tensor = torch.from_numpy(pixels).permute(2, 0, 1)
+        return (tensor - self._mean) / self._std
+
+
 def _normalize_steps(normalize: str) -> list[Callable]:
     """把 PIL 图转成张量，并按配置决定要不要减均值除方差。
 
-    ToTensor 自己会把 0~255 的整数缩到 0~1，所以 "none" 模式下就是「只缩放
-    像素到 0~1」，与配置里写的含义一致。
+    `_NormalizedTensor` 会把 0~255 的整数缩到 0~1，所以 "none" 模式下就是
+    「只缩放像素到 0~1」，与配置里写的含义一致。
     """
     if normalize == "imagenet":
-        return [T.ToTensor(), T.Normalize(IMAGENET_MEAN, IMAGENET_STD)]
-    return [T.ToTensor()]
+        return [_NormalizedTensor(IMAGENET_MEAN, IMAGENET_STD)]
+    return [_NormalizedTensor((0.0, 0.0, 0.0), (1.0, 1.0, 1.0))]

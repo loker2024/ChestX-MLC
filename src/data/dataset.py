@@ -54,17 +54,19 @@ class StudyDataset(Dataset):
         return item
 
 
-def load_image(path: Path) -> Image.Image:
-    """读一张图并统一成 RGB。
+def load_image(path: Path, convert_rgb: bool = True) -> Image.Image:
+    """读一张图；默认统一成 RGB，`convert_rgb=False` 时保留原模式（如 L）。
 
     用 with 打开是为了读完立刻释放文件句柄——全量数据几万张图、num_workers
     又有多个进程，句柄泄漏在长训练里会变成 "too many open files"。
 
     推理脚本（infer.predict.predict_image / predict_study）也复用这个函数，
     保证「数据集里读图」和「单张计时里读图」是同一段代码、同一种 RGB 转换。
+    单图计时传 `convert_rgb=False`：灰度图在 L 模式下 resize 更快，最终
+    `Letterbox` 会在 resize 之后转 RGB，与先转 RGB 再 resize 的结果逐像素一致。
     """
     with Image.open(path) as image:
-        return image.convert("RGB")
+        return image.convert("RGB") if convert_rgb else image.copy()
 
 
 def collate_studies(batch: list[dict[str, Any]]) -> dict[str, Any]:

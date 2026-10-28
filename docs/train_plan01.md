@@ -1,6 +1,6 @@
 # ChestX-MLC 训练计划（RUN-001～004）
 
-> 状态：RUN-001 已记录；本计划从 RUN-001R 开始，后续结果见 [training_log.md](training_log.md)（2026-10-27 制定）
+> 状态：RUN-001 / 001R / 002 已记录，RUN-003 进行中（epoch 1 后暂停，可续训）；结果见 [training_log.md](training_log.md)（2026-10-27 制定，2026-10-28 更新状态）
 > 执行环境：远程 GPU（RTX 3090 24G），仓库 `/root/ChestX-MLC`，数据软链 `/root/sj-tmp`
 > 本机（macOS）只做 pytest 与文档验证，不训练
 > 记录出口：每个 run 结束后回填 `docs/training_log.md`，本文件只放「计划 / 命令 / 判读门」

@@ -141,7 +141,9 @@ def predict_image(
     单图 forward 与 DataLoader 里多图 forward 在 eval 模式下逐图独立，结果一致。
     """
     model.eval()
-    tensor = transform(load_image(Path(image_path))).unsqueeze(0)
+    # convert_rgb=False：灰度图保留 L 模式，由 Letterbox 在 resize 之后转 RGB，
+    # 结果与先转 RGB 再 resize 逐像素一致，但单通道插值只需 1/3 的运算量。
+    tensor = transform(load_image(Path(image_path), convert_rgb=False)).unsqueeze(0)
     offsets = torch.tensor([0, 1], dtype=torch.long)
     return _forward_probabilities(model, tensor, offsets, device)[0].numpy()
 
@@ -164,6 +166,9 @@ def predict_study(
     if not paths:
         raise ValueError("一个 study 至少要有一张图片才能推理")
     model.eval()
-    images = torch.stack([transform(load_image(path)) for path in paths])
+    images = torch.stack(
+        # 与 predict_image 一致：灰度图保留 L 模式、在 resize 后再转 RGB。
+        [transform(load_image(path, convert_rgb=False)) for path in paths]
+    )
     offsets = torch.tensor([0, len(paths)], dtype=torch.long)
     return _forward_probabilities(model, images, offsets, device)[0].numpy()
