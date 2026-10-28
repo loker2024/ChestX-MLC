@@ -36,6 +36,8 @@
 - `11:48`（变更）`src/train/engine.py`：`_build_scheduler` 改为按配置构造——`warmup` 保持原「线性预热后恒定」，新增 `cosine` 模式：同样线性预热，之后余弦衰减到 `lr_min`，末轮正好落在 `lr_min`；`fit` 调用处同步调整。
 - `11:48`（变更）`tests/test_config.py`、`tests/test_engine.py`：补 `lr_scheduler` 非法值 / `lr_min > lr` 校验用例、`exp_cosine.yaml` 加载断言，以及 5 轮 2-warmup 的余弦学习率轨迹用例（末轮 = `lr_min`）。本机 `python -m pytest -q` 为 180 passed / 3 skipped。
 - `11:48`（变更）`docs/train_plan02.md`、`docs/train_plan03.md`：plan02 补 `configs/exp_cosine.yaml` 与执行命令（`--tag run003a_cosine`）；两份计划均注明 `num_workers: 16` 继承自 `default.yaml`。
+- `13:35`（变更）`docs/多目标胸部病变检测分类（ChestX-MLC）.md`：按赛题最新提交格式更新示例表，新增第 5 列 `Gate` 并补字段说明——类别阈值默认为 0.5，若需要自定义阈值，可以在最后一列填入，否则该列不填。
+- `13:35`（变更）`docs/manual.md`：§3.7 `submission.csv` 格式表补可选 `Gate` 列及说明（类别阈值默认 0.5，不填即用默认值），并注明当前 `run_infer` 仍按四列输出、`validate_submission` / `read_submission` 严格校验四列，启用 `Gate` 前需同步放开校验（尚未实现）。
 
 
 ## 2026-10-27

@@ -394,6 +394,9 @@ subject_00000,study_00000,2,0.030000
 | `Study_id` | 检查 ID，必须覆盖 `test.csv` 中全部 study。 |
 | `Predict_class` | 类别 ID，1–10。 |
 | `Probability` | `[0, 1]` 内的概率。 |
+| `Gate`（可选） | 类别阈值，默认 0.5；需要自定义阈值时在最后一列填入，否则该列不填。 |
+
+> 赛题最新版提交格式在四列之后增加了可选的 `Gate` 列，用于表达自定义类别阈值（默认 0.5，不填即用默认值）。当前 `run_infer` 仍按四列输出，`validate_submission` / `read_submission` 也严格校验四列；若提交时要启用 `Gate`，需同步放开校验（尚未实现）。
 
 两种输出模式：
 
