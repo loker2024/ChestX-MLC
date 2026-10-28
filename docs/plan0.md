@@ -185,7 +185,7 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 
 涉及文件：
 
-- `cost.py`（仓库根目录，赛题附录 A 要求提交包根目录含此文件）
+- `src/cost.py`（打包时复制到提交包根目录，以符合赛题附录 A）
 - `src/infer/profiling.py`：耗时评测的可测口径（图片发现与身份解析、提交文件读取校验、阈值选择、study 预测比对、计时统计、`[CONCLUSION]` 格式化）
 - `src/infer/predict.py`：新增 `build_eval_inference_transform`、`predict_image`、`predict_study`，与 `predict_loader` 共用内部前向
 - `src/data/dataset.py`：`load_image` 公开给推理复用
@@ -193,14 +193,14 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 
 产出：
 
-- `python cost.py <submission.csv> <pictures_100> <pictures_5>`：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮并测量写出；涉及多图 study 时，单图候选结果不等于最终聚合结果，不能据此判定最终耗时，详见 `docs/cost.md`。
+- `python src/cost.py <submission.csv> <pictures_100> <pictures_5>`：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮并测量写出；涉及多图 study 时，单图候选结果不等于最终聚合结果，不能据此判定最终耗时，详见 `docs/cost.md`。
 - 复用 `infer.predict` 的 `load_checkpoint_model` / `build_eval_inference_transform` / `predict_image` / `predict_study`，保证与 `run_infer.py` 同一套推理与聚合逻辑；计时后用 `predict_study` 聚合现场预测并与 `submission.csv` 比对。
 - 支持 `--precision fp16`（FP16 须在提交说明中声明）、`--report` 写出 JSON 明细；退出码 0 成功、1 超限或不一致、2 参数/文件/配置错误。
 
 验收：
 
 ```bash
-python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 --config configs/default.yaml --checkpoint outputs/<final>/best.pt --report outputs/cost_report.json
+python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 --config configs/default.yaml --checkpoint outputs/<final>/best.pt --report outputs/cost_report.json
 python -m pytest -q tests/test_cost.py
 ```
 

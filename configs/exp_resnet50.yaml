@@ -1,0 +1,5 @@
+# 待排期的骨干对照：只切换到 ImageNet 预训练 ResNet-50。
+_base: default.yaml
+
+model:
+  backbone: resnet50

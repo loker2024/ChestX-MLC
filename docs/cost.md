@@ -1,15 +1,15 @@
 # cost.py：赛题第 7 条耗时自检
 
-`cost.py` 位于仓库根目录，对应赛题「端到端单张图片推理耗时」评测：按官方指定的调用方式，在 100 张图上以 `batch=1` 串行、连续跑 3 轮，给出单张平均耗时，并顺带核对「现场预测」与最终 `submission.csv` 是否一致。规则原文见 `docs/比赛参赛规则.md`，第 7 条与附录 A。
+仓库中的入口是 `src/cost.py`，对应赛题「端到端单张图片推理耗时」评测：在 100 张图上以 `batch=1` 串行、连续跑 3 轮，给出单张平均耗时，并顺带核对「现场预测」与最终 `submission.csv` 是否一致。提交包须按附录 A 将脚本复制到根目录，见第 9 节。规则原文见 `docs/比赛参赛规则.md`。
 
 ## 1. 快速开始
 
 ```bash
 # 在仓库根目录（或提交包根目录）执行，参数顺序与规则一致
-python cost.py <submission.csv> <pictures_100> <pictures_5>
+python src/cost.py <submission.csv> <pictures_100> <pictures_5>
 
 # 例：本地联调时显式指定配置与权重
-python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 \
+python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 \
     --config configs/default.yaml \
     --checkpoint outputs/<run>/best.pt \
     --report outputs/cost_report.json
@@ -117,12 +117,13 @@ JSON 顶层键：
 
 ```text
 cost.py
+src/               # 保留 common、data、model、infer 等源码及其依赖
 config.yaml        # 或 configs/default.yaml，保证 cost.py 能自动找到
 best.pt            # 或 model/best.pt，与生成 submission.csv 的权重一致
 submission.csv     # 最终提交文件
 ```
 
-赛题附录 A 要求提交包根目录有 `cost.py`；模型与配套文件解压后总大小不超过 500 MB（第 8 条）。`pictures_100` / `pictures_5` 由主办方提供，不需要随包提交；本地自测时请用与测试集同结构的目录。
+赛题附录 A 要求提交包根目录有 `cost.py`：打包时将仓库的 `src/cost.py` 复制到提交包根目录，并保留 `src/` 下的源码依赖，评测命令仍为 `python cost.py ...`。模型与配套文件解压后总大小不超过 500 MB（第 8 条）。`pictures_100` / `pictures_5` 由主办方提供，不需要随包提交；本地自测时请用与测试集同结构的目录。
 
 ## 10. 已知限制
 

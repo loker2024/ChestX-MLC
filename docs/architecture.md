@@ -15,7 +15,7 @@
 
 ## 2. 目录总览
 
-`src/` 按 `common`、`data`、`model`、`train`、`infer` 分层；五个运行入口位于 `src/`，`cost.py` 位于仓库根目录。`configs/` 存放配置，`tests/` 存放合成数据测试，`docs/` 存放说明。`data/` 和 `outputs/` 分别存放本地数据和运行产物，不入库。
+`src/` 按 `common`、`data`、`model`、`train`、`infer` 分层；运行入口和耗时自检入口 `cost.py` 均位于 `src/`。`configs/` 存放配置，`tests/` 存放合成数据测试，`docs/` 存放说明。`data/` 和 `outputs/` 分别存放本地数据和运行产物，不入库。
 
 ## 3. 模块职责
 
@@ -79,7 +79,7 @@
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 | `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `per_class.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
-| `cost.py`（仓库根目录） | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径。调用方式、索引降级行为和限制见 [cost.md](cost.md) |
+| `src/cost.py` | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径。调用方式、索引降级行为和限制见 [cost.md](cost.md) |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -101,7 +101,7 @@
 4. `train.engine` 以 `BCEWithLogitsLoss` 训练，按 valid macro-AUC 保存最优权重。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
-7. 根目录 `cost.py` 加载同一份 checkpoint 与配置，按单图串行计时，并在完整测试索引可用时补齐 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
+7. `src/cost.py` 加载同一份 checkpoint 与配置，按单图串行计时，并在完整测试索引可用时补齐 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
 
 每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv`、`per_class.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 

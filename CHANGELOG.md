@@ -40,6 +40,12 @@
 - `13:35`（变更）`docs/manual.md`：§3.7 `submission.csv` 格式表补可选 `Gate` 列及说明（类别阈值默认 0.5，不填即用默认值），并注明当前 `run_infer` 仍按四列输出、`validate_submission` / `read_submission` 严格校验四列，启用 `Gate` 前需同步放开校验（尚未实现）。
 - `13:41`（变更）`docs/training_log.md`：回填三组串行训练实测——RUN-003-A（余弦调度，10 轮早停、best epoch 5、macro-AUC 0.7852 / F1@0.5 0.2855、29m47s）、RUN-002-A（`pos_weight` + seed 42，10 轮早停、best epoch 5、0.7872 / 0.4045、30m34s）、RUN-002-B（`pos_weight` + seed 2026，12 轮早停、best epoch 7、0.7871 / 0.4198、45m58s）；原样贴入配置与 `metrics.csv`，记录命令、起止时间（UTC / 北京）与产物目录；RUN-003-A 补与 RUN-003 的逐类 AUC 对比表，两组 `pos_weight` 补阈值曲线（峰在 0.5–0.6，上限与基线 @0.2 持平）说明；汇总表补三行，环境表注明 seed 2026。
 - `13:41`（变更）`docs/experiments.md`：实验矩阵补 RUN-003-A / RUN-002-A / RUN-002-B 三行；「执行与结果」补两条结论（余弦调度无 AUC 增益但更快、完整周期 `pos_weight` 双 seed 判无效且 F1 提升属阈值校准）；冻结结论注明 `lr_scheduler` 维持 `warmup`；待验证项新增「学习率调度」行，并按实测更新阈值曲线选点与 `pos_weight` 两行。
+- `15:23`（新增）`configs/exp_densenet121.yaml`、`configs/exp_resnet50.yaml`：新增继承默认配置的两项骨干对照配置，保留 `pos_weight: false`，训练计划待定。
+- `15:23`（变更）`docs/manual.md`、`docs/experiments.md`：补充骨干配置、继承关系、权重及部署验证说明，记录实验待排期。
+- `15:31`（新增）`source/README.md`、`source/01_CXR-LT-2023/`、`source/02_CXR-LT-2024/`、`source/03_经典胸片论文/`：收集两届 CXR-LT 论文与经典胸片论文 PDF，记录来源、阅读优先级、可借鉴方向和赛题限制，资料仅供本地阅读。
+- `15:31`（变更）`.gitignore`：忽略仓库根目录 `source/`，避免将文献 PDF 和本地索引加入 Git。
+- `15:34`（变更）`src/model/network.py`：更新模块和建模函数说明，明确按配置选择 timm 骨干、逐图输出及 study 聚合，并澄清预训练加载行为。
+- `15:36`（变更）`cost.py` → `src/cost.py`：迁移耗时自检入口并适配仓库与提交包根目录的路径；更新 `tests/test_cost.py`、`src/infer/predict.py`、`src/infer/profiling.py`、`AGENTS.md`、`docs/architecture.md`、`docs/cost.md`、`docs/plan0.md`、`docs/train_plan01.md` 的测试、入口及打包说明。
 
 
 ## 2026-10-27

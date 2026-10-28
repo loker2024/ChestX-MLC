@@ -118,6 +118,8 @@ train:
 | `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停 |
 | `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 对照 | `_base: default.yaml` | `pos_weight: true` |
 | `configs/exp_short_pos_weight.yaml` | 短周期 `pos_weight` 对照 | `_base: exp_short.yaml` | 在短周期基础上打开 `pos_weight` |
+| `configs/exp_densenet121.yaml` | DenseNet-121 骨干对照，训练待排期 | `_base: default.yaml` | `backbone: densenet121.ra_in1k` |
+| `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，训练待排期 | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
 
 继承关系：
@@ -127,10 +129,17 @@ default.yaml
 ├── exp_short.yaml
 │   └── exp_short_pos_weight.yaml
 ├── exp_pos_weight.yaml
+├── exp_densenet121.yaml
+├── exp_resnet50.yaml
 └── exp_example.yaml
 ```
 
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
+
+新增骨干配置复用 `timm.create_model` 和现有 study 聚合逻辑，继承 320 输入、
+`pretrained: true` 与 `pos_weight: false`。训练计划和执行时间待定；训练环境需核查
+实际加载的预训练权重、许可证和来源，查看日志确认「预训练权重: 已加载」。验证与推理
+须使用对应训练配置和 checkpoint；模型大小及 T4 端到端耗时尚待实测。
 
 ### 2.3 字段总览
 

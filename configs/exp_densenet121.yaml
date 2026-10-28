@@ -1,0 +1,5 @@
+# 待排期的骨干对照：只切换到 ImageNet 预训练 DenseNet-121。
+_base: default.yaml
+
+model:
+  backbone: densenet121.ra_in1k

@@ -5,7 +5,7 @@
 本仓库用于 ChestX-MLC 胸片多标签分类。P1–P8 的代码、配置与文档已完成；P7 的对照实验、P8 的耗时实测与最终提交在训练环境（远程 GPU / 赛题服务器）执行，本机只做代码与测试验证。
 
 - `docs/`：赛题说明、架构与文件结构 `docs/architecture.md`、实现计划 `docs/plan0.md`、耗时自检说明 `docs/cost.md`、调优记录 `docs/experiments.md` 与数据流图；实现前先阅读赛题文档与架构说明。
-- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层（`infer/profiling.py` 放耗时评测口径），并有 `check_data.py`、`run_train.py`、`run_eval.py`、`run_infer.py`、`run_compare.py` 五个入口；仓库根目录的 `cost.py` 是赛题第 7 条耗时自检入口。
+- `src/`：可复用源码，按 `common/`、`data/`、`model/`、`train/`、`infer/` 分层（`infer/profiling.py` 放耗时评测口径），包含训练、推理、对照及赛题第 7 条耗时自检等入口。
 - `tests/`：pytest 测试与合成数据 fixture；当前覆盖标签、索引、数据集、数据体检、指标、模型、训练、配置、run 对比、提交、耗时自检与端到端链路。
 - `configs/`：运行配置；`default.yaml` 是冻结的最终配置，`exp_*.yaml` 通过 `_base` 继承它，只写实验差异。
 - `requirements.txt`：Python 3.12 依赖及 macOS、Windows、Linux 安装说明。
@@ -40,7 +40,7 @@ python src/run_train.py  --resume outputs/<run>
 python src/run_eval.py   --config configs/default.yaml --checkpoint outputs/<run>/best.pt --thresholds 0.3,0.4,0.5,0.6
 python src/run_infer.py  --config configs/default.yaml --checkpoint outputs/<run>/best.pt --out outputs/submission.csv
 python src/run_compare.py --runs outputs/<run_a> outputs/<run_b> --thresholds 0.3,0.4,0.5,0.6,0.7
-python cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 \
+python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictures_5 \
     --config configs/default.yaml --checkpoint outputs/<run>/best.pt \
     --report outputs/cost_report.json
 ```

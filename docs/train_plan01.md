@@ -161,7 +161,7 @@ python src/run_infer.py --config outputs/<001R>/config.yaml \
 ### 5.3 运行与验收
 
 ```bash
-python cost.py outputs/<001R>/submission.csv outputs/cost_pics/pictures_100 outputs/cost_pics/pictures_5 \
+python src/cost.py outputs/<001R>/submission.csv outputs/cost_pics/pictures_100 outputs/cost_pics/pictures_5 \
     --config outputs/<001R>/config.yaml --checkpoint outputs/<001R>/best.pt \
     --report outputs/cost_report.json
 ```

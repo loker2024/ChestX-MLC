@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import csv
+import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -26,10 +27,7 @@ import yaml
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-# cost.py 在仓库根目录，不在 src/ 里；测试直接 import 它来测 CLI 与内部函数。
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
+# conftest.py 已将 src/ 加入模块搜索路径。
 import cost  # noqa: E402
 
 from common.checkpoint import save_checkpoint  # noqa: E402
@@ -56,6 +54,23 @@ from infer.profiling import (  # noqa: E402
 )
 from infer.submission import build_submission_frame, write_submission  # noqa: E402
 from model.network import build_model  # noqa: E402
+
+
+def test_cost_entrypoints_work_from_repository_and_submission_package(tmp_path: Path) -> None:
+    """仓库入口与提交包根目录入口都能启动，并从各自的 src 导入依赖。"""
+    source = ROOT / "src" / "cost.py"
+    assert source.is_file()
+    package_src = tmp_path / "src"
+    package_src.symlink_to(ROOT / "src", target_is_directory=True)
+    package_cost = tmp_path / "cost.py"
+    package_cost.write_bytes(source.read_bytes())
+    for script, cwd in ((source, ROOT), (package_cost, tmp_path)):
+        result = subprocess.run(
+            [sys.executable, str(script), "--help"], cwd=cwd,
+            capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "pictures_100" in result.stdout
 
 # 测试目录里图片的摆放：2 个 study、3 张图，study_00000 有两张（验证多图聚合）。
 IMAGE_RELATIVES = (

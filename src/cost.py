@@ -2,7 +2,7 @@
 
 用法（参数顺序与规则附录一致）：
 
-    python cost.py <submission.csv> <pictures_100> <pictures_5>
+    python src/cost.py <submission.csv> <pictures_100> <pictures_5>
 
 - `submission.csv`：最终提交的提交文件，用来做预测一致性比对；
 - `pictures_100`：100 张计时图目录，结构与测试集一致
@@ -50,9 +50,9 @@ import tempfile
 from pathlib import Path
 from typing import Sequence
 
-# 提交包根目录的 cost.py 是唯一入口，src/ 不在 sys.path 里；显式插到最前面，
-# 后面就能像仓库内脚本一样 `from infer.predict import ...`。
-ROOT = Path(__file__).resolve().parent
+# 仓库中脚本位于 src/；提交包按赛题要求复制到根目录，并保留 src/ 依赖。
+SCRIPT_DIR = Path(__file__).resolve().parent
+ROOT = SCRIPT_DIR.parent if SCRIPT_DIR.name == "src" else SCRIPT_DIR
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))

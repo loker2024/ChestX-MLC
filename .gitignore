@@ -50,3 +50,6 @@ env/
 submission_*.csv
 /example
 docs/sju.md
+
+# ---- 本地文献资料（PDF 与索引均不入库）----
+/source/

@@ -9,7 +9,7 @@
 infer.submission 负责转换。
 
 本模块同时提供 `predict_image` / `predict_study` 两个「不经 DataLoader」的
-推理入口，供根目录的 `cost.py` 计时和一致性校验复用。三者（predict_loader、
+推理入口，供 `src/cost.py` 计时和一致性校验复用。三者（predict_loader、
 predict_image、predict_study）都经 `_forward_probabilities` 做前向、聚合与
 sigmoid，保证提交概率、计时口径、校验口径不分叉。
 """
