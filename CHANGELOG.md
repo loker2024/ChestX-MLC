@@ -31,6 +31,11 @@
 - `10:30`（新增）`outputs/submission_run003.csv`：用 RUN-003 `best.pt` 生成全类概率提交文件（1,414 studies × 10 类 = 14,140 行，仅本地校验，未提交）。
 - `10:45`（变更）`configs/default.yaml`、`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan01.md`、`docs/plan0.md`、`CHANGELOG.md`：按「以远程为准」同步 GitHub 提交（`9de5f85`）时，上述文档的 RUN-003 记录被远端旧版覆盖；现依据本机备份 `/tmp/chestx_local_run003.patch` 恢复——`num_workers: 16`、RUN-003 正式结果（13 轮早停、best epoch 8、macro-AUC 0.7887 / F1@0.5 0.2655、38 分钟、`submission_run003.csv`）及三份文档的完成状态，重新提交并推送。
 - `11:39`（新增）`docs/train_plan02.md`、`docs/train_plan03.md`：记录 RUN-003-A 余弦学习率调度对照计划，以及 RUN-002-A / RUN-002-B 的完整周期 `pos_weight` 双种子训练计划。
+- `11:48`（新增）`configs/exp_cosine.yaml`：RUN-003-A 对照配置，`_base: default.yaml` 只改 `train.lr_scheduler: cosine` 与 `train.lr_min: 0.00001`，其余（25 轮、warmup 2、early-stop 5、`pos_weight: false`、`num_workers: 16`）继承冻结配置。
+- `11:48`（变更）`src/common/config.py`：`TrainConfig` 新增 `lr_scheduler`（`warmup` / `cosine`，默认 `warmup`）与 `lr_min`（默认 `1e-5`）两个字段，并校验取值与 `lr_min <= lr`；默认值与原行为一致，不影响既有配置。
+- `11:48`（变更）`src/train/engine.py`：`_build_scheduler` 改为按配置构造——`warmup` 保持原「线性预热后恒定」，新增 `cosine` 模式：同样线性预热，之后余弦衰减到 `lr_min`，末轮正好落在 `lr_min`；`fit` 调用处同步调整。
+- `11:48`（变更）`tests/test_config.py`、`tests/test_engine.py`：补 `lr_scheduler` 非法值 / `lr_min > lr` 校验用例、`exp_cosine.yaml` 加载断言，以及 5 轮 2-warmup 的余弦学习率轨迹用例（末轮 = `lr_min`）。本机 `python -m pytest -q` 为 180 passed / 3 skipped。
+- `11:48`（变更）`docs/train_plan02.md`、`docs/train_plan03.md`：plan02 补 `configs/exp_cosine.yaml` 与执行命令（`--tag run003a_cosine`）；两份计划均注明 `num_workers: 16` 继承自 `default.yaml`。
 
 
 ## 2026-10-27

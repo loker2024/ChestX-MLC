@@ -1,4 +1,4 @@
-在 RUN-003 的基础上，只改变学习率调度策略，训练一次。
+在 RUN-003 的基础上，只改变学习率调度策略，训练一次（新增 `configs/exp_cosine.yaml`，只写 `lr_scheduler: cosine` 与 `lr_min: 1e-5`，其余字段继承 `default.yaml`）。
 
 | 配置项 | RUN-003-A |
 |---|---|
@@ -8,6 +8,10 @@
 | 最大 epoch | 25 |
 | early-stop patience | 5 |
 | pos_weight | 关闭 |
-| 其他配置 | 与 RUN-003 保持一致 |
+| 其他配置 | 与 RUN-003 保持一致（含 `num_workers: 16`） |
+
+```bash
+python src/run_train.py --config configs/exp_cosine.yaml --seed 42 --tag run003a_cosine
+```
 
 训练后，与 RUN-003 比较最佳 epoch、Macro-AUC、逐类 AUC 和训练曲线。两次若提前早停，比较各自实际选出的最佳 checkpoint。

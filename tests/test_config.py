@@ -95,6 +95,31 @@ def test_warmup_must_be_less_than_epochs(tmp_path):
         load_config(_write(tmp_path, text))
 
 
+def test_unknown_lr_scheduler_raises(tmp_path):
+    text = BASE.replace("  warmup_epochs: 0", "  warmup_epochs: 0\n  lr_scheduler: step")
+    with pytest.raises(ValueError, match="lr_scheduler"):
+        load_config(_write(tmp_path, text))
+
+
+def test_lr_min_must_not_exceed_lr(tmp_path):
+    text = BASE.replace("  warmup_epochs: 0", "  warmup_epochs: 0\n  lr_min: 1.0")
+    with pytest.raises(ValueError, match="lr_min"):
+        load_config(_write(tmp_path, text))
+
+
+def test_cosine_experiment_config_loads():
+    """RUN-003-A 配置只改调度：25 轮、warmup 2、余弦到 1e-5、num_workers 16。"""
+    config = load_config(Path(__file__).resolve().parents[1] / "configs/exp_cosine.yaml")
+
+    assert config.train.lr_scheduler == "cosine"
+    assert config.train.lr_min == pytest.approx(1e-5)
+    assert config.train.warmup_epochs == 2
+    assert config.train.epochs == 25
+    assert config.train.early_stop_patience == 5
+    assert config.train.pos_weight is False
+    assert config.train.num_workers == 16
+
+
 def test_eval_threshold_range_is_checked(tmp_path):
     text = BASE.replace(
         "eval:\n  batch_studies: 2", "eval:\n  batch_studies: 2\n  threshold: 1.5"

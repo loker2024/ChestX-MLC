@@ -77,13 +77,31 @@ def _amp_enabled(config: Config, device: torch.device) -> bool:
     return config.train.amp and device.type == "cuda"
 
 
-def _build_scheduler(optimizer: Optimizer, warmup_epochs: int) -> LambdaLR:
-    """线性 warmup：前 warmup_epochs 轮把学习率从 lr/warmup 线性涨到 lr，之后不变。
+def _build_scheduler(optimizer: Optimizer, config: Config) -> LambdaLR:
+    """按 `train.lr_scheduler` 构造学习率调度。
 
     LambdaLR 的 lr_lambda 收到的是“已经走过的步数”。这里每个 epoch 只调用一次
     scheduler.step()，所以“步数”就是 epoch 序号（从 0 开始）：
-    warmup_epochs=2 时，第 1 轮 lr*0.5、第 2 轮 lr*1.0，之后一直是 lr。
+
+    - `warmup`（默认）：前 warmup_epochs 轮把学习率从 lr/warmup 线性涨到 lr，
+      之后不变。warmup_epochs=2 时，第 1 轮 lr*0.5、第 2 轮 lr*1.0，之后一直是 lr。
+    - `cosine`：同样的线性 warmup，之后按半个余弦周期从 lr 衰减到 lr_min，
+      最后一轮正好落在 lr_min（例如 lr=3e-4、lr_min=1e-5、epochs=25）。
     """
+    warmup_epochs = config.train.warmup_epochs
+    if config.train.lr_scheduler == "cosine":
+        total_epochs = config.train.epochs
+        lr_floor = config.train.lr_min / config.train.lr
+        # 预热结束后开始衰减，分母用“最后一轮的步数 - warmup”，保证末轮正好到 lr_min。
+        decay_steps = max(1, total_epochs - 1 - warmup_epochs)
+
+        def cosine_lr(step: int) -> float:
+            if warmup_epochs > 0 and step < warmup_epochs:
+                return (step + 1) / warmup_epochs
+            progress = min(1.0, max(0.0, (step - warmup_epochs) / decay_steps))
+            return lr_floor + (1.0 - lr_floor) * 0.5 * (1.0 + math.cos(math.pi * progress))
+
+        return LambdaLR(optimizer, lr_lambda=cosine_lr)
     if warmup_epochs <= 0:
         return LambdaLR(optimizer, lr_lambda=lambda _: 1.0)
     return LambdaLR(optimizer, lr_lambda=lambda step: min(1.0, (step + 1) / warmup_epochs))
@@ -219,7 +237,7 @@ def fit(
         lr=config.train.lr,
         weight_decay=config.train.weight_decay,
     )
-    scheduler = _build_scheduler(optimizer, config.train.warmup_epochs)
+    scheduler = _build_scheduler(optimizer, config)
     scaler = torch.amp.GradScaler(device.type, enabled=_amp_enabled(config, device))
     # 先恢复优化器再恢复调度器：LambdaLR 的 last_epoch 决定下一轮的学习率。
     if optimizer_state is not None:

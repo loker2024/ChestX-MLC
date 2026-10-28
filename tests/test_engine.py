@@ -87,6 +87,30 @@ def test_warmup_ramps_learning_rate(config: Config) -> None:
     assert lrs == pytest.approx([config.train.lr / 2, config.train.lr, config.train.lr])
 
 
+def test_cosine_scheduler_decays_learning_rate(config: Config) -> None:
+    # 5 轮、前 2 轮 warmup，之后余弦衰减到 lr_min；末轮正好落在 lr_min。
+    config = replace(
+        config,
+        train=replace(
+            config.train,
+            epochs=5,
+            warmup_epochs=2,
+            lr_scheduler="cosine",
+            lr_min=config.train.lr * 0.1,
+        ),
+    )
+    train_loader, val_loader = _loaders(config)
+
+    result = fit(config, build_model(config), train_loader, val_loader, torch.device("cpu"))
+
+    lr, lr_min = config.train.lr, config.train.lr_min
+    # 第 1 轮 lr/2、第 2 轮 lr（预热完成）、第 3 轮仍是峰值 lr（余弦起点）、
+    # 第 4 轮走到半个余弦周期、第 5 轮落到 lr_min。
+    expected = [lr / 2, lr, lr, lr_min + (lr - lr_min) * 0.5, lr_min]
+    lrs = [record["lr"] for record in result["history"]]
+    assert lrs == pytest.approx(expected)
+
+
 def test_evaluate_reports_loss_and_metrics(config: Config) -> None:
     device = torch.device("cpu")
     _, val_loader = _loaders(config)

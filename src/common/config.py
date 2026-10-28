@@ -83,6 +83,8 @@ class TrainConfig:
     weight_decay: float = 0.01
     pos_weight: bool = False  # 按训练集类别频率给 BCE 的正样本加权；类别极不平衡时打开
     warmup_epochs: int = 2  # 前几个 epoch 线性升温到 lr
+    lr_scheduler: str = "warmup"  # "warmup"=预热后保持 lr；"cosine"=预热后余弦衰减到 lr_min
+    lr_min: float = 1e-5  # cosine 衰减的终点学习率；"warmup" 模式下不生效
     amp: bool = True  # 混合精度；仅 CUDA 上生效
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
     num_workers: int = 8
@@ -101,6 +103,16 @@ class TrainConfig:
             raise ValueError(
                 f"train.warmup_epochs 必须满足 0 <= warmup < epochs，"
                 f"当前 warmup={self.warmup_epochs}、epochs={self.epochs}"
+            )
+        if self.lr_scheduler not in {"warmup", "cosine"}:
+            raise ValueError(
+                f"train.lr_scheduler 只能是 'warmup' 或 'cosine'，当前为 {self.lr_scheduler!r}"
+            )
+        if self.lr_min < 0:
+            raise ValueError(f"train.lr_min 必须 >= 0，当前为 {self.lr_min}")
+        if self.lr_min > self.lr:
+            raise ValueError(
+                f"train.lr_min 必须 <= train.lr，当前 lr_min={self.lr_min}、lr={self.lr}"
             )
         if self.grad_clip < 0:
             raise ValueError(f"train.grad_clip 必须 >= 0，当前为 {self.grad_clip}")
