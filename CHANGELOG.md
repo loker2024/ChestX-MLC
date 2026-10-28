@@ -46,6 +46,7 @@
 - `20:41`（变更）`train01.plan`、`docs/train_plan01.md`：记录训练计划迁移至 docs 并精简重复的时间线和约束，保留各 run 命令与判读门；同步完整测试索引缺失时的耗时自检行为。
 - `20:41`（修复）`docs/manual.md`、`docs/architecture.md`、`docs/experiments.md`、`docs/plan0.md`、`docs/training_log.md`、`configs/default.yaml`：修正训练计划链接、实验配置字段与设备说明，澄清实验和指标判读。
 - `20:44`（修复）`docs/cost.md`：按实际实现澄清索引缺失时的判定、退出码优先级、比对图片数和计时报告字段。
+- `20:49`（新增）`docs/model_flow.md`：新增 ResNet-18 @320 的 ASCII 模型流程图，说明预处理、study 级 logits 聚合、训练和推理。
 
 ## 2026-10-26
 
