@@ -57,6 +57,10 @@
 
 - `21:04`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/manual.md`：回填 RUN-007-B `densenet121_viewweighted_s2026_384` 实测——原样贴入 6 轮 `metrics.csv`，记录运行命令、起止时间（北京 20:31:58 → 20:55:40）、产物目录与耗时 23m42s；最优 epoch 5、macro-AUC 0.7959、F1@0.5 0.4227；与 RUN-007-A 的 12 轮早停结果相比 AUC +0.0053、F1 +0.0029，但轮数与 cosine 周期不同、不可单变量归因分辨率；汇总表加 RUN-007-B 行，实验矩阵标注已完成，待验证项「更高分辨率 / TTA」改为已验证（方向性），§2.2 配置表与继承树补 `configs/exp_run007b.yaml`。
 
+- `22:35`（变更）`docs/training_log.md`：回填 RUN008-A/B/C/D 四组骨干对照实测——新增 RUN-008 章节，记录四组配置原文、运行命令、权重来源 / HF commit / SHA-256 与许可（EfficientNet-B2、EfficientNetV2-S RW、ConvNeXt-Tiny 为 Apache-2.0，ConvNeXtV2-Nano 为 CC BY-NC 4.0）、起止时间与耗时（北京 A 20:59:07→21:33:40、B 21:01:44→21:36:48、C 21:38:17→22:02:35、D 22:02:48→22:25:27）、产物目录、`metrics.csv` 原样与逐类 AUC；最优 macro-AUC：A 0.7952 / F1@0.5 0.4095（epoch 4）、B 0.7954 / 0.4100（epoch 2）、C 0.8008 / 0.4382（epoch 5）、D 0.4977 / 0.1604（epoch 2，训练异常）；记录四组与 RUN-007-A 的组间对照及并行 / 预算差异口径，汇总表新增 4 行与 3 条注脚。
+- `22:35`（变更）`docs/experiments.md`：实验矩阵标注 RUN008-A/B/C/D 已完成并更新随机种子行；「执行与结果」新增 RUN-008 骨干对照四条结论（ConvNeXt-Tiny 在 6 轮预算下 0.8008、比 RUN-007-A 高 +0.0102 但预算不同且单 seed，只作候选方向；EfficientNet-B2 / V2-S 分别 +0.0046 / +0.0048 未达 +0.005 门；ConvNeXtV2-Nano 训练异常且 CC BY-NC 4.0 不合规、仅研究记录；四组两两并行、耗时不可横向比较）；待验证项「新骨干对照」补 RUN-008 结果；冻结结论说明同口径复核前不切换默认骨干。
+- `22:35`（变更）`docs/manual.md`：§2.2 现有配置表新增 `configs/exp_run008a~d.yaml` 四行，继承关系树补其位于 `exp_run007a.yaml` 之下的分支。
+
 ## 2026-10-28
 
 - `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。
