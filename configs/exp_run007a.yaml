@@ -1,0 +1,13 @@
+# RUN-007-A：RUN-007（DenseNet-121 + 正侧位 7:3 加权聚合）的 seed 复核，
+# 只把随机种子从 42 换成 2026，其余配置完全继承 RUN-007 的口径。
+#
+# 用途：RUN-007 单 seed 下正侧位加权聚合的 macro-AUC 比 RUN-006 等权高 0.0012，
+# 未达 +0.005 判读门，也小于 DenseNet-121 的 seed 波动（RUN-006 与 RUN-006-A
+# 相差 0.0033）。本组用第二个 seed 复核加权聚合的方向是否稳定；与 RUN-006-A
+# （同 seed 的等权对照）可直接配对比较，差异只应来自聚合方式。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run007a.yaml --seed 2026 --tag densenet121_viewweighted_s2026
+_base: exp_run007.yaml
+
+seed: 2026

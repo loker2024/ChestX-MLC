@@ -159,6 +159,28 @@ def test_run006a_experiment_config_loads():
     assert differences == {"seed": (42, 2026)}
 
 
+def test_run007a_experiment_config_loads():
+    """RUN-007-A 只把 RUN-007 的 seed 换成 2026，其余口径（含加权聚合）完全一致。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    run007 = load_config(configs / "exp_run007.yaml")
+    config = load_config(configs / "exp_run007a.yaml")
+
+    assert config.model.backbone == "densenet121.ra_in1k"
+    assert config.model.aggregation == "view_weighted"
+    assert config.model.frontal_weight == pytest.approx(0.7)
+    assert config.seed == 2026
+
+    # 与 RUN-007 逐字段比对：除 seed 外不允许有任何差异，否则就不是单变量对照。
+    run007_dict = run007.to_dict()
+    config_dict = config.to_dict()
+    differences = {
+        key: (run007_dict[key], config_dict[key])
+        for key in run007_dict
+        if run007_dict[key] != config_dict[key]
+    }
+    assert differences == {"seed": (42, 2026)}
+
+
 def test_eval_threshold_range_is_checked(tmp_path):
     text = BASE.replace(
         "eval:\n  batch_studies: 2", "eval:\n  batch_studies: 2\n  threshold: 1.5"
