@@ -1,0 +1,67 @@
+{
+  "experiment_config": {
+    "experiment_id": "B1_DenseNet121_320_Study",
+    "backbone": "densenet121",
+    "pretrained": true,
+    "pretrained_weight_path": "checkpoints/pretrained/densenet121-a639ec97.pth",
+    "pretrained_weight_sha256": "a639ec97d7c33b07ae66f0b5fb7d0192f95a3b11b7576c66c0126c2a727c4395",
+    "pretrained_registry": "configs/pretrained_registry.json",
+    "input_size": 320,
+    "num_classes": 10,
+    "optimizer": "AdamW",
+    "loss": "BCEWithLogitsLoss",
+    "backbone_lr": 0.0001,
+    "head_lr": 0.001,
+    "weight_decay": 0.01,
+    "epochs": 12,
+    "study_aggregation": "mean",
+    "validation_mode": "official_valid_eval_only",
+    "seed": 42,
+    "batch_size": 16,
+    "normalization": "imagenet",
+    "normalization_mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "normalization_std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "data_config": "configs/data.json",
+    "scheduler": {
+      "name": "warmup_cosine",
+      "warmup_epochs": 2,
+      "total_epochs": 12,
+      "start_factor": 0.1,
+      "min_factor": 0.01
+    },
+    "augmentation": "none",
+    "sampler": "study_batch",
+    "early_stopping": {
+      "patience": 3,
+      "min_delta": 0.0001
+    },
+    "image_size": 320,
+    "loss_reduction": "study_balanced_image_bce",
+    "studies_per_batch": 8,
+    "max_images_per_batch": 16,
+    "num_workers": 8,
+    "pin_memory": true
+  },
+  "baseline_metrics": {
+    "epoch": 6,
+    "macro_auc": 0.7954665375350549,
+    "macro_f1": 0.2939811180708684,
+    "validation_loss": 0.3150896978068117,
+    "validation_fingerprint": "191c3054c6925fec37a3efa1f89acce7a8eb3fc04a52ec6d4d2445769b9739c9"
+  },
+  "source_config_sha256": "8f8a2607fb0323d7a656f130540168e76c5c751982903775b6bb7cde87507e5e",
+  "source_metrics_sha256": "a900d95071e4ec33da67c9c22418c7db3b2c1c3c81b4d704cb8e02798cab2576",
+  "differences": [
+    "experiment_id",
+    "augmentation"
+  ],
+  "directory_name_is_not_model_identity": true
+}
