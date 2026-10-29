@@ -123,6 +123,21 @@ def test_cosine_experiment_config_loads():
     assert config.train.num_workers == 16
 
 
+def test_run003b_experiment_config_loads():
+    """RUN-003-B 固定当前默认口径：ResNet-18 + cosine + pos_weight，seed 42。"""
+    config = load_config(Path(__file__).resolve().parents[1] / "configs/exp_run003b.yaml")
+
+    assert config.model.backbone == "resnet18"
+    assert config.train.lr_scheduler == "cosine"
+    assert config.train.lr_min == pytest.approx(1e-5)
+    assert config.train.warmup_epochs == 2
+    assert config.train.pos_weight is True
+    assert config.train.epochs == 25
+    assert config.train.early_stop_patience == 5
+    assert config.train.num_workers == 16
+    assert config.seed == 42
+
+
 def test_eval_threshold_range_is_checked(tmp_path):
     text = BASE.replace(
         "eval:\n  batch_studies: 2", "eval:\n  batch_studies: 2\n  threshold: 1.5"

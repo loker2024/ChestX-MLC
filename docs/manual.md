@@ -118,6 +118,7 @@ train:
 | `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停和 `pos_weight` |
 | `configs/exp_view_weighted.yaml` | 正侧位加权聚合对照，待训练 | `_base: default.yaml` | `aggregation: view_weighted`，正位权重 0.7 |
 | `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 实验配置 | `_base: default.yaml` | 显式设置 `pos_weight: true`，与当前默认一致 |
+| `configs/exp_run003b.yaml` | RUN-003-B：当前默认口径的 ResNet-18 完整复跑（cosine + pos_weight，seed 42），已完成 | `_base: default.yaml` | 显式固定 `backbone: resnet18`、`pos_weight: true`、`lr_scheduler: cosine`、`lr_min`、`seed: 42`（取值与当前默认一致） |
 | `configs/exp_short_pos_weight.yaml` | 短周期 `pos_weight` 对照 | `_base: exp_short.yaml` | 在短周期基础上打开 `pos_weight` |
 | `configs/exp_densenet121.yaml` | DenseNet-121 骨干对照，已完成（RUN-006） | `_base: default.yaml` | `backbone: densenet121.ra_in1k` |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
@@ -131,6 +132,7 @@ default.yaml
 │   └── exp_short_pos_weight.yaml
 ├── exp_view_weighted.yaml
 ├── exp_pos_weight.yaml
+├── exp_run003b.yaml
 ├── exp_densenet121.yaml
 ├── exp_resnet50.yaml
 └── exp_example.yaml
@@ -141,10 +143,11 @@ default.yaml
 新增骨干配置复用 `timm.create_model` 和现有 study 聚合逻辑，继承 320 输入、
 `pretrained: true` 与 `pos_weight: true`。已按 [train_plan04.md](train_plan04.md) 完成
 RUN-005（ResNet-50，macro-AUC 0.7857）与 RUN-006（DenseNet-121，0.7880），结果与对照
-结论见 [training_log.md](training_log.md) 与 [experiments.md](experiments.md)；两组均未
-超过现有 ResNet-18 结果，默认骨干仍为 `resnet18`。实际加载的预训练权重已由 checkpoint
-`metadata.pretrained_loaded` 确认；新骨干的权重许可证核验与 T4 端到端耗时仍待实测
-（仅当后续决定切换骨干时）。
+结论见 [training_log.md](training_log.md) 与 [experiments.md](experiments.md)。补齐同口径
+基线 RUN-003-B（ResNet-18，0.7837）后，新骨干的 macro-AUC 分别高 0.0020 / 0.0043，但
+单 seed 差距不足以判定骨干优劣，默认骨干仍为 `resnet18`。实际加载的预训练权重已由
+checkpoint `metadata.pretrained_loaded` 确认；新骨干的权重许可证核验与 T4 端到端耗时
+仍待实测（仅当后续决定切换骨干时）。
 
 ### 2.3 字段总览
 

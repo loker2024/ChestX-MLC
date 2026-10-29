@@ -325,6 +325,93 @@ metrics.csv（10 轮原样复制，epoch 10 后因连续 5 轮无提升早停）
 | 9 | 260 | 0.8923 | 0.8972 | +0.0049 |
 | 10 | 306 | 0.8642 | 0.8672 | +0.0030 |
 
+### RUN-003-B run003b_cosine_pos_weight（`configs/exp_run003b.yaml`）
+
+配置 [configs/exp_run003b.yaml](../configs/exp_run003b.yaml)，完整内容：
+
+```yaml
+# RUN-003-B：当前默认口径的 ResNet-18 完整复跑（cosine 调度 + pos_weight，seed 42）。
+#
+# 用途：RUN-003 / RUN-003-A / RUN-002-A 跑在旧口径上（warmup 调度，或 pos_weight
+# 关闭），而 RUN-005 / RUN-006 继承的是当前 default.yaml（cosine 调度 +
+# pos_weight: true）。为了给骨干对照提供同口径的 ResNet-18 基线，本配置把当前
+# 默认口径的关键字段固定下来，单独复跑一次。
+# 下面显式写出的字段取值与 default.yaml 当前完全一致；写明是为了让 RUN-003-B 的
+# 配置快照以后还能查——default.yaml 之后再变，也不会影响本组实验的口径。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run003b.yaml --seed 42 --tag run003b_cosine_pos_weight
+_base: default.yaml
+
+model:
+  backbone: resnet18
+
+train:
+  pos_weight: true
+  lr_scheduler: cosine
+  lr_min: 0.00001
+
+seed: 42
+```
+
+| 项 | 值 |
+|---|---|
+| 相对父配置的差异 | 无配置差异：显式固定的 `backbone: resnet18`、`pos_weight: true`、`lr_scheduler: cosine`、`lr_min: 1e-5`、`seed: 42` 与当前 `default.yaml` 取值一致，其余继承 `default.yaml`（25 轮、早停 5、`num_workers` 16）。本 run 的意义是把当前默认口径冻结成可复现的实验快照，作为 RUN-005 / RUN-006 的同口径基线 |
+| 运行命令 | `python src/run_train.py --config configs/exp_run003b.yaml --seed 42 --tag run003b_cosine_pos_weight` |
+| 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
+| 预训练 | 已加载 `resnet18.a1_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
+| 产物 | `outputs/20261029-041949_run003b_cosine_pos_weight/`（`best.pt` 42.7 MiB / `last.pt` 170.8 MiB / `metrics.csv` / `train.log`） |
+| 耗时 | 2026-10-29 12:19:49 → 12:53:33 CST，**13 轮即早停**（未跑满 25 轮），共 **33 分 44 秒**；单轮约 2.6 分钟 |
+
+metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）：
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 1.0321 | 0.9963 | 0.7185 | 0.3531 |
+| 2 | 3.00e-04 | 0.9754 | 0.9621 | 0.7534 | 0.3861 |
+| 3 | 3.00e-04 | 0.9351 | 0.9647 | 0.7630 | 0.3913 |
+| 4 | 2.99e-04 | 0.9035 | 0.9268 | 0.7769 | 0.4010 |
+| 5 | 2.94e-04 | 0.8755 | 0.9473 | 0.7776 | 0.3910 |
+| 6 | 2.87e-04 | 0.8447 | 0.9285 | 0.7822 | 0.3987 |
+| 7 | 2.77e-04 | 0.8054 | 0.9701 | 0.7797 | 0.3967 |
+| 8 | 2.65e-04 | 0.7653 | 0.9580 | **0.7837** | 0.4042 |
+| 9 | 2.50e-04 | 0.7187 | 1.0101 | 0.7788 | 0.4099 |
+| 10 | 2.33e-04 | 0.6767 | 1.0912 | 0.7721 | 0.4009 |
+| 11 | 2.15e-04 | 0.6287 | 1.1417 | 0.7704 | 0.4013 |
+| 12 | 1.96e-04 | 0.5833 | 1.2110 | 0.7644 | 0.3909 |
+| 13 | 1.76e-04 | 0.5460 | 1.3812 | 0.7563 | 0.3994 |
+
+**结论**：最优 epoch 8，macro-AUC **0.7837**、F1@0.5 **0.4040**（`run_compare` 重算；与训练时 `metrics.csv` 的 0.7837 / 0.4042 一致）。epoch 8 后 valid_loss 由 0.96 升至 1.38、AUC 回落，连续 5 轮无提升，`early_stop_patience: 5` 于第 13 轮触发早停，总耗时 33m44s、单轮约 2.6 分钟（比 RUN-003 的 3.3 分钟/轮快，训练时机器空闲）。
+
+ResNet-18 的四个口径组合（seed 42、25 轮上限、早停 5）现在全部有实测：
+
+| 学习率调度 | `pos_weight` | run | macro-AUC | F1@0.5 |
+|---|---|---|---|---|
+| warmup | 否 | RUN-003 | 0.7887 | 0.2655 |
+| cosine | 否 | RUN-003-A | 0.7852 | 0.2855 |
+| warmup | 是 | RUN-002-A | 0.7872 | 0.4037 |
+| cosine | 是 | RUN-003-B | 0.7837 | 0.4040 |
+
+四组极差 0.0050（RUN-003 与 RUN-003-B）：对比 RUN-003 为 Δ−0.0050、对比 RUN-002-A 为 Δ−0.0035、对比 RUN-003-A 为 Δ−0.0015 → **cosine 与 `pos_weight` 同时开启也没有 AUC 增益**，四组中反而最低；两项的单独结论（RUN-003-A、RUN-002-A）方向一致。F1@0.5 的提升仍来自 `pos_weight` 的概率校准：阈值曲线 @0.2/0.3/0.4/0.5/0.6/0.7 为 0.3657/0.3846/0.4059/0.4040/0.3984/0.3731，峰从 RUN-003 的 0.2 右移到 0.4，但上限 0.4059 低于 RUN-003 @0.2 的 0.4219。逐类 AUC 上，class1/3/5/8 高于 RUN-003，class2/4/6/7/9/10 更低（class4 −0.0412 最明显，support 68）。
+
+本 run 的第二个用途是给骨干对照提供同口径基线：RUN-005（ResNet-50）与 RUN-006（DenseNet-121）同为 cosine + `pos_weight: true` + seed 42，可直接与 RUN-003-B 作单变量比较。同口径下 ResNet-18 的 0.7837 比 ResNet-50 的 0.7857 低 0.0020、比 DenseNet-121 的 0.7880 低 0.0043，详见 `outputs/compare_backbone_s42/summary.md`。
+
+逐类 AUC（`run_compare.py` 在 valid 上重算，Δ 为四位小数相减）：
+
+| class_id | support | RUN-003 | RUN-003-A | RUN-002-A | RUN-003-B | Δ（003B−003） |
+|---|---|---|---|---|---|---|
+| 1 | 24 | 0.7087 | 0.6808 | 0.7386 | 0.7374 | +0.0287 |
+| 2 | 37 | 0.8274 | 0.7811 | 0.8285 | 0.8100 | −0.0174 |
+| 3 | 46 | 0.7577 | 0.7796 | 0.7687 | 0.7713 | +0.0136 |
+| 4 | 68 | 0.7138 | 0.7217 | 0.6971 | 0.6726 | −0.0412 |
+| 5 | 115 | 0.8628 | 0.8691 | 0.8693 | 0.8693 | +0.0065 |
+| 6 | 177 | 0.7763 | 0.7724 | 0.7621 | 0.7659 | −0.0104 |
+| 7 | 193 | 0.7756 | 0.7668 | 0.7630 | 0.7539 | −0.0217 |
+| 8 | 214 | 0.7078 | 0.7162 | 0.6946 | 0.7129 | +0.0051 |
+| 9 | 260 | 0.8923 | 0.8972 | 0.8873 | 0.8843 | −0.0080 |
+| 10 | 306 | 0.8642 | 0.8672 | 0.8630 | 0.8600 | −0.0042 |
+
 ### RUN-002-A pos_weight_s42（`configs/exp_pos_weight.yaml`）
 
 配置 [configs/exp_pos_weight.yaml](../configs/exp_pos_weight.yaml)，完整内容：
@@ -521,15 +608,18 @@ metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）
 | RUN-002 | `exp_short_pos_weight.yaml` | +pos_weight | 6 | 5 | 0.7882 | 0.4048 | 33m06s（并行） | AUC Δ−0.0021 未达门，pos_weight 无效 |
 | RUN-003 | `default.yaml` | 25 轮冻结版（`num_workers` 16） | 13（早停）/25 | 8 | 0.7887 | 0.2655 | 38m | AUC Δ−0.0016 未达增益门，轮数不是瓶颈；提交文件 `outputs/submission_run003.csv` |
 | RUN-003-A | `exp_cosine.yaml` | +余弦调度（warmup 后衰减到 1e-5） | 10（早停）/25 | 5 | 0.7852 | 0.2855 | 29m47s | AUC Δ−0.0035 未达门，但最佳轮次前移、耗时缩短；调度不带来 AUC 增益 |
+| RUN-003-B | `exp_run003b.yaml` | 当前默认口径（+cosine +pos_weight），seed 42 | 13（早停）/25 | 8 | 0.7837 | 0.4040 | 33m44s | 同口径 ResNet-18 基线；四组 ResNet-18 口径中 macro-AUC 最低（vs RUN-003 Δ−0.0050），cosine + pos_weight 组合无增益；供 RUN-005 / RUN-006 单变量对照 |
 | RUN-002-A | `exp_pos_weight.yaml` | +pos_weight，seed 42 | 10（早停）/25 | 5 | 0.7872 | 0.4045 | 30m34s | AUC Δ−0.0015 未达门；F1@0.5 大涨但阈值峰右移到 0.6，上限与基线的 @0.2 持平 |
 | RUN-002-B | `exp_pos_weight.yaml` | +pos_weight，seed 2026 | 12（早停）/25 | 7 | 0.7871 | 0.4198 | 45m58s | 与 002-A 的 AUC 仅差 0.0001，seed 稳健；同样无 AUC 增益 |
-| RUN-005 | `exp_resnet50.yaml` | ResNet-50 + a1_in1k，+cosine +pos_weight | 14（早停）/25 | 9 | 0.7857 | 0.4193 | 43m23s | AUC 低于 DenseNet-121（Δ−0.0023）但 F1@0.5 更高（+0.0123）；未超过 ResNet-18 历史结果 |
-| RUN-006 | `exp_densenet121.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight | 13（早停）/25 | 8 | 0.7880 | 0.4070 | 44m32s | 两组中 macro-AUC 最高（Δ+0.0023），但 F1@0.5 更低；单 seed 差不足以判定骨干优劣 |
+| RUN-005 | `exp_resnet50.yaml` | ResNet-50 + a1_in1k，+cosine +pos_weight | 14（早停）/25 | 9 | 0.7857 | 0.4193 | 43m23s | 同口径下 AUC 高于 RUN-003-B（Δ+0.0020）、F1@0.5 高 0.0153；低于 DenseNet-121（Δ−0.0023） |
+| RUN-006 | `exp_densenet121.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight | 13（早停）/25 | 8 | 0.7880 | 0.4070 | 44m32s | 同口径下 macro-AUC 最高（vs RUN-003-B Δ+0.0043），F1@0.5 仅高 0.0030；单 seed 差不足以判定骨干优劣 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
-注：RUN-005 / RUN-006 的 macro-AUC 与 F1@0.5 取 `outputs/compare_backbones/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0013）；两组继承当前 `default.yaml`（cosine 调度 + `pos_weight: true`），与 RUN-003 系列的 warmup + `pos_weight: false` 口径不同，历史数字只作参考、不作单变量对照。
+注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
+注：RUN-005 / RUN-006 的 macro-AUC 与 F1@0.5 取 `outputs/compare_backbones/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0013）；两组与 RUN-003-B 同为 cosine 调度 + `pos_weight: true` + seed 42，可与 RUN-003-B 直接作单变量骨干对照（`outputs/compare_backbone_s42/summary.md`），与 RUN-003 系列的 warmup / `pos_weight: false` 口径不同，历史数字只作参考。
 注：RUN-001R 与 RUN-002 并行执行（两路各 8 workers，16 核饱和），单轮耗时不可与 RUN-001 的串行口径直接对照；`num_workers` 不影响 shuffle 顺序，AUC 可直接对比。
 注：RUN-003 为独占串行运行（16 workers 独占 16 核），单轮约 3.3 分钟，可与 RUN-001 的串行口径对照；13 轮总耗时约 38 分钟（含启动与验证），未跑满 25 轮是因早停，不是被中断。
+注：RUN-003-B 同为独占串行运行，单轮约 2.6 分钟、13 轮共 33m44s；与 RUN-003 的差异主要来自机器负载（训练时 GPU 空闲），不影响 AUC 口径。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 

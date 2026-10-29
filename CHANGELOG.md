@@ -14,11 +14,16 @@
 - `11:55`（变更）`docs/experiments.md`：实验矩阵标注 RUN-005 / RUN-006 已完成；「执行与结果」新增 2026-10-29 骨干对照三条结论（ResNet-50 未超过 ResNet-18 历史水平、DenseNet-121 macro-AUC 最高但 F1 更低、单 seed 差不足以判定骨干优劣）；待验证项「新骨干对照」改为已验证（无增益）并注明 T4 耗时 / 权重许可核验仍待做；冻结结论注明默认骨干维持 `resnet18`。
 - `12:00`（变更）远端训练环境（不涉及仓库文件）：验证集图片由嵌套的 `/root/sj-tmp/valid/valid/subject_*` 上移为 `/root/sj-tmp/valid/subject_*`，与 train / test 目录结构一致；`check_data.py --full` 复检通过后从头重跑 RUN-005，避免训练中途移动图片。
 - `12:05`（变更）`docs/manual.md`：§2.2 现有配置文件中 `exp_resnet50.yaml` / `exp_densenet121.yaml` 的「训练待排期」改为「已完成（RUN-005 / RUN-006）」；骨干说明段更新为已按 train_plan04 完成、结果见训练记录与调优记录、默认骨干维持 `resnet18`，并把「许可证核验与 T4 耗时」限定为仅当后续切换骨干时才需补做。
+- `12:21`（新增）`configs/exp_run003b.yaml`、`tests/test_config.py`：新增 RUN-003-B 配置与加载断言——当前默认口径的 ResNet-18 完整复跑，显式固定 `backbone: resnet18`、`train.pos_weight: true`、`train.lr_scheduler: cosine`、`train.lr_min: 1e-5`、顶层 `seed: 42`（取值与当前 `default.yaml` 一致），其余继承 `default.yaml`；测试断言骨干、调度、`pos_weight`、25 轮、早停 5、`num_workers` 16 与 seed 42。本机 `python -m pytest -q` 182 passed / 3 skipped。
+- `12:21`（变更）`docs/experiments.md`、`docs/manual.md`：实验矩阵新增 RUN-003-B 行（tag `run003b_cosine_pos_weight`，用途为给 RUN-005 / RUN-006 提供同口径的 ResNet-18 基线）；§2.2 配置表与继承关系树补 `configs/exp_run003b.yaml`。
 
 - `12:42`（新增）`configs/exp_view_weighted.yaml`、`tests/test_model.py`、`tests/test_dataset.py`：增加正侧位 7:3 聚合实验配置与视角对齐、梯度和推理一致性测试。
 - `12:42`（变更）`src/common/config.py`、`src/data/index.py`、`src/data/dataset.py`、`src/model/network.py`、`src/train/engine.py`、`src/infer/predict.py`、`src/run_infer.py`、`src/run_eval.py`、`src/run_compare.py`、`src/cost.py`、`docs/experiments.md`：贯通视角元数据与可配置聚合，未知视角回退全图均值并确保训练、推理及耗时校验一致。
 
 - `12:45`（变更）`docs/manual.md`、`docs/architecture.md`、`docs/model_flow.md`、`docs/cost.md`、`docs/experiments.md`：补充聚合配置、视角数据流和耗时校验限制，区分默认均值与待验证的加权实验。
+- `12:58`（变更）`docs/training_log.md`：回填 RUN-003-B `run003b_cosine_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间（北京 12:19:49 → 12:53:33）、产物目录与耗时；最优 epoch 8、macro-AUC 0.7837、F1@0.5 0.4040，第 13 轮早停（33m44s）；补 ResNet-18 四口径组合表与逐类 AUC 对比表；汇总表加 RUN-003-B 行，RUN-005 / RUN-006 结论列改为与 RUN-003-B 的同口径比较（Δ+0.0020 / +0.0043），并更新口径脚注。
+- `12:58`（变更）`docs/experiments.md`：实验矩阵 RUN-003-B 标已完成；「执行与结果」新增 RUN-003-B 结论（四组 ResNet-18 口径差异均 ≤0.005，cosine + `pos_weight` 无 AUC 增益）与 2026-10-29 同口径骨干对照（ResNet-50 比基线高 0.0020、DenseNet-121 高 0.0043），修正此前「新骨干未超过 ResNet-18 历史结果」的不可比说法；冻结结论与待验证项同步更新。
+- `12:58`（变更）`docs/manual.md`、`docs/train_plan04.md`：manual 配置表与继承树标注 RUN-003-B 已完成、骨干说明段改为同口径结论；train_plan04 由两组扩为三组（加 RUN-003-B 同口径基线），训练命令与 `run_compare` 输出同步为 `compare_backbone_s42`。
 
 ## 2026-10-28
 

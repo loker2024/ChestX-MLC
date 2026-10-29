@@ -1,0 +1,22 @@
+# RUN-003-B：当前默认口径的 ResNet-18 完整复跑（cosine 调度 + pos_weight，seed 42）。
+#
+# 用途：RUN-003 / RUN-003-A / RUN-002-A 跑在旧口径上（warmup 调度，或 pos_weight
+# 关闭），而 RUN-005 / RUN-006 继承的是当前 default.yaml（cosine 调度 +
+# pos_weight: true）。为了给骨干对照提供同口径的 ResNet-18 基线，本配置把当前
+# 默认口径的关键字段固定下来，单独复跑一次。
+# 下面显式写出的字段取值与 default.yaml 当前完全一致；写明是为了让 RUN-003-B 的
+# 配置快照以后还能查——default.yaml 之后再变，也不会影响本组实验的口径。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run003b.yaml --seed 42 --tag run003b_cosine_pos_weight
+_base: default.yaml
+
+model:
+  backbone: resnet18
+
+train:
+  pos_weight: true
+  lr_scheduler: cosine
+  lr_min: 0.00001
+
+seed: 42
