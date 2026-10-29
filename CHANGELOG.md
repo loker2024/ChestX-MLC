@@ -32,6 +32,9 @@
 
 - `14:13`（修复）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan05.md`、`docs/manual.md`：修正 RUN-006-A 跨 seed 骨干对照的判读、RUN-001 / RUN-001R 种子与波动说明，以及种子汇总、阈值提交和运行差异的表述；保留原始实验数据与配置快照。
 - `14:16`（新增）`configs/exp_run007.yaml`、`docs/train_plan06.md`：新增 DenseNet-121 正侧位 7:3 加权聚合配置与 RUN-006 单变量对照计划，记录核对、训练和比较命令。
+- `15:20`（变更）`docs/training_log.md`：回填 RUN-007 `densenet121_viewweighted_s42` 实测——原样贴入配置与 13 轮 `metrics.csv`，记录命令、起止时间（北京 14:20:02 → 14:54:58）、产物目录与耗时；最优 epoch 8、macro-AUC 0.7892、F1@0.5 0.4122，第 13 轮早停（34m56s）；补逐类 AUC 对比表与单 seed 判定，汇总表加 RUN-007 行，并加代码版本（`53568fe` vs RUN-006 的 `da8fef7`）与 seed 波动口径脚注。
+- `15:20`（变更）`docs/experiments.md`：实验矩阵标注 RUN-007 已完成；「执行与结果」新增正侧位 7:3 加权聚合结论（AUC Δ+0.0012 未达 +0.005 门、小于 seed 波动 0.0033；F1 提升属阈值曲线右移；默认聚合维持 `mean`）；待验证项「视图元信息」改为已验证（未达切换门槛）；正侧位加权聚合配置段同步 RUN-007 实测。
+- `15:20`（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_run007.yaml` 行，继承树补其位于 `exp_densenet121.yaml` 之下。
 
 ## 2026-10-28
 
