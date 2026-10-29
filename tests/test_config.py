@@ -234,7 +234,12 @@ def test_run008_experiment_configs_load(key, backbone):
 
     assert config["model"].pop("backbone") == backbone
     assert run007a["model"].pop("backbone") == "densenet121.ra_in1k"
-    # 骨干之外的配置必须与 RUN-007-A 完全相同，否则就不是单变量对照。
+    # 四组统一缩短为 6 轮、关闭早停（RUN-007-A 仍是 25 轮上限、耐心 5）。
+    assert config["train"].pop("epochs") == 6
+    assert config["train"].pop("early_stop_patience") == 0
+    assert run007a["train"].pop("epochs") == 25
+    assert run007a["train"].pop("early_stop_patience") == 5
+    # 除骨干与训练预算外，其余配置必须与 RUN-007-A 完全相同。
     assert config == run007a
 
     config = load_config(configs / f"exp_run008{key}.yaml")
@@ -243,7 +248,8 @@ def test_run008_experiment_configs_load(key, backbone):
     assert config.model.aggregation == "view_weighted"
     assert config.model.frontal_weight == pytest.approx(0.7)
     assert config.image.size == 320
-    assert config.train.epochs == 25
+    assert config.train.epochs == 6
+    assert config.train.early_stop_patience == 0
     assert config.train.batch_studies == 16
     assert config.seed == 2026
 

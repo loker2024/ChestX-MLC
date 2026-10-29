@@ -2,3 +2,7 @@ _base: exp_run007a.yaml
 
 model:
   backbone: efficientnetv2_rw_s.ra2_in1k
+
+train:
+  epochs: 6
+  early_stop_patience: 0

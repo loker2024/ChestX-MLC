@@ -52,6 +52,7 @@
 - `20:00`（变更）`Submission.md`：根据提交截图记录 RUN-006-A 与 RUN-007-A 的官方得分、提交 ID、时间及文件信息，并保留各自验证指标与 CSV 哈希。
 - `20:31`（新增）`docs/train_plan08.md`：制定基于 RUN-007-A 的 RUN008-A / B / C / D 四组骨干及预训练权重对照，明确配置继承、权重许可与来源核验、执行命令和结果判读。
 - `20:45`（新增）`configs/exp_run007b.yaml`、`tests/test_config.py`：新增 RUN-007-B 分辨率探针配置与加载断言——在 RUN-007-A 上只把 `image.size` 由 320 改为 384、`train.epochs` 由 25 改为 6，其余口径不变；测试断言除这两项外与 RUN-007-A 逐字段零差异。
+- `20:52`（变更）`configs/exp_run008a.yaml`、`configs/exp_run008b.yaml`、`configs/exp_run008c.yaml`、`configs/exp_run008d.yaml`、`tests/test_config.py`、`docs/train_plan08.md`：按用户要求把四组实验由「最多 25 轮 + 早停耐心 5 + 串行」改为「固定 6 轮 + 无早停 + A+B、C+D 两两并行」；配置统一覆盖 `train.epochs: 6` 与 `train.early_stop_patience: 0`，测试断言同步允许这两项差异，计划文档更新固定条件、两两并行启动命令，并注明与 RUN-007-A 训练预算不同、差值只作方向性参考。
 - `20:45`（新增）`configs/exp_run008a.yaml`、`configs/exp_run008b.yaml`、`configs/exp_run008c.yaml`、`configs/exp_run008d.yaml`、`tests/test_config.py`：新增 RUN008-A / B / C / D 四组骨干对照配置与参数化加载断言，均以 `_base: exp_run007a.yaml` 只覆盖 `model.backbone`（`efficientnet_b2.ra_in1k`、`efficientnetv2_rw_s.ra2_in1k`、`convnext_tiny.fb_in1k`、`convnextv2_nano.fcmae_ft_in1k`）；断言除骨干外与 RUN-007-A 逐字段一致，并固定 320×320、`view_weighted` / 正位权重 0.7、seed 2026、25 轮与 `pretrained: true`。本机 `python -m pytest -q` 192 passed / 3 skipped。
 
 ## 2026-10-28
