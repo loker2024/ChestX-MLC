@@ -839,6 +839,87 @@ RUN-006-A（0.7913 / 0.4103）配对比较：**AUC Δ−0.0007**、F1@0.5 +0.009
 | 9 | 260 | 0.8894 | 0.9039 | +0.0145 |
 | 10 | 306 | 0.8631 | 0.8778 | +0.0147 |
 
+### RUN-007-B densenet121_viewweighted_s2026_384（`configs/exp_run007b.yaml`）
+
+RUN-007-A 的分辨率探针：只把输入尺寸从 320 提到 384、训练轮数从 25 缩到 6，
+其余继承 RUN-007-A，用于看更高分辨率在 6 轮短跑里的趋势。配置
+[configs/exp_run007b.yaml](../configs/exp_run007b.yaml)，完整内容：
+
+```yaml
+# RUN-007-B：在 RUN-007-A 的基础上只改两处——输入分辨率 320→384、训练 25→6 轮，
+# 其余口径（DenseNet-121、正侧位 7:3 加权聚合、pos_weight、warmup + cosine、
+# seed 2026、batch_studies 16）完全继承 RUN-007-A。
+#
+# 用途：RUN-007 / RUN-007-A 已在 320×320 下判定「正侧位 7:3 加权聚合」无稳定
+# 增益；本组把输入分辨率提到 384×384，用 6 轮短跑看更高分辨率能否带来更优的
+# valid macro-AUC 趋势。6 轮会把 cosine 周期压缩到 6 轮（warmup 2 轮占 1/3），
+# 指标不能与 RUN-007-A 的 12 轮早停结果直接比较，只用于判断方向。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run007b.yaml --tag densenet121_viewweighted_s2026_384
+_base: exp_run007a.yaml
+
+image:
+  size: 384
+
+train:
+  epochs: 6
+```
+
+（其余字段全部继承 [configs/exp_run007a.yaml](../configs/exp_run007a.yaml)，即再继承
+`exp_run007.yaml` / `exp_densenet121.yaml`：正侧位 7:3 加权聚合、`pos_weight: true`、
+warmup 2 轮后余弦衰减、CUDA AMP、早停 5、`num_workers` 16、seed 2026；
+`tests/test_config.py` 的 `test_run007b_experiment_config_loads` 断言与 RUN-007-A
+除 `image.size` 与 `train.epochs` 外零差异。）
+
+| 项 | 值 |
+|---|---|
+| 相对父配置的差异 | `image.size: 320 → 384`、`train.epochs: 25 → 6`；其余与 RUN-007-A 完全一致 |
+| 运行命令 | `python src/run_train.py --config configs/exp_run007b.yaml --tag densenet121_viewweighted_s2026_384` |
+| 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `bfa6d45`（在 `27dbe56` 基础上仅新增 RUN-008 评估工具，训练路径未变） |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A 同一份 split） |
+| 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
+| 产物 | `outputs/20261029-123158_densenet121_viewweighted_s2026_384/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
+| 耗时 | 2026-10-29 20:31:58 → 20:55:40 CST，6 轮跑满（未早停），共 **23 分 42 秒**；单轮约 3.9 分钟；显存峰值约 10.2–10.5 GB（独占运行） |
+
+metrics.csv（6 轮原样复制）：
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 0.9999 | 0.9617 | 0.7594 | 0.3824 |
+| 2 | 3.00e-04 | 0.9600 | 0.9802 | 0.7529 | 0.3786 |
+| 3 | 3.00e-04 | 0.9224 | 0.9313 | 0.7729 | 0.4067 |
+| 4 | 2.27e-04 | 0.8845 | 0.9252 | 0.7868 | 0.4120 |
+| 5 | 8.25e-05 | 0.8139 | 0.9059 | **0.7959** | 0.4227 |
+| 6 | 1.00e-05 | 0.7456 | 0.9261 | 0.7945 | 0.4263 |
+
+**结论**：最优 epoch 5，macro-AUC **0.7959**、F1@0.5 **0.4227**（`run_compare`
+重算，与 `metrics.csv` 一致）；epoch 6 学习率衰减到 1e-5 后 AUC 基本走平。与
+RUN-007-A（320×320、12 轮早停，0.7906 / 0.4198）相比 AUC **+0.0053**、F1@0.5
++0.0029，但两者轮数与 cosine 周期不同（007B 的 6 轮周期让第 5 轮 lr 已降到
+8.25e-5、模型提前收敛；007A 第 6 轮 lr 仍有 2.87e-4），**不能把差异单变量归因于
+分辨率**。仅作方向筛查：384 + 6 轮短跑在 6 轮内即达 0.7959、未见分辨率提升带来
+的退化，值得后续用 25 轮完整对照（同 seed、同调度与早停口径）再判定。
+
+逐类 AUC（`outputs/compare_run007b/per_class.csv`，Δ 为四位小数相减）：
+
+| class_id | support | RUN-007-A 320 | RUN-007-B 384 | Δ（007B−007A） |
+|---|---|---|---|---|
+| 1 | 24 | 0.7208 | 0.7188 | −0.0020 |
+| 2 | 37 | 0.7944 | 0.8339 | +0.0395 |
+| 3 | 46 | 0.7650 | 0.7642 | −0.0008 |
+| 4 | 68 | 0.6975 | 0.7146 | +0.0171 |
+| 5 | 115 | 0.8752 | 0.8694 | −0.0058 |
+| 6 | 177 | 0.7794 | 0.7737 | −0.0057 |
+| 7 | 193 | 0.7718 | 0.7778 | +0.0060 |
+| 8 | 214 | 0.7205 | 0.7259 | +0.0054 |
+| 9 | 260 | 0.9039 | 0.9027 | −0.0012 |
+| 10 | 306 | 0.8778 | 0.8781 | +0.0003 |
+
+差异主要来自稀有类 2（+0.0395）与 4（+0.0171），常见类 5/6/9 略降；6 轮短跑下
+单类波动大，逐类方向不足以作为分辨率结论。
+
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -856,6 +937,7 @@ RUN-006-A（0.7913 / 0.4103）配对比较：**AUC Δ−0.0007**、F1@0.5 +0.009
 | RUN-006-A | `exp_run006a.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight，seed 2026 | 10（早停）/25 | 5 | 0.7913 | 0.4103 | 34m14s（并行） | seed 复核：AUC 比 RUN-006 高 +0.0033；缺少 seed 2026 的 ResNet-18 配对对照，尚不足以判定骨干优劣 |
 | RUN-007 | `exp_run007.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合，seed 42 | 13（早停）/25 | 8 | 0.7892 | 0.4122 | 34m56s | 对比 RUN-006（等权）AUC Δ+0.0012，未达 +0.005 门且小于 seed 波动（0.0033）；F1@0.5 提升伴随阈值曲线右移 → 暂不改默认聚合 |
 | RUN-007-A | `exp_run007a.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合，seed 2026 | 12（早停）/25 | 7 | 0.7906 | 0.4198 | 35m01s | 与同 seed 等权 RUN-006-A 配对 Δ−0.0007，与 seed 42 的 +0.0012 方向相反、均在 seed 波动内 → 加权聚合无稳定增益，默认 `mean` 不变 |
+| RUN-007-B | `exp_run007b.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合 + 384×384，seed 2026，6 轮短跑 | 6 | 5 | 0.7959 | 0.4227 | 23m42s | 探针：6 轮内达 0.7959（比 007A 的 12 轮 0.7906 高 +0.0053），但轮数与调度不同、不可单变量归因分辨率；待 25 轮完整对照 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
