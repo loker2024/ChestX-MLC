@@ -13,7 +13,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | 数据 | 全量 train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 设备 | RTX 3090 24G（复用同一实例；本机只做代码与文档验证） |
 | 软件 | Python 3.12、torch 2.x（CUDA）、timm 1.0.30 |
-| 随机种子 | 42（RUN-002-B、RUN-006-A 为 2026） |
+| 随机种子 | 42（RUN-002-B、RUN-006-A、RUN-007-A 为 2026） |
 | 输入 | 320×320，letterbox，ImageNet 归一化，默认无水平翻转 |
 | 骨干 | timm `resnet18.a1_in1k`，ImageNet 预训练 |
 
@@ -93,8 +93,8 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 
 ## 后续待验证优化项（未排期）
 
-记录想法，不承诺优先级；每项都要等基线（25 轮 `default.yaml`）出结果后再单独做对照，
-一次只改一个变量，并附 `run_compare.py` 结果。
+记录想法，不承诺优先级；后续实验应在已有基线的基础上单独做对照，
+一次只改一个变量，并保存对应的验证报告。
 
 | 优化项 | 预期收益 | 改动点 | 备注 |
 | --- | --- | --- | --- |
@@ -104,11 +104,9 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | 训练轮数 | 已验证 | 在正式基线之后调整 `train.epochs` | **RUN-003 已判无效**：epoch 8 达峰（0.7887）后过拟合、第 13 轮早停，25 轮上限未带来 AUC 增益（Δ−0.0016 vs RUN-001R），该次实验未证明增加训练轮数有收益 |
 | 学习率调度 | 已验证 | `train.lr_scheduler` / `train.lr_min` | **RUN-003-A 判无效**：余弦调度 best epoch 5、macro-AUC 0.7852 vs RUN-003 的 0.7887（Δ−0.0035，未达门）；但最佳轮次前移（8→5）、早停更快（13→10 轮）、耗时约 30 分钟 vs 38 分钟。当前默认配置为 `cosine`；该对照未证明 AUC 增益 |
 | `pos_weight` | 已验证 | `train.pos_weight: true` | **RUN-002-A/B 未达原 AUC 增益门**：完整周期双 seed macro-AUC 0.7872 / 0.7871，vs RUN-003 0.7887 为 Δ−0.0015 / −0.0016，均未达 +0.005 门；F1@0.5 提升（0.4045 / 0.4198）伴随阈值曲线右移，已测峰值与基线接近，当前默认开启 |
-| 聚合方式消融 | 低—中 | `aggregate_logits` 增加「平均概率 / 最大 / 平均 logits」三种 | 当前实现是平均 logits 后 sigmoid（等价 G2 方案），可作为对照项记录 |
+| 聚合方式消融 | 待评估 | 比较平均 logits、平均概率及最大聚合 | 当前使用平均 logits 后 sigmoid；其他方式尚未实现或实测 |
 | 更高分辨率 / TTA | 待评估 | `image.size`、`run_infer.py` 加翻转 TTA | 先测显存与耗时，3090 24G 下 448 可能吃紧 |
 
 ### 正侧位加权聚合配置
 
-`configs/exp_view_weighted.yaml` 使用与默认配置相同的训练设置，仅将 `model.aggregation` 设为 `view_weighted`、`model.frontal_weight` 设为 0.7；`configs/exp_run007.yaml` 以 `_base: exp_densenet121.yaml` 把同一加权口径挂到 RUN-006 的 DenseNet-121 上，用于单变量对照。**RUN-007 / RUN-007-A 实测**（`outputs/compare_run007/summary.md`、`outputs/compare_run007a/summary.md`，明细见训练记录）：seed 42 为 0.7892 vs 等权 0.7880（Δ+0.0012）、seed 2026 为 0.7906 vs 等权 0.7913（Δ−0.0007），两 seed 配对差方向相反且均未达 +0.005 判读门 → **加权聚合判定无效，默认 `aggregation: mean` 不变**。推理、评估及耗时检查须传入相同配置。
-
-每个 study 先按正位（AP、PA）和侧位（LATERAL、LL）分别求 logits 均值，再按 0.7 / 0.3 聚合，最后 sigmoid；只有一种已知视角或包含未知视角时，对该 study 全部图片等权平均。空值及未识别值（包括 `PA LLD`）视为未知。默认 `mean` 保持原有图片等权逻辑。没有完整测试索引时，视角加权的多图耗时一致性校验会报错，避免把未知视角结果当作有效校验。
+`configs/exp_view_weighted.yaml` 在默认骨干上启用加权聚合；RUN-007 系列使用 DenseNet-121。正位（AP、PA）和侧位（LATERAL、LL）先分别求 logits 均值，再按 0.7 / 0.3 加权；单视角或含未知视角时回退全部图片等权均值。推理及耗时检查须使用相同配置；缺少完整测试索引时，多图加权一致性校验会报错。实测结果见上文及 [训练记录](training_log.md)。

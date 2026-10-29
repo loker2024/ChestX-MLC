@@ -41,10 +41,13 @@
 - `15:44`（变更）`docs/experiments.md`：实验矩阵标注 RUN-007-A 已完成；「执行与结果」新增 seed 复核结论（seed 2026 配对 Δ−0.0007，与 seed 42 的 +0.0012 方向相反、均值 +0.00025，均在 seed 波动内 → 加权聚合判定无效，默认维持 `mean`）；待验证项「视图元信息」改为已验证（无效）；正侧位加权聚合配置段同步两个 seed 结果。
 - `15:44`（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_run007a.yaml` 行，继承树补其位于 `exp_run007.yaml` 之下。
 
-- `16:52`（新增）`docs/train_plan08.md`：制定 RUN-008 固定 checkpoint 的 logits / 概率聚合对照计划，限定 G0/G1 唯一变量，列明逐图缓存评估工具、合成数据测试、远程执行接口、基准一致性校验、条件 seed 复核及结果判读；明确新命令尚需实现，本次仅编写计划。
-
 - `17:05`（新增）`src/infer/aggregation_compare.py`、`src/run_aggregation_compare.py`、`tests/test_aggregation_compare.py`：实现 RUN-008 聚合空间对照工具——`export` 在 valid 上逐批前向一次导出逐图 logits 缓存（`image_logits.npz`：logits / offsets / labels / Study_id / Subject_id / Dicom_id / 视角）与 `metadata.json`（格式版本、代码与环境指纹、checkpoint / valid CSV / NPZ 的 SHA-256、图片身份与内容哈希清单、G0 基准差值），并用 `predict_loader` 独立校验 G0 与现有路径最大绝对差 ≤1e-6；`compare` 只读缓存离线重算 G0（logits 均值后 sigmoid）与 G1（逐图 sigmoid 后均值），按 Study_id 严格对齐后写出 `predictions_g0.csv` / `predictions_g1.csv`、`summary.csv` / `summary.md`（全体 / 单图 / 多图 AUC、各阈值 F1、概率差、有效 AUC 类别数、空子集标无结果）与 `per_class.csv`；缓存哈希或格式版本不符、ID 重复 / 缺失 / 额外时拒绝执行。合成数据测试覆盖数值排序反转、单图一致、变长与未知视角、单次前向计数、配置回退、非 mean 聚合拒绝、缓存往返、ID 对齐、空子集与 CLI 全链路；本机 `python -m pytest -q` 206 passed / 3 skipped（新文件 19 passed）。
-- `17:05`（变更）`docs/train_plan08.md`：勾选工具实现与本机测试步骤（第 1、2 节），当前状态标记「新评估工具和本机测试完成」。
+
+- `18:27`（移除）`docs/train_plan08.md`：删除固定 checkpoint 聚合对照计划及其新增、更新记录；保留已实现的聚合对照工具、测试与实现记录。
+
+- `18:37`（修复）`docs/manual.md`、`docs/architecture.md`、`docs/experiments.md`：对照配置与源码补充聚合对照入口、视角字段和实验状态，修正配置示例及 seed 记录，精简重复的实验说明。
+
+- `18:39`（移除）`src/infer/aggregation_compare.py`、`src/run_aggregation_compare.py`、`tests/test_aggregation_compare.py`：回退 RUN-008 聚合空间对照工具和测试；同步移除 `docs/manual.md`、`docs/architecture.md` 的工具说明，并将 `docs/experiments.md` 恢复为待评估状态。`docs/train_plan08.md` 已在此前工作区变更中移除。
 
 ## 2026-10-28
 

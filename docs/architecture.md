@@ -46,6 +46,7 @@
     "offsets": torch.Tensor,  # [B + 1]，第 i 个 study 的图片区间
     "labels": torch.Tensor,   # [B, 10]，test 时缺省
     "study_ids": list[str],   # 长度 B
+    "views": torch.Tensor,    # [N]，0 正位、1 侧位、2 未知
 }
 ```
 
@@ -53,7 +54,7 @@
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `network.py` | ResNet-18 骨干 + 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets, views=None, frontal_weight=0.7) -> Tensor[B, 10]` |
+| `network.py` | timm 骨干（默认 ResNet-18）+ 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets, views=None, frontal_weight=0.7) -> Tensor[B, 10]` |
 | `losses.py` | BCEWithLogitsLoss；可选按训练集频率计算 `pos_weight`，并显式指定设备 | `build_loss(cfg, train_labels=None, device=None)` |
 
 ### 3.4 train：训练逻辑

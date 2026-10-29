@@ -1,6 +1,6 @@
 # ChestX-MLC 使用手册
 
-> 适用分支：`loker`。本手册讲清三件事：配置怎么写、训练产物在哪、命令怎么跑。
+> 本手册介绍配置、训练产物与运行命令；以当前检出的代码和配置为准。
 > 赛题背景见 [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md)，模块划分见
 > [架构与文件结构](architecture.md)，调优结论见 [P7 调优记录](experiments.md)。
 
@@ -107,7 +107,7 @@ python src/check_data.py --config configs/default.yaml --full
 _base: default.yaml
 
 train:
-  pos_weight: true      # 只改这一个字段，其余沿用 default.yaml
+  pos_weight: false     # 覆盖当前默认值，其余沿用 default.yaml
 ```
 
 ### 2.2 现有配置文件
@@ -117,6 +117,7 @@ train:
 | `configs/default.yaml` | P7 冻结的最终配置，正式训练与提交使用 | 无 | 25 epoch、`pos_weight: true` |
 | `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停和 `pos_weight` |
 | `configs/exp_view_weighted.yaml` | 正侧位加权聚合对照，待训练 | `_base: default.yaml` | `aggregation: view_weighted`，正位权重 0.7 |
+| `configs/exp_cosine.yaml` | RUN-003-A 历史余弦调度对照 | `_base: default.yaml` | 固定 `cosine`、关闭 `pos_weight` |
 | `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 实验配置 | `_base: default.yaml` | 显式设置 `pos_weight: true`，与当前默认一致 |
 | `configs/exp_run003b.yaml` | RUN-003-B：当前默认口径的 ResNet-18 完整复跑（cosine + pos_weight，seed 42），已完成 | `_base: default.yaml` | 显式固定 `backbone: resnet18`、`pos_weight: true`、`lr_scheduler: cosine`、`lr_min`、`seed: 42`（取值与当前默认一致） |
 | `configs/exp_short_pos_weight.yaml` | 短周期 `pos_weight` 对照 | `_base: exp_short.yaml` | 在短周期基础上打开 `pos_weight` |
@@ -134,6 +135,7 @@ default.yaml
 ├── exp_short.yaml
 │   └── exp_short_pos_weight.yaml
 ├── exp_view_weighted.yaml
+├── exp_cosine.yaml
 ├── exp_pos_weight.yaml
 ├── exp_run003b.yaml
 ├── exp_densenet121.yaml
@@ -146,15 +148,7 @@ default.yaml
 
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
 
-新增骨干配置复用 `timm.create_model` 和现有 study 聚合逻辑，继承 320 输入、
-`pretrained: true` 与 `pos_weight: true`。已按 [train_plan04.md](train_plan04.md) 完成
-RUN-005（ResNet-50，macro-AUC 0.7857）与 RUN-006（DenseNet-121，0.7880），结果与对照
-结论见 [training_log.md](training_log.md) 与 [experiments.md](experiments.md)。补齐同口径
-基线 RUN-003-B（ResNet-18，0.7837）后，新骨干的 macro-AUC 分别高 0.0020 / 0.0043；随后按 [train_plan05.md](train_plan05.md) 用 seed 2026 复核 DenseNet-121
-（RUN-006-A，0.7913）；缺少 seed 2026 的 ResNet-18 配对对照，仍不足以判定骨干优劣，
-默认骨干仍为 `resnet18`。实际加载的预训练权重已由
-checkpoint `metadata.pretrained_loaded` 确认；新骨干的权重许可证核验与 T4 端到端耗时
-仍待实测（仅当后续决定切换骨干时）。
+骨干实验的实测结果和选择依据见 [调优记录](experiments.md)；各 run 的运行配置与指标见 [训练记录](training_log.md)。
 
 ### 2.3 字段总览
 
