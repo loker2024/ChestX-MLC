@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> None:
 
     loader = build_loader(config, args.split, pin_memory=device.type == "cuda")
     model = load_checkpoint_model(config, args.checkpoint, device)
-    predictions = predict_loader(model, loader, device)
+    predictions = predict_loader(model, loader, device, config)
 
     probability_columns = [f"p{class_id}" for class_id in CLASS_IDS]
     y_score = predictions[probability_columns].to_numpy(dtype=np.float64)

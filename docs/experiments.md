@@ -80,10 +80,16 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | 优化项 | 预期收益 | 改动点 | 备注 |
 | --- | --- | --- | --- |
 | 新骨干对照 | 已验证（无增益） | `configs/exp_densenet121.yaml` / `configs/exp_resnet50.yaml` | **RUN-005 / RUN-006 已完成**：ResNet-50 macro-AUC 0.7857、DenseNet-121 0.7880，均未超过 ResNet-18 历史 0.7887 / 0.7903，暂不切换默认骨干；详见 [train_plan04.md](train_plan04.md) 与训练记录。T4 端到端耗时与权重许可 / SHA-256 核验仍待做（仅当选新骨干时） |
-| **视图元信息（ViewPosition）** | 中—高 | `StudyRecord` 加 `views`、`collate_studies` 透传、分类头拼接 one-hot 或改用视图条件聚合 | 正位 / 侧位显影不同，当前无差别均值会互相稀释；`Rows`/`Columns` 不建议用（易学设备偏差），`Subject_id` 严禁入特征 |
+| **视图元信息（ViewPosition）** | 待实验 | 已实现 `StudyRecord` / `collate_studies` 传递视角及正侧位加权聚合 | 默认仍为图像等权；加权配置尚无实测结果。`Rows`/`Columns` 不建议用（易学设备偏差），`Subject_id` 严禁入特征 |
 | 阈值曲线选点 | 中 | 仅推理侧：`run_compare.py` 扫 0.3~0.7，必要时改 `eval.threshold` | RUN-003 正式模型已复核：F1 峰值仍在 0.2（0.4219，@0.5 为 0.2655），与 RUN-001R 形态一致；RUN-002-A/B 的 pos_weight 模型把峰右移到 0.5–0.6（0.4182 / 0.4212）但上限与基线 @0.2 持平，提交仍按 0.2 选点 |
 | 训练轮数 | 已验证 | 在正式基线之后调整 `train.epochs` | **RUN-003 已判无效**：epoch 8 达峰（0.7887）后过拟合、第 13 轮早停，25 轮上限未带来 AUC 增益（Δ−0.0016 vs RUN-001R），轮数不是瓶颈 |
 | 学习率调度 | 已验证 | `train.lr_scheduler` / `train.lr_min` | **RUN-003-A 判无效**：余弦调度 best epoch 5、macro-AUC 0.7852 vs RUN-003 的 0.7887（Δ−0.0035，未达门）；但最佳轮次前移（8→5）、早停更快（13→10 轮）、耗时约 30 分钟 vs 38 分钟。当前默认配置为 `cosine`；该对照未证明 AUC 增益 |
 | `pos_weight` | 已验证 | `train.pos_weight: true` | **RUN-002-A/B 未达原 AUC 增益门**：完整周期双 seed macro-AUC 0.7872 / 0.7871，vs RUN-003 0.7887 为 Δ−0.0015 / −0.0016，均未达 +0.005 门；F1@0.5 提升（0.4045 / 0.4198）伴随阈值曲线右移，已测峰值与基线接近，当前默认开启 |
 | 聚合方式消融 | 低—中 | `aggregate_logits` 增加「平均概率 / 最大 / 平均 logits」三种 | 当前实现是平均 logits 后 sigmoid（等价 G2 方案），可作为对照项记录 |
 | 更高分辨率 / TTA | 待评估 | `image.size`、`run_infer.py` 加翻转 TTA | 先测显存与耗时，3090 24G 下 448 可能吃紧 |
+
+### 正侧位加权聚合配置
+
+`configs/exp_view_weighted.yaml` 使用与默认配置相同的训练设置，仅将 `model.aggregation` 设为 `view_weighted`、`model.frontal_weight` 设为 0.7。可使用 `python src/run_train.py --config configs/exp_view_weighted.yaml --seed 42` 启动对照；推理、评估及耗时检查须传入相同配置。该权重是实验设定，尚无性能结论。
+
+每个 study 先按正位（AP、PA）和侧位（LATERAL、LL）分别求 logits 均值，再按 0.7 / 0.3 聚合，最后 sigmoid；只有一种已知视角或包含未知视角时，对该 study 全部图片等权平均。空值及未识别值（包括 `PA LLD`）视为未知。默认 `mean` 保持原有图片等权逻辑。没有完整测试索引时，视角加权的多图耗时一致性校验会报错，避免把未知视角结果当作有效校验。

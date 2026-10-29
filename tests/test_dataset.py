@@ -128,3 +128,10 @@ def test_build_loader_rejects_unknown_split(labeled_split, unlabeled_split, writ
 
     with pytest.raises(ValueError, match="split"):
         build_loader(config, "dev")
+
+
+def test_view_ids_remain_aligned_with_packed_images(labeled_split):
+    dataset = _dataset(labeled_split["csv"], labeled_split["images"])
+    batch = collate_studies([dataset[0], dataset[1]])
+    assert dataset.records[0].views == (0, 1)
+    assert batch["views"].tolist() == [0, 1, 0]

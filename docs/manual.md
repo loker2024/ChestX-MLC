@@ -116,6 +116,7 @@ train:
 | --- | --- | --- | --- |
 | `configs/default.yaml` | P7 冻结的最终配置，正式训练与提交使用 | 无 | 25 epoch、`pos_weight: true` |
 | `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停和 `pos_weight` |
+| `configs/exp_view_weighted.yaml` | 正侧位加权聚合对照，待训练 | `_base: default.yaml` | `aggregation: view_weighted`，正位权重 0.7 |
 | `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 实验配置 | `_base: default.yaml` | 显式设置 `pos_weight: true`，与当前默认一致 |
 | `configs/exp_short_pos_weight.yaml` | 短周期 `pos_weight` 对照 | `_base: exp_short.yaml` | 在短周期基础上打开 `pos_weight` |
 | `configs/exp_densenet121.yaml` | DenseNet-121 骨干对照，已完成（RUN-006） | `_base: default.yaml` | `backbone: densenet121.ra_in1k` |
@@ -128,6 +129,7 @@ train:
 default.yaml
 ├── exp_short.yaml
 │   └── exp_short_pos_weight.yaml
+├── exp_view_weighted.yaml
 ├── exp_pos_weight.yaml
 ├── exp_densenet121.yaml
 ├── exp_resnet50.yaml
@@ -197,6 +199,8 @@ data:
 | `model.backbone` | 非空字符串 | `resnet18` | timm 支持的模型名 | 骨干网络。换骨干等于换模型，必须重新训练；推理配置要与训练一致。 |
 | `model.pretrained` | 布尔 | `true` | `true` / `false` | 是否加载 ImageNet 预训练权重。离线环境拿不到权重时会告警并回退随机初始化，训练日志与 checkpoint 的 `metadata.pretrained_loaded` 会记录真实情况。 |
 | `model.num_classes` | 整数 | `10` | 必须等于 `10` | 赛题固定 10 类，写其他值会直接报错。 |
+| `model.aggregation` | 字符串 | `mean` | `mean` / `view_weighted` | 图片等权均值或按正侧位均值加权。 |
+| `model.frontal_weight` | 数字 | `0.7` | `0 < 值 < 1` | 视角加权时正位权重；侧位权重为 `1 - frontal_weight`。 |
 
 默认结构为 ResNet-18 骨干 + 单层 `Linear(512, 10)` 分类头，参数量约 11.2M。
 
@@ -579,7 +583,7 @@ python src/run_infer.py \
 | `--out` | `outputs/submission.csv` | 提交文件路径，父目录会自动创建。 |
 | `--threshold` | 无 | 只输出概率 ≥ 该值的类别，必须在 `[0, 1]`。省略时输出全部 10 类概率。 |
 
-推理流程：按配置构建 test loader → 加载权重 → 逐图前向并按 study 求 logits 均值 → sigmoid → 摊平成提交长表 → 按 `test.csv` 校验。终端会打印 checkpoint、设备、test study 数、提交文件路径、输出策略与行数。
+推理流程：按配置构建 test loader → 加载权重 → 逐图前向并按配置聚合 study logits → sigmoid → 摊平成提交长表 → 按 `test.csv` 校验。终端会打印 checkpoint、设备、test study 数、提交文件路径、输出策略与行数。
 
 建议始终使用 run 目录里的配置：
 
@@ -590,7 +594,7 @@ python src/run_infer.py \
     --out outputs/submission.csv
 ```
 
-因为 `config.yaml` 记录的是训练时的 `backbone`、`image.size` 和数据路径，能避免“用新默认配置推理旧权重”导致的结构或预处理不一致。
+因为 `config.yaml` 记录的是训练时的 `backbone`、聚合方式与权重、`image.size` 和数据路径，能避免“用新默认配置推理旧权重”导致的结构或预处理不一致。
 
 ### 4.5 多 run 对比：`run_compare.py`
 

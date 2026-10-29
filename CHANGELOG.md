@@ -15,6 +15,11 @@
 - `12:00`（变更）远端训练环境（不涉及仓库文件）：验证集图片由嵌套的 `/root/sj-tmp/valid/valid/subject_*` 上移为 `/root/sj-tmp/valid/subject_*`，与 train / test 目录结构一致；`check_data.py --full` 复检通过后从头重跑 RUN-005，避免训练中途移动图片。
 - `12:05`（变更）`docs/manual.md`：§2.2 现有配置文件中 `exp_resnet50.yaml` / `exp_densenet121.yaml` 的「训练待排期」改为「已完成（RUN-005 / RUN-006）」；骨干说明段更新为已按 train_plan04 完成、结果见训练记录与调优记录、默认骨干维持 `resnet18`，并把「许可证核验与 T4 耗时」限定为仅当后续切换骨干时才需补做。
 
+- `12:42`（新增）`configs/exp_view_weighted.yaml`、`tests/test_model.py`、`tests/test_dataset.py`：增加正侧位 7:3 聚合实验配置与视角对齐、梯度和推理一致性测试。
+- `12:42`（变更）`src/common/config.py`、`src/data/index.py`、`src/data/dataset.py`、`src/model/network.py`、`src/train/engine.py`、`src/infer/predict.py`、`src/run_infer.py`、`src/run_eval.py`、`src/run_compare.py`、`src/cost.py`、`docs/experiments.md`：贯通视角元数据与可配置聚合，未知视角回退全图均值并确保训练、推理及耗时校验一致。
+
+- `12:45`（变更）`docs/manual.md`、`docs/architecture.md`、`docs/model_flow.md`、`docs/cost.md`、`docs/experiments.md`：补充聚合配置、视角数据流和耗时校验限制，区分默认均值与待验证的加权实验。
+
 ## 2026-10-28
 
 - `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。

@@ -55,8 +55,14 @@ def build_model(cfg: Config) -> nn.Module:
     return model
 
 
-def aggregate_logits(logits: torch.Tensor, offsets: torch.Tensor) -> torch.Tensor:
-    """把逐图 logits 聚合为 study 级 logits（同一 study 内取均值）。
+def aggregate_logits(
+    logits: torch.Tensor, offsets: torch.Tensor, views: torch.Tensor | None = None,
+    frontal_weight: float = 0.7,
+) -> torch.Tensor:
+    """把逐图 logits 聚合为 study 级 logits；提供 views 时按视角加权。
+
+    views 使用 0=正位、1=侧位、2=未知。含未知视角或只有一种视角的
+    study 回退全图均值；两种已知视角先分别求均值再加权。
 
     参数：
 
@@ -82,5 +88,22 @@ def aggregate_logits(logits: torch.Tensor, offsets: torch.Tensor) -> torch.Tenso
         len(counts), logits.shape[1], dtype=logits.dtype, device=logits.device
     ).index_add(0, study_index, logits)
 
-    # counts 是 long，除法会自动提升到浮点；unsqueeze 把 [B] 变成 [B, 1] 以便广播。
-    return sums / counts.unsqueeze(1)
+    mean = sums / counts.unsqueeze(1)
+    if views is None:
+        return mean
+    if views.ndim != 1 or views.numel() != logits.shape[0]:
+        raise ValueError("views 必须与图片数量一致")
+    if not 0 < frontal_weight < 1:
+        raise ValueError("frontal_weight 必须在 (0, 1) 内")
+    # 未知视角的 study 使用全图均值；单一已知视角同样使用该组均值。
+    group_means = []
+    group_counts = []
+    for view_id in (0, 1):
+        mask = (views == view_id).to(logits.dtype)
+        counts_view = torch.zeros(len(counts), dtype=logits.dtype, device=logits.device).index_add(0, study_index, mask)
+        sums_view = torch.zeros_like(sums).index_add(0, study_index, logits * mask.unsqueeze(1))
+        group_means.append(sums_view / counts_view.clamp_min(1).unsqueeze(1))
+        group_counts.append(counts_view)
+    both = (group_counts[0] > 0) & (group_counts[1] > 0) & ((group_counts[0] + group_counts[1]) == counts)
+    weighted = frontal_weight * group_means[0] + (1 - frontal_weight) * group_means[1]
+    return torch.where(both.unsqueeze(1), weighted, mean)

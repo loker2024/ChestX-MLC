@@ -1,0 +1,5 @@
+_base: default.yaml
+
+model:
+  aggregation: view_weighted
+  frontal_weight: 0.7

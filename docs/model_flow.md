@@ -57,6 +57,6 @@
 ```
 
 - 默认训练图像增强包括随机旋转、平移、缩放以及亮度和对比度调整；默认不水平翻转。验证与推理不使用随机增强。
-- 同一 study 的多张图**先对 logits 求均值，再执行 Sigmoid**。训练使用 `BCEWithLogitsLoss`，不先手动执行 Sigmoid；默认配置启用 `pos_weight`。
+- 同一 study 的多张图**先聚合 logits，再执行 Sigmoid**；本图展示默认图片等权均值。正侧位加权实验及未知视角回退规则见 [调优记录](experiments.md#正侧位加权聚合配置)。训练使用 `BCEWithLogitsLoss`，不先手动执行 Sigmoid；默认配置启用 `pos_weight`。
 - 默认最多训练 25 轮，按验证集 Macro-AUC 选择最优模型，连续 5 轮无提升时早停。推理通常加载 `best.pt`，默认输出全部 10 类概率。
 - 模型与聚合见 [`src/model/network.py`](../src/model/network.py)，预处理见 [`src/data/transforms.py`](../src/data/transforms.py)，推理见 [`src/infer/predict.py`](../src/infer/predict.py)。

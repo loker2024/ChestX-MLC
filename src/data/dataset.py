@@ -48,6 +48,7 @@ class StudyDataset(Dataset):
         item: dict[str, Any] = {
             "images": torch.stack(images),  # [n, 3, size, size]，n = 这次检查的图片数
             "study_id": record.study_id,
+            "views": torch.tensor(record.views or (2,) * len(images), dtype=torch.long),
         }
         if record.labels is not None:
             item["labels"] = torch.from_numpy(record.labels)
@@ -87,6 +88,7 @@ def collate_studies(batch: list[dict[str, Any]]) -> dict[str, Any]:
 
     collated: dict[str, Any] = {
         "images": images,
+        "views": torch.cat([item["views"] for item in batch]),
         "offsets": offsets,
         "study_ids": [item["study_id"] for item in batch],
     }

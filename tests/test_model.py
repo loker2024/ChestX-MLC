@@ -154,3 +154,41 @@ def test_predict_loader_empty_raises():
     """空 loader 不能走到 torch.cat([])，否则报错信息很难定位。"""
     with pytest.raises(RuntimeError, match="推理集为空"):
         predict_loader(build_model(_config()), [], torch.device("cpu"))
+
+
+def test_view_weighting_uses_group_means_and_unknown_fallback():
+    logits = torch.tensor([[2.], [4.], [10.], [3.], [9.]], requires_grad=True)
+    offsets = torch.tensor([0, 3, 5])
+    views = torch.tensor([0, 0, 1, 0, 2])
+    result = aggregate_logits(logits, offsets, views, 0.7)
+    assert torch.allclose(result, torch.tensor([[5.1], [6.0]]))
+    result.sum().backward()
+    assert torch.allclose(logits.grad[:, 0], torch.tensor([.35, .35, .3, .5, .5]))
+
+
+def test_weighted_loader_and_study_prediction_match(labeled_split):
+    from dataclasses import replace
+    from PIL import Image
+    from data.dataset import StudyDataset, collate_studies
+    from data.index import read_split
+    from data.transforms import build_eval_transform
+    from infer.predict import predict_study
+    from torch.utils.data import DataLoader
+
+    records = read_split(labeled_split["csv"], labeled_split["images"])
+    Image.new("RGB", (64, 48), (240, 240, 240)).save(records[0].image_paths[1])
+    transform = build_eval_transform(32, normalize="none")
+    loader = DataLoader(StudyDataset(records, transform), batch_size=2, collate_fn=collate_studies)
+
+    class PixelModel(torch.nn.Module):
+        def forward(self, images):
+            return images.mean(dim=(1, 2, 3)).unsqueeze(1).repeat(1, 10)
+
+    config = _config()
+    config = replace(config, model=replace(config.model, aggregation="view_weighted", frontal_weight=0.7))
+    model = PixelModel()
+    result = predict_loader(model, loader, torch.device("cpu"), config)
+    direct = predict_study(model, records[0].image_paths, transform, torch.device("cpu"), records[0].views, 0.7)
+    np.testing.assert_allclose(result.iloc[0, 1:].to_numpy(dtype=float), direct, atol=1e-7)
+    logits = torch.stack([transform(Image.open(path)).mean() for path in records[0].image_paths])
+    assert direct[0] == pytest.approx(torch.sigmoid(0.7 * logits[0] + 0.3 * logits[1]).item())

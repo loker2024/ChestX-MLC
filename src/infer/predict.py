@@ -79,6 +79,8 @@ def _forward_probabilities(
     images: torch.Tensor,
     offsets: torch.Tensor,
     device: torch.device,
+    views: torch.Tensor | None = None,
+    frontal_weight: float = 0.7,
 ) -> torch.Tensor:
     """CPU 上的 images/offsets -> CPU 上的 `[B, 10]` fp32 概率。
 
@@ -88,7 +90,8 @@ def _forward_probabilities(
     """
     model_images = images.to(device=device, dtype=_model_dtype(model), non_blocking=True)
     model_offsets = offsets.to(device=device, non_blocking=True)
-    study_logits = aggregate_logits(model(model_images), model_offsets)
+    study_logits = aggregate_logits(model(model_images), model_offsets,
+                                    views.to(device) if views is not None else None, frontal_weight)
     # 先转 float32 再搬 CPU：以后即使模型用半精度推理，概率也按 fp32 落表。
     return torch.sigmoid(study_logits.float()).cpu()
 
@@ -98,6 +101,7 @@ def predict_loader(
     model: nn.Module,
     loader: DataLoader,
     device: torch.device,
+    config: Config | None = None,
 ) -> pd.DataFrame:
     """对一个 DataLoader 做推理，返回 `Study_id, p1..p10` 的宽表。
 
@@ -114,7 +118,9 @@ def predict_loader(
 
     for batch in loader:
         probabilities = _forward_probabilities(
-            model, batch["images"], batch["offsets"], device
+            model, batch["images"], batch["offsets"], device,
+            batch["views"] if config is not None and config.model.aggregation == "view_weighted" else None,
+            config.model.frontal_weight if config is not None else 0.7,
         )
         study_ids.extend(batch["study_ids"])
         probability_batches.append(probabilities)
@@ -154,6 +160,8 @@ def predict_study(
     image_paths: Sequence[str | Path],
     transform: Callable[[Image.Image], torch.Tensor],
     device: torch.device,
+    views: Sequence[int] | None = None,
+    frontal_weight: float = 0.7,
 ) -> np.ndarray:
     """一次检查（study）的 10 类概率：该 study 所有图片 logits 求均值后 sigmoid。
 
@@ -171,4 +179,5 @@ def predict_study(
         [transform(load_image(path, convert_rgb=False)) for path in paths]
     )
     offsets = torch.tensor([0, len(paths)], dtype=torch.long)
-    return _forward_probabilities(model, images, offsets, device)[0].numpy()
+    return _forward_probabilities(model, images, offsets, device,
+                                  torch.tensor(views) if views is not None else None, frontal_weight)[0].numpy()

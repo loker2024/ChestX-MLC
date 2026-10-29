@@ -62,8 +62,14 @@ class ModelConfig:
     backbone: str = "resnet18"  # timm 的模型名
     pretrained: bool = True  # 是否加载 ImageNet 预训练权重
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
+    aggregation: str = "mean"
+    frontal_weight: float = 0.7
 
     def __post_init__(self) -> None:
+        if self.aggregation not in {"mean", "view_weighted"}:
+            raise ValueError("model.aggregation 只能是 mean 或 view_weighted")
+        if not 0.0 < self.frontal_weight < 1.0:
+            raise ValueError("model.frontal_weight 必须在 (0, 1) 内")
         if not self.backbone:
             raise ValueError("model.backbone 不能为空")
         if self.num_classes != NUM_CLASSES:

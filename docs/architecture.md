@@ -11,7 +11,7 @@
 - ID 规则：`Subject_id`、`Study_id`、`Dicom_id` 均带前导零，读取与写出全程使用字符串。
 - 数据划分：官方 train/valid 已按患者划分且无重叠，直接沿用；valid 只用于选型与早停。
 - 部署约束：模型总分 ≤500MB、单图端到端 ≤100ms（T4 16GB），默认 ResNet-18 + 320px 输入。
-- 聚合口径：逐图 forward 得到 logits，同一 study 内按图片取均值，再 sigmoid；训练损失与推理提交使用同一口径。
+- 聚合口径：逐图 forward 得到 logits，默认同一 study 内按图片取均值；可选正侧位分组均值加权，未知视角或单视角回退全图均值；聚合后 sigmoid，训练损失与推理提交使用同一口径。
 
 ## 2. 目录总览
 
@@ -53,7 +53,7 @@
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `network.py` | ResNet-18 骨干 + 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets) -> Tensor[B, 10]` |
+| `network.py` | ResNet-18 骨干 + 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets, views=None, frontal_weight=0.7) -> Tensor[B, 10]` |
 | `losses.py` | BCEWithLogitsLoss；可选按训练集频率计算 `pos_weight`，并显式指定设备 | `build_loss(cfg, train_labels=None, device=None)` |
 
 ### 3.4 train：训练逻辑
@@ -66,7 +66,7 @@
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `predict.py` | 加载 checkpoint 对 loader / 单图 / 单 study 推理，聚合为 study 级概率；`predict_loader`、`predict_image`、`predict_study` 共用内部前向 | `load_checkpoint_model(config, path, device)`、`build_eval_inference_transform(config)`、`predict_loader(model, loader, device) -> pd.DataFrame`（`Study_id, p1..p10`）、`predict_image(model, image_path, transform, device) -> np.ndarray`（单图，计时用）、`predict_study(model, image_paths, transform, device) -> np.ndarray`（study 聚合，一致性校验用） |
+| `predict.py` | 加载 checkpoint 对 loader / 单图 / 单 study 推理，聚合为 study 级概率；`predict_loader`、`predict_image`、`predict_study` 共用内部前向 | `load_checkpoint_model(config, path, device)`、`build_eval_inference_transform(config)`、`predict_loader(model, loader, device, config=None) -> pd.DataFrame`（`Study_id, p1..p10`）、`predict_image(model, image_path, transform, device) -> np.ndarray`（单图，计时用）、`predict_study(model, image_paths, transform, device) -> np.ndarray`（study 聚合，一致性校验用） |
 | `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出；阈值必须在 `[0, 1]` | `build_submission_frame(predictions, study_subjects, threshold=None)`、`validate_submission(path, test_csv, require_all_classes=True)`、`write_submission(df, path)` |
 | `profiling.py` | 耗时评测的可测口径：图片发现与身份解析、提交文件读取校验、阈值选择、study 预测比对、计时统计与结论格式化；不含 `torch` | `COST_LIMIT_MS` / `DEFAULT_ROUNDS` / `DEFAULT_WARMUP_IMAGES` / `DEFAULT_TOLERANCE`、`list_images`、`parse_image_identity`、`group_images_by_study`、`read_submission`、`select_prediction_rows`、`compare_study_predictions`、`summarize_timings`、`format_conclusion` |
 
@@ -97,7 +97,7 @@
 
 1. `data.index.read_split` 读取 CSV 并递归索引图片，返回 `list[StudyRecord]`。
 2. `data.dataset.StudyDataset` 按 study 取图，`collate_studies` 拼成 `images / offsets / labels`。
-3. `model.network` 逐图输出 logits，`aggregate_logits` 按 `offsets` 求每个 study 的均值。
+3. `model.network` 逐图输出 logits，`aggregate_logits` 按 `offsets` 和可选视角信息聚合每个 study 的 logits。
 4. `train.engine` 以 `BCEWithLogitsLoss` 训练，按 valid macro-AUC 保存最优权重。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。

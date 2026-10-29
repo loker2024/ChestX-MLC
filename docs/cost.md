@@ -39,13 +39,13 @@ python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictu
 - 退出码 `1`：存在不一致的 study，或最终单图耗时可判定且超限；一致性失败优先于多图耗时判定；
 - 退出码 `2`：参数、文件、配置或权重错误，或样本包含多图 study 导致最终端到端耗时无法判定（打印 `[ERROR]`）。
 
-完整测试集索引不可用（赛题附录 A 的提交包不要求携带测试集，评测环境常见）不算错误：脚本打印 `[WARN]` 后退化为按 `pictures_100` 自身分组比对，退出码仍按上面三条判定，报告里 `final_timing_verifiable` 为 `false`。
+完整测试集索引不可用时，默认等权聚合模式下（赛题附录 A 的提交包不要求携带测试集）不算错误：脚本打印 `[WARN]` 后退化为按 `pictures_100` 自身分组比对，退出码仍按上面三条判定，报告里 `final_timing_verifiable` 为 `false`。
 
 日志前缀：`[INFO]` 过程信息、`[WARN]` 非致命提示（如图片数不足 100 / 不足 5 张、CPU 上跑 fp16）、`[ERROR]` 失败原因。脚本输出 `[CONCLUSION]`，格式对齐规则里的日志示例；指定 `--report` 时其后还会输出报告路径。
 
 ## 2. 配置与权重的自动查找
 
-完整测试集索引（`data.test.csv` + `data.test.images`）可用时，脚本用它确认抽样 study 的全部图片并检查患者身份；索引可用但抽样图与索引的 Subject_id / 文件名对不上会返回 2。索引缺失时打印 `[WARN]` 后退化为按 `pictures_100` 自身分组，报告标注不可核实。配置和权重的查找顺序为：
+完整测试集索引（`data.test.csv` + `data.test.images`）可用时，脚本用它确认抽样 study 的全部图片并检查患者身份；索引可用但抽样图与索引的 Subject_id / 文件名对不上会返回 2。索引缺失时打印 `[WARN]` 后退化为按 `pictures_100` 自身分组，报告标注不可核实。视角加权模式下，如果抽样分组含多图 study 而完整索引不可用，脚本返回 2，无法验证聚合结果；单图抽样仍按原有限制处理。配置和权重的查找顺序为：
 
 - 权重顺序：`--checkpoint` → 环境变量 `COST_CHECKPOINT` → `submission.csv` 同目录的 `best.pt` / `model/best.pt` → 仓库/提交包根目录的 `best.pt` / `model/*.pt` → `outputs/*/best.pt`（按修改时间倒序）。
 - 配置顺序：`--config` → 仓库 `configs/default.yaml` → 提交包根目录 `config.yaml` → checkpoint 里存档的训练配置（经 `config_from_dict` 还原）。
@@ -81,7 +81,7 @@ python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictu
 
 ## 5. 一致性比对口径
 
-计时前核对样本路径与完整测试集索引。计时结束后，`cost.py` 对抽中的每个 study 使用抽样图片和完整测试集中的其他图片，以 `predict_study` 求 logits 均值并与 `submission.csv` 比对：
+计时前核对样本路径与完整测试集索引。计时结束后，`cost.py` 对抽中的每个 study 使用抽样图片和完整测试集中的其他图片，以 `predict_study` 按配置聚合 logits 并与 `submission.csv` 比对：
 
 - 提交文件输出全部 10 类时：逐类比较概率绝对差，最大差 `<= --tolerance` 记为一致；
 - 提交文件按阈值过滤过时（某个 study 少于 10 行）：先按 `--threshold` 对现场概率做同样的过滤，比较保留的类别集合，再比较交集类别的概率；

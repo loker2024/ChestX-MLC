@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> None:
 
     loader = build_loader(config, "test", pin_memory=device.type == "cuda")
     model = load_checkpoint_model(config, args.checkpoint, device)
-    predictions = predict_loader(model, loader, device)
+    predictions = predict_loader(model, loader, device, config)
 
     # Subject_id 不在推理宽表里，从 test split 的索引记录补上。
     study_subjects = {

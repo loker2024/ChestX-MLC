@@ -31,6 +31,7 @@ class StudyRecord:
     subject_id: str
     image_paths: tuple[Path, ...]  # 顺序与 CSV 中出现顺序一致，保证可复现
     labels: np.ndarray | None = None  # test split 没有标注，为 None
+    views: tuple[int, ...] = ()  # 0 正位，1 侧位，2 未知
 
     @property
     def num_images(self) -> int:
@@ -99,6 +100,8 @@ def read_split(
             "一行对应一次检查，重复行会让同一张图被计两次"
         )
 
+    if "ViewPosition" not in frame.columns:
+        frame["ViewPosition"] = ""
     images = index_images(images_root)
 
     # 先把缺图一次性找全再报错：边遍历边报错会在第一张图就中断，看不出缺口规模。
@@ -113,6 +116,7 @@ def read_split(
     # 同一 study 的行归到一起：study_id -> [(dicom_id, 图片路径, 原始标签串), ...]
     grouped_rows: dict[str, list[tuple[str, Path, str]]] = {}
     subjects: dict[str, str] = {}
+    views_by_study: dict[str, list[int]] = {}
     for row in frame.itertuples(index=False):
         previous_subject = subjects.get(row.Study_id)
         if previous_subject is not None and previous_subject != row.Subject_id:
@@ -123,6 +127,9 @@ def read_split(
         grouped_rows.setdefault(row.Study_id, []).append(
             (row.Dicom_id, images[row.Dicom_id], row.Predict_class if labeled else "")
         )
+        view = row.ViewPosition.strip().upper()
+        view_id = 0 if view in {"AP", "PA"} else 1 if view in {"LATERAL", "LL"} else 2
+        views_by_study.setdefault(row.Study_id, []).append(view_id)
         subjects[row.Study_id] = row.Subject_id
 
     records: list[StudyRecord] = []
@@ -134,6 +141,7 @@ def read_split(
                 subject_id=subjects[study_id],
                 image_paths=tuple(path for _, path, _ in rows),
                 labels=labels,
+                views=tuple(views_by_study[study_id]),
             )
         )
     return records

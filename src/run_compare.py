@@ -86,7 +86,7 @@ def evaluate_run(
     )
     loader = build_loader(config, "valid", pin_memory=device.type == "cuda")
     model = load_checkpoint_model(config, run_dir / "best.pt", device)
-    predictions = predict_loader(model, loader, device)
+    predictions = predict_loader(model, loader, device, config)
 
     probability_columns = [f"p{class_id}" for class_id in CLASS_IDS]
     y_score = predictions[probability_columns].to_numpy(dtype=np.float64)
