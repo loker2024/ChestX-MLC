@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "weights": [
+    {
+      "weights_name": "ResNet18_Weights.IMAGENET1K_V1",
+      "download_url": "https://download.pytorch.org/models/resnet18-f37072fd.pth",
+      "primary_dataset": "ImageNet-1K",
+      "sha256": "f37072fd47e89c5e827621c5baffa7500819f7896bbacec160b1a16c560e07ec",
+      "sha256_origin": "fresh official HTTPS download HTTP200 without authentication; matches previous local cache",
+      "review_status": "approved",
+      "code_license": "BSD-3-Clause",
+      "code_license_url": "https://github.com/pytorch/vision/blob/main/LICENSE",
+      "weight_license": "BSD-3-Clause",
+      "permissions": {
+        "competition_use": true,
+        "redistribution": true,
+        "nc_restriction": false,
+        "gated": false
+      },
+      "reviewer": "project_user_confirmation",
+      "reviewed_at": "2026-10-25T20:28:02+08:00",
+      "approval_evidence": [
+        {
+          "kind": "weight_license",
+          "path": "docs/pretrained/PT1_recheck_evidence_20261025/torchvision_v0.26.0_LICENSE.txt",
+          "url": "https://github.com/pytorch/vision/blob/v0.26.0/LICENSE",
+          "sha256": "c06363f9d33627dc5173b13522444cc85fbb4739f63e16d4587d5c0a165b5b1e"
+        },
+        {
+          "kind": "upstream_data",
+          "path": "docs/pretrained/PT1_recheck_evidence_20261025/torchvision_v0.26.0_resnet18_enum.txt",
+          "url": "https://github.com/pytorch/vision/blob/v0.26.0/torchvision/models/resnet.py",
+          "sha256": "7736e3e8f9772d9bd8981df2296cb2eee7608098cb30a6f59b779a1a8ec4dc83"
+        },
+        {
+          "kind": "competition_and_redistribution",
+          "path": "docs/pretrained/PT1_recheck_evidence_20261025/timm_resnet18_source_excerpt.txt",
+          "url": "https://github.com/huggingface/pytorch-image-models/blob/main/timm/models/resnet.py",
+          "sha256": "bbc61f1ca4e5f3ad78c8204dfad5eb66190ca61170d10defd2e2d54ad72d1fc0"
+        }
+      ],
+      "blocking_reason": "",
+      "review_document": "pretrain_compliance_report.md",
+      "compliance_classification": "enabled_by_user_confirmation_not_organizer_written_approval",
+      "download_evidence": "docs/pretrained/PT1_recheck_evidence_20261025/download_verification.json",
+      "source_review_evidence": "docs/pretrained/PT1_recheck_evidence_20261025/retrieval_manifest.json",
+      "same_file_bsd_support": "timm main/timm/models/resnet.py links resnet18-f37072fd.pth with bsd-3-clause",
+      "review_basis": "user_confirmation_with_public_timm_same_file_bsd_evidence",
+      "user_confirmation_path": "docs/pretrained/PT1_user_confirmation_20261025.md",
+      "user_confirmation_sha256": "9528a64eafafa961b17ec05fbc134a17a6586acd997c4fa4e8c13108847477b1"
+    },
+    {
+      "weights_name": "DenseNet121_Weights.IMAGENET1K_V1",
+      "backbone": "densenet121",
+      "download_url": "https://download.pytorch.org/models/densenet121-a639ec97.pth",
+      "primary_dataset": "ImageNet-1K",
+      "sha256": "a639ec97d7c33b07ae66f0b5fb7d0192f95a3b11b7576c66c0126c2a727c4395",
+      "sha256_origin": "actual official HTTP200 download; full file hash",
+      "review_status": "approved",
+      "code_license": "BSD-3-Clause",
+      "weight_license": "BSD-3-Clause (scope accepted by project user)",
+      "permissions": {
+        "competition_use": true,
+        "redistribution": true,
+        "nc_restriction": false,
+        "gated": false
+      },
+      "reviewer": "project_user_confirmation",
+      "reviewed_at": "2026-10-26T21:43:09.306176+08:00",
+      "approval_evidence": [
+        {
+          "kind": "weight_license",
+          "path": "docs/pretrained/B1_ImageNet_evidence_20261026_202532_cfcc101c/torchvision_LICENSE.txt",
+          "url": "https://github.com/pytorch/vision/blob/v0.26.0/LICENSE",
+          "sha256": "6502f676851cfe25f8af75531dfb32375b7325b73c37e7b43741fa422893e71d",
+          "scope": "code BSD; weight scope accepted by user"
+        },
+        {
+          "kind": "upstream_data",
+          "path": "docs/pretrained/B1_evidence_20261026_194313_b791c02c/torchvision_densenet.py.txt",
+          "url": "https://github.com/pytorch/vision/blob/v0.26.0/torchvision/models/densenet.py",
+          "sha256": "76a71797b7873088c27ca0458588861c197528e86421f57525dc8e3ad771c59a"
+        },
+        {
+          "kind": "competition_and_redistribution",
+          "path": "docs/pretrained/B1_user_confirmation_20261026.md",
+          "url": "https://download.pytorch.org/models/densenet121-a639ec97.pth",
+          "sha256": "ed608c121840b8833b7d725a8f12109c9221337bf938550f106e3aede22863c0",
+          "source_type": "project_user_message",
+          "url_role": "candidate identity, not a URL for organizer reply"
+        }
+      ],
+      "blocking_reason": "",
+      "review_document": "docs/B1_HANDOFF.md",
+      "review_basis": "explicit_user_confirmation_with_archived_public_source_evidence",
+      "download_evidence": "docs/pretrained/B1_evidence_20261026_194313_b791c02c/download_verification.json",
+      "source_review_evidence": "docs/pretrained/B1_evidence_20261026_194313_b791c02c/sources.json",
+      "compliance_classification": "project_user_confirmed_not_independently_verified_organizer_reply",
+      "weight_license_scope_status": "accepted_by_user; prior independent scope uncertainty retained",
+      "user_confirmation_path": "docs/pretrained/B1_user_confirmation_20261026.md",
+      "user_confirmation_sha256": "ed608c121840b8833b7d725a8f12109c9221337bf938550f106e3aede22863c0"
+    },
+    {
+      "weights_name": "timm/densenet121.ra_in1k",
+      "backbone": "densenet121",
+      "model_backend": "timm",
+      "recipe": "RA",
+      "revision": "92007b6200e0b4a4fe68cb4e3947022a928aaaae",
+      "download_url": "https://huggingface.co/timm/densenet121.ra_in1k/resolve/92007b6200e0b4a4fe68cb4e3947022a928aaaae/model.safetensors",
+      "primary_dataset": "ImageNet-1K",
+      "sha256": "eae900d8ae5b3716efa7f443fcc692aeb5a7f01f72581835c03c8c495f9eda10",
+      "sha256_origin": "actual download matches HF LFS SHA at pinned revision",
+      "review_status": "approved",
+      "code_license": "Apache-2.0",
+      "weight_license": "Apache-2.0",
+      "permissions": {
+        "competition_use": true,
+        "redistribution": true,
+        "nc_restriction": false,
+        "gated": false
+      },
+      "reviewer": "project_official_source_review",
+      "reviewed_at": "2026-10-27T19:05:38.343792+08:00",
+      "review_basis": "specific_author_model_card_apache2_license_and_full_public_weight_identity",
+      "review_document": "docs/B1_RA_COMPLIANCE.md",
+      "blocking_reason": "",
+      "approval_evidence": [
+        {
+          "kind": "weight_license",
+          "path": "docs/pretrained/B1_RA_evidence_20261027_190011/apache_LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "kind": "upstream_data",
+          "path": "docs/pretrained/B1_RA_evidence_20261027_190011/model_card.md",
+          "sha256": "8b3b5b7500f9e0ff5777d63719ca6480d93c72f15109d5c85d3d7e339ef708f8",
+          "url": "https://huggingface.co/timm/densenet121.ra_in1k/resolve/92007b6200e0b4a4fe68cb4e3947022a928aaaae/README.md"
+        },
+        {
+          "kind": "competition_and_redistribution",
+          "path": "docs/pretrained/B1_RA_evidence_20261027_190011/model_card.md",
+          "sha256": "8b3b5b7500f9e0ff5777d63719ca6480d93c72f15109d5c85d3d7e339ef708f8",
+          "url": "https://huggingface.co/timm/densenet121.ra_in1k/resolve/92007b6200e0b4a4fe68cb4e3947022a928aaaae/README.md"
+        },
+        {
+          "kind": "code_license",
+          "path": "docs/pretrained/B1_RA_evidence_20261027_190011/timm_LICENSE.txt",
+          "sha256": "71b111620fa32c17a80ccd6db2da759d31a591e497d8b5f382174f59d1b59d49",
+          "url": "https://github.com/huggingface/pytorch-image-models/blob/v1.0.30/LICENSE"
+        }
+      ],
+      "normalization_mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "normalization_std": [
+        0.229,
+        0.224,
+        0.225
+      ],
+      "download_evidence": "docs/pretrained/B1_RA_evidence_20261027_190011/download_verification.json",
+      "source_review_evidence": "docs/pretrained/B1_RA_evidence_20261027_190011/sources.json",
+      "review_note": "项目按明确权重级Apache声明核查，不冒称主办方另行签发许可；保留版权、许可、修改声明及适用NOTICE。"
+    },
+    {
+      "backbone": "efficientnet_b2",
+      "weights_name": "EfficientNet_B2_Weights.IMAGENET1K_V1",
+      "download_url": "https://download.pytorch.org/models/efficientnet_b2_rwightman-c35c1473.pth",
+      "sha256": "c35c147384e385a5bab5a8eabdabbe5a3df0487ee4a554108626ae474a5bf755",
+      "primary_dataset": "ImageNet-1K",
+      "review_status": "approved",
+      "code_license": "BSD-3-Clause",
+      "weight_license": "Apache-2.0 (upstream weights); BSD-3-Clause (TV port code)",
+      "reviewer": "project_primary_source_review",
+      "reviewed_at": "2026-10-28T17:27:34.973560+08:00",
+      "review_basis": "official_TV_port_origin_and_specific_upstream_Apache2_card_with_exact_tensor_content_crosscheck",
+      "permissions": {
+        "competition_use": true,
+        "redistribution": true,
+        "nc_restriction": false,
+        "gated": false
+      },
+      "approval_evidence": [
+        {
+          "kind": "weight_license",
+          "path": "docs/pretrained/B2_evidence_20261028_172420/apache_LICENSE.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "kind": "upstream_data",
+          "path": "docs/pretrained/B2_evidence_20261028_172420/upstream_model_card.md",
+          "sha256": "3fb3ae97ebe3464b1c1c4fd5a92eb8a1a6b788ddfb4246b729540f3347d338cc",
+          "url": "https://huggingface.co/timm/efficientnet_b2.ra_in1k/resolve/3577c4a7d84723645311bb5a9e5086f1b62ec8e2/README.md"
+        },
+        {
+          "kind": "competition_and_redistribution",
+          "path": "docs/pretrained/B2_evidence_20261028_172420/upstream_model_card.md",
+          "sha256": "3fb3ae97ebe3464b1c1c4fd5a92eb8a1a6b788ddfb4246b729540f3347d338cc",
+          "url": "https://huggingface.co/timm/efficientnet_b2.ra_in1k/resolve/3577c4a7d84723645311bb5a9e5086f1b62ec8e2/README.md"
+        },
+        {
+          "kind": "code_license",
+          "path": "docs/pretrained/B2_evidence_20261028_172420/torchvision_LICENSE.txt",
+          "sha256": "6502f676851cfe25f8af75531dfb32375b7325b73c37e7b43741fa422893e71d",
+          "url": "https://raw.githubusercontent.com/pytorch/vision/v0.26.0/LICENSE"
+        },
+        {
+          "kind": "port_origin",
+          "path": "docs/pretrained/B2_evidence_20261028_172420/torchvision_efficientnet.py.txt",
+          "sha256": "82d058e1989ef84e4ef7ce43e4a49dc10f1b95dcd003303c2c052438de823b17",
+          "url": "https://raw.githubusercontent.com/pytorch/vision/v0.26.0/torchvision/models/efficientnet.py"
+        }
+      ],
+      "review_document": "docs/B2_PRETRAIN_COMPLIANCE.md",
+      "normalization_mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "normalization_std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    }
+  ]
+}

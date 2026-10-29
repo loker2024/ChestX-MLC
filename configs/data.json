@@ -1,6 +1,7 @@
 {
   "size": 224,
   "batch_size": 4,
+  "num_workers": 4,
   "train": {"csv": "cxr_first/cxr_first/train.csv", "images": "cxr_first/cxr_first/train"},
   "valid": {"csv": "cxr_first/cxr_first/valid.csv", "images": "cxr_first/cxr_first/valid"},
   "test": {"csv": "cxr_first/cxr_first/test.csv", "images": "cxr_first/cxr_first/test"}
