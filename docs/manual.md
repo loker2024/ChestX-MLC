@@ -123,6 +123,7 @@ train:
 | `configs/exp_densenet121.yaml` | DenseNet-121 骨干对照，已完成（RUN-006） | `_base: default.yaml` | `backbone: densenet121.ra_in1k` |
 | `configs/exp_run006a.yaml` | RUN-006-A：RUN-006 的 seed 复核（DenseNet-121，seed 2026），已完成 | `_base: exp_densenet121.yaml` | 只覆盖顶层 `seed: 2026` |
 | `configs/exp_run007.yaml` | RUN-007：DenseNet-121 的正侧位 7:3 加权聚合对照，已完成 | `_base: exp_densenet121.yaml` | `aggregation: view_weighted`、`frontal_weight: 0.7` |
+| `configs/exp_run007a.yaml` | RUN-007-A：RUN-007 的 seed 复核（DenseNet-121 加权聚合，seed 2026），已完成 | `_base: exp_run007.yaml` | 只覆盖顶层 `seed: 2026` |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
 
@@ -138,6 +139,7 @@ default.yaml
 ├── exp_densenet121.yaml
 │   ├── exp_run006a.yaml
 │   └── exp_run007.yaml
+│       └── exp_run007a.yaml
 ├── exp_resnet50.yaml
 └── exp_example.yaml
 ```

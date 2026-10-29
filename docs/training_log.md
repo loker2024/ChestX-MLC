@@ -751,6 +751,94 @@ RUN-006 的 0.6（0.4098）移到 0.5（0.4122），上限基本持平，属校�
 | 9 | 260 | 0.9031 | 0.9002 | −0.0029 |
 | 10 | 306 | 0.8713 | 0.8742 | +0.0029 |
 
+### RUN-007-A densenet121_viewweighted_s2026（`configs/exp_run007a.yaml`）
+
+RUN-007 的 seed 复核：只把随机种子从 42 换成 2026，其余继承 RUN-007。配置
+[configs/exp_run007a.yaml](../configs/exp_run007a.yaml)，完整内容：
+
+```yaml
+# RUN-007-A：RUN-007（DenseNet-121 + 正侧位 7:3 加权聚合）的 seed 复核，
+# 只把随机种子从 42 换成 2026，其余配置完全继承 RUN-007 的口径。
+#
+# 用途：RUN-007 单 seed 下正侧位加权聚合的 macro-AUC 比 RUN-006 等权高 0.0012，
+# 未达 +0.005 判读门，也小于 DenseNet-121 的 seed 波动（RUN-006 与 RUN-006-A
+# 相差 0.0033）。本组用第二个 seed 复核加权聚合的方向是否稳定；与 RUN-006-A
+# （同 seed 的等权对照）可直接配对比较，差异只应来自聚合方式。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run007a.yaml --seed 2026 --tag densenet121_viewweighted_s2026
+_base: exp_run007.yaml
+
+seed: 2026
+```
+
+（其余字段全部继承 [configs/exp_run007.yaml](../configs/exp_run007.yaml)，即再继承
+`exp_densenet121.yaml` 的全部口径：320×320 letterbox、`pos_weight: true`、warmup 后
+余弦衰减、CUDA AMP、25 轮上限、早停 5、`num_workers` 16；`tests/test_config.py` 的
+`test_run007a_experiment_config_loads` 断言与 RUN-007 除 seed 外零差异。）
+
+| 项 | 值 |
+|---|---|
+| 相对父配置的差异 | 仅顶层 `seed: 42 → 2026`；其余与 RUN-007（含加权聚合与正位权重 0.7）完全一致 |
+| 运行命令 | `python src/run_train.py --config configs/exp_run007a.yaml --seed 2026 --tag densenet121_viewweighted_s2026` |
+| 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `27dbe56`（在 `53568fe` 基础上仅新增本配置、测试与计划；`src/` 未变） |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-006-A 同一份 split；`check_data.py --full` 全量通过） |
+| 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
+| 产物 | `outputs/20261029-070733_densenet121_viewweighted_s2026/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
+| 耗时 | 2026-10-29 15:07:33 → 15:42:34 CST，**12 轮即早停**（未跑满 25 轮），共 **35 分 01 秒**；单轮约 2.9 分钟（独占运行） |
+
+metrics.csv（12 轮原样复制，epoch 12 后因连续 5 轮无提升早停）：
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 0.9966 | 0.9555 | 0.7636 | 0.3866 |
+| 2 | 3.00e-04 | 0.9553 | 0.9612 | 0.7690 | 0.4022 |
+| 3 | 3.00e-04 | 0.9228 | 0.9498 | 0.7778 | 0.4140 |
+| 4 | 2.99e-04 | 0.9007 | 0.9292 | 0.7836 | 0.4153 |
+| 5 | 2.94e-04 | 0.8791 | 0.9046 | 0.7869 | 0.4032 |
+| 6 | 2.87e-04 | 0.8615 | 0.9325 | 0.7751 | 0.3911 |
+| 7 | 2.77e-04 | 0.8306 | 0.9143 | **0.7906** | 0.4194 |
+| 8 | 2.65e-04 | 0.8031 | 0.9605 | 0.7842 | 0.4203 |
+| 9 | 2.50e-04 | 0.7579 | 0.9600 | 0.7845 | 0.4261 |
+| 10 | 2.33e-04 | 0.7143 | 1.0379 | 0.7748 | 0.4178 |
+| 11 | 2.15e-04 | 0.6664 | 1.0880 | 0.7807 | 0.4157 |
+| 12 | 1.96e-04 | 0.6056 | 1.2269 | 0.7708 | 0.4249 |
+
+**结论**：最优 epoch 7，macro-AUC **0.7906**、F1@0.5 **0.4198**（`run_compare`
+重算；`metrics.csv` 训练时记录 F1 0.4194，AUC 一致）。epoch 7 后 valid_loss 由 0.91
+升至 1.23、AUC 回落，连续 5 轮无提升，于第 12 轮早停。与同 seed 的等权对照
+RUN-006-A（0.7913 / 0.4103）配对比较：**AUC Δ−0.0007**、F1@0.5 +0.0095。
+
+两个 seed 的「加权−等权」配对差方向相反：
+
+| seed | 等权对照 | 加权 | Δ（加权−等权） |
+|---|---|---|---|
+| 42 | RUN-006 0.7880 | RUN-007 0.7892 | **+0.0012** |
+| 2026 | RUN-006-A 0.7913 | RUN-007-A 0.7906 | **−0.0007** |
+
+两 seed 配对差的均值为 +0.00025，绝对值均远低于 +0.005 判读门，且方向不一致 →
+**加权正侧位 7:3 聚合对 macro-AUC 无稳定增益，判定无效，默认 `model.aggregation`
+维持 `mean`。** F1 表现为：seed 42 仅 0.5–0.7 段提升（0.2–0.4 段下降），seed 2026
+则全线提升 +0.0067~+0.0196（0.2–0.7），两 seed 形态不同，说明 F1 变化同样不稳定，
+不能作为判别力提升的证据。逐类 AUC 上 seed 2026 呈现「常见类 5–10 升、稀有类 1–4
+降」（class9 +0.0145、class10 +0.0147、class3 −0.0279），与 seed 42 的方向也不完全
+一致。
+
+逐类 AUC（`outputs/compare_run007a/per_class.csv`，Δ 为四位小数相减）：
+
+| class_id | support | RUN-006-A 等权 | RUN-007-A 加权 7:3 | Δ（007A−006A） |
+|---|---|---|---|---|
+| 1 | 24 | 0.7405 | 0.7208 | −0.0197 |
+| 2 | 37 | 0.8212 | 0.7944 | −0.0268 |
+| 3 | 46 | 0.7929 | 0.7650 | −0.0279 |
+| 4 | 68 | 0.7023 | 0.6975 | −0.0048 |
+| 5 | 115 | 0.8640 | 0.8752 | +0.0112 |
+| 6 | 177 | 0.7684 | 0.7794 | +0.0110 |
+| 7 | 193 | 0.7637 | 0.7718 | +0.0081 |
+| 8 | 214 | 0.7070 | 0.7205 | +0.0135 |
+| 9 | 260 | 0.8894 | 0.9039 | +0.0145 |
+| 10 | 306 | 0.8631 | 0.8778 | +0.0147 |
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -767,6 +855,7 @@ RUN-006 的 0.6（0.4098）移到 0.5（0.4122），上限基本持平，属校�
 | RUN-006 | `exp_densenet121.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight | 13（早停）/25 | 8 | 0.7880 | 0.4070 | 44m32s | 同口径下 macro-AUC 最高（vs RUN-003-B Δ+0.0043），F1@0.5 仅高 0.0030；单 seed 差不足以判定骨干优劣 |
 | RUN-006-A | `exp_run006a.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight，seed 2026 | 10（早停）/25 | 5 | 0.7913 | 0.4103 | 34m14s（并行） | seed 复核：AUC 比 RUN-006 高 +0.0033；缺少 seed 2026 的 ResNet-18 配对对照，尚不足以判定骨干优劣 |
 | RUN-007 | `exp_run007.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合，seed 42 | 13（早停）/25 | 8 | 0.7892 | 0.4122 | 34m56s | 对比 RUN-006（等权）AUC Δ+0.0012，未达 +0.005 门且小于 seed 波动（0.0033）；F1@0.5 提升伴随阈值曲线右移 → 暂不改默认聚合 |
+| RUN-007-A | `exp_run007a.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合，seed 2026 | 12（早停）/25 | 7 | 0.7906 | 0.4198 | 35m01s | 与同 seed 等权 RUN-006-A 配对 Δ−0.0007，与 seed 42 的 +0.0012 方向相反、均在 seed 波动内 → 加权聚合无稳定增益，默认 `mean` 不变 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -777,6 +866,7 @@ RUN-006 的 0.6（0.4098）移到 0.5（0.4122），上限基本持平，属校�
 
 注：RUN-006-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run006a/summary.md` 的重算值（`metrics.csv` 的 F1 差 0.0001、AUC 一致）；与 RUN-006 的配置仅 seed 不同，但代码版本和运行负载不同，不能将结果差异完全归因于 seed。RUN-006-A 与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），单轮耗时不可与 RUN-006 的独占 44m32s 对照。
 注：RUN-007 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run007/summary.md` 的重算值（与 `metrics.csv` 的 AUC 一致、F1 差 0.0002）；与 RUN-006 仅差 `model.aggregation`，但代码版本不同（`53568fe` vs `da8fef7`，后者无视角元信息），且 0.0012 的 AUC 差小于 DenseNet-121 的 seed 波动 0.0033，不能将差异全部归因于聚合方式。
+注：RUN-007-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run007a/summary.md` 的重算值（与 `metrics.csv` 的 AUC 一致、F1 差 0.0004）；与 RUN-006-A 的配置仅差聚合方式，但代码版本不同（`27dbe56` vs `a41033d`，`src/` 等价），单 seed 配对差 −0.0007 与 seed 42 的 +0.0012 方向相反，两 seed 配对差绝对值均小于 +0.005 判读门 → 加权聚合判定无效。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 

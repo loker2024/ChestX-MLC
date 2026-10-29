@@ -37,6 +37,9 @@
 - `15:02`（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_run007.yaml` 行，继承树补其位于 `exp_densenet121.yaml` 之下。
 - `15:06`（新增）`configs/exp_run007a.yaml`、`tests/test_config.py`、`docs/train_plan07.md`：新增 RUN-007-A（DenseNet-121 正侧位 7:3 加权聚合的 seed 复核）配置，以 `_base: exp_run007.yaml` 继承全部口径、只覆盖顶层 `seed: 2026`；补 `test_run007a_experiment_config_loads`，断言骨干、加权聚合与正位权重 0.7，且除 seed 外与 RUN-007 零差异；新增训练计划，记录配置核对、训练与比较命令。本机 `python -m pytest -q` 187 passed / 3 skipped。
 - `15:06`（修复）`CHANGELOG.md`：修正上一提交 RUN-007 回填条目的时间标注（15:20 → 15:02），与实际完成回填并推送的时刻一致；记录内容不变。
+- `15:44`（变更）`docs/training_log.md`：回填 RUN-007-A `densenet121_viewweighted_s2026` 实测——原样贴入配置与 12 轮 `metrics.csv`，记录命令、起止时间（北京 15:07:33 → 15:42:34）、产物目录与耗时；最优 epoch 7、macro-AUC 0.7906、F1@0.5 0.4198，第 12 轮早停（35m01s）；补两个 seed 的「加权−等权」配对差表与逐类 AUC 对比，汇总表加 RUN-007-A 行，并加 seed 2026 配对与代码版本口径脚注。
+- `15:44`（变更）`docs/experiments.md`：实验矩阵标注 RUN-007-A 已完成；「执行与结果」新增 seed 复核结论（seed 2026 配对 Δ−0.0007，与 seed 42 的 +0.0012 方向相反、均值 +0.00025，均在 seed 波动内 → 加权聚合判定无效，默认维持 `mean`）；待验证项「视图元信息」改为已验证（无效）；正侧位加权聚合配置段同步两个 seed 结果。
+- `15:44`（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_run007a.yaml` 行，继承树补其位于 `exp_run007.yaml` 之下。
 
 ## 2026-10-28
 
