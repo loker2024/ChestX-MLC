@@ -30,6 +30,9 @@
 - `13:55`（变更）`docs/training_log.md`：回填 RUN-006-A `densenet121_s2026` 实测——原样贴入配置与 10 轮 `metrics.csv`，记录命令、起止时间（北京 13:15:14 → 13:49:28）、产物目录与耗时；最优 epoch 5、macro-AUC 0.7913、F1@0.5 0.4103，第 10 轮早停（34m14s，与 experiment4 的 EfficientNet-B2 实验并行执行，耗时不可与 RUN-006 的独占 44m32s 直接对照）；补逐类 AUC 对比表与 seed 复核结论，汇总表、环境表种子行与注脚同步更新。
 - `13:55`（变更）`docs/experiments.md`、`docs/manual.md`：实验矩阵加 RUN-006-A 行；「执行与结果」补 seed 复核结论（AUC 比 RUN-006 高 +0.0033，DenseNet-121 两个 seed 均高于同口径 ResNet-18 基线，但 seed 间差与骨干差同量级，仍不足以判定骨干优劣）；待验证项「新骨干对照」与冻结结论补 RUN-006-A；manual 配置表、继承树与骨干说明段同步。
 
+- `14:13`（修复）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan05.md`、`docs/manual.md`：修正 RUN-006-A 跨 seed 骨干对照的判读、RUN-001 / RUN-001R 种子与波动说明，以及种子汇总、阈值提交和运行差异的表述；保留原始实验数据与配置快照。
+- `14:16`（新增）`configs/exp_run007.yaml`、`docs/train_plan06.md`：新增 DenseNet-121 正侧位 7:3 加权聚合配置与 RUN-006 单变量对照计划，记录核对、训练和比较命令。
+
 ## 2026-10-28
 
 - `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。

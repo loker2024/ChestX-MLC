@@ -147,7 +147,7 @@ default.yaml
 RUN-005（ResNet-50，macro-AUC 0.7857）与 RUN-006（DenseNet-121，0.7880），结果与对照
 结论见 [training_log.md](training_log.md) 与 [experiments.md](experiments.md)。补齐同口径
 基线 RUN-003-B（ResNet-18，0.7837）后，新骨干的 macro-AUC 分别高 0.0020 / 0.0043；随后按 [train_plan05.md](train_plan05.md) 用 seed 2026 复核 DenseNet-121
-（RUN-006-A，0.7913）方向一致，但 seed 间差与骨干差同量级，仍不足以判定骨干优劣，
+（RUN-006-A，0.7913）；缺少 seed 2026 的 ResNet-18 配对对照，仍不足以判定骨干优劣，
 默认骨干仍为 `resnet18`。实际加载的预训练权重已由
 checkpoint `metadata.pretrained_loaded` 确认；新骨干的权重许可证核验与 T4 端到端耗时
 仍待实测（仅当后续决定切换骨干时）。

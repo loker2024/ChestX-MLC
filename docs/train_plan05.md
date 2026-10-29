@@ -1,9 +1,10 @@
 # 训练计划 05：RUN-006-A（DenseNet-121 的 seed 复核）
 
 RUN-006（DenseNet-121 骨干对照）只有 seed 42 一个种子，与同口径 ResNet-18 基线
-RUN-003-B 的 macro-AUC 差为 +0.0043，而历史同配置换 seed 的波动可达 0.0045
-（RUN-001 0.7858 vs RUN-001R 0.7903）。本计划用 seed 2026 复跑 RUN-006 的口径，
-检验「DenseNet-121 高于 ResNet-18 基线」的方向在第二个种子上是否成立。
+RUN-003-B 的 macro-AUC 差为 +0.0043。本计划用 seed 2026 复跑 RUN-006 的口径，
+观察 DenseNet-121 的第二次结果；要检验骨干差异在第二个 seed 下的方向，还需
+补跑相同训练口径的 ResNet-18 seed 2026。RUN-001 与 RUN-001R 均为 seed 42，
+其 0.0045 差值不能作为换 seed 的波动。
 
 训练在远程 GPU 环境执行；实际结果回填 [training_log.md](training_log.md)，对照结论
 记录在 [experiments.md](experiments.md)。
@@ -19,7 +20,7 @@ RUN-003-B 的 macro-AUC 差为 +0.0043，而历史同配置换 seed 的波动可
 只覆盖顶层 `seed: 2026`；其余字段（320×320 letterbox、ImageNet 归一化、
 `batch_studies: 16`、`pos_weight: true`、学习率 0.0003、前 2 轮 warmup 后余弦衰减到
 0.00001、CUDA AMP、`pretrained: true`、连续 5 轮无提升早停）完全一致。与 RUN-006
-的差异只应来自随机种子；`tests/test_config.py` 的
+的配置差异仅为随机种子；两次实际代码版本和运行负载也不同，不能断言结果差异只由 seed 造成；`tests/test_config.py` 的
 `test_run006a_experiment_config_loads` 已断言两份配置「除 seed 外零差异」。
 
 启动前可在仓库根目录复核一次：
@@ -60,11 +61,10 @@ python src/run_compare.py \
     --out outputs/compare_run006a
 ```
 
-判读门：先看 study 级 macro-AUC 是否落在 RUN-006 的 seed 波动范围内（历史同配置双
-seed 差 0.0045 作参考），再看阈值曲线与逐类 AUC。两个 seed 都高于 RUN-003-B
-（0.7837）才支持「DenseNet-121 方向性更好」；seed 间差与骨干差同量级时仍不能判定
-骨干优劣，结论措辞保持保守。
+判读时先比较 RUN-006 与 RUN-006-A 的 study 级 macro-AUC、阈值曲线与逐类 AUC，
+这只能描述 DenseNet 的两次结果。骨干对照需在同一验证集、相同训练口径下，
+分别比较 seed 42 和 seed 2026 的 DenseNet 与 ResNet-18；目前后者尚缺配对结果。
+即使两个配对差值方向一致，两个 seed 仍不足以证明优势稳定。
 
 RUN-006-A 与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），
-耗时不可与 RUN-006 的独占 44m32s 直接比较；`num_workers` 与 shuffle 顺序不受并行
-影响，AUC 可直接对比。
+耗时不可与 RUN-006 的独占 44m32s 直接比较；两组 `num_workers` 均为 16；不能仅凭此断言并行运行不会影响数值结果。

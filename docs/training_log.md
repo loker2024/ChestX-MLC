@@ -108,7 +108,7 @@ metrics.csv（原样复制）：
 | 5 | 3.00e-04 | 0.3037 | 0.3252 | 0.7822 | 0.2666 |
 | 6 | 3.00e-04 | 0.2958 | 0.3206 | 0.7903 | 0.2651 |
 
-**结论**：末轮 macro-AUC 0.7903，对比 RUN-001 的 0.7858，Δ+0.0045，落在判读门 [0.7808, 0.7908] 内 → **回归门通过**，新代码训练结果与旧代码一致；F1@0.5 0.2649 略低于旧 0.2796，阈值曲线峰值在 0.2（=0.4012），见 `outputs/compare/summary.md`。耗时口径：本次与 RUN-002 并行（两路各 8 workers，16 核饱和），单轮 6m20s 不可与 RUN-001 串行 4m47s/轮直接对照；AUC 不受 `num_workers` 影响（shuffle 顺序由主进程决定）。口径说明：表中 `valid_macro_f1` 列（console 打印为 `macro_f1`）为训练时按 0.5 阈值算出的 0.2651，`run_compare` 用同一份 valid 重算为 0.2649（差 0.0002，属重算实现差异）；本段与汇总表统一采用 `run_compare` 值，便于与 RUN-002 同口径比较。
+**结论**：末轮 macro-AUC 0.7903，对比 RUN-001 的 0.7858，Δ+0.0045，落在判读门 [0.7808, 0.7908] 内 → **回归门通过**，该次结果达到预设回归门，但不能证明两版训练结果完全一致；F1@0.5 0.2649 略低于旧 0.2796，阈值曲线峰值在 0.2（=0.4012），见 `outputs/compare/summary.md`。耗时口径：本次与 RUN-002 并行（两路各 8 workers，16 核饱和），单轮 6m20s 不可与 RUN-001 串行 4m47s/轮直接对照；主进程负责 shuffle，但不能仅凭此断言 `num_workers` 不会影响训练结果。口径说明：表中 `valid_macro_f1` 列（console 打印为 `macro_f1`）为训练时按 0.5 阈值算出的 0.2651，`run_compare` 用同一份 valid 重算为 0.2649（差 0.0002，属重算实现差异）；本段与汇总表统一采用 `run_compare` 值，便于与 RUN-002 同口径比较。
 
 ### RUN-002 short_pos_weight（`configs/exp_short_pos_weight.yaml`）
 
@@ -246,7 +246,7 @@ metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）
 | 12 | 3.00e-04 | 0.2339 | 0.3546 | 0.7626 | 0.3092 |
 | 13 | 3.00e-04 | 0.2193 | 0.3907 | 0.7550 | 0.2863 |
 
-**结论**：最优 epoch 8，macro-AUC **0.7887**、F1@0.5 **0.2655**（`run_compare` 重算与训练时值一致）。epoch 8 后 valid_loss 由 0.326 升至 0.391、AUC 回落至 0.755，连续 5 轮无提升，`early_stop_patience: 5` 于第 13 轮触发早停，未跑满 25 轮。对比 RUN-001R（0.7903）Δ **−0.0016**，未达增益门槛；`run_compare` 重算的 F1 阈值曲线整体上移（0.2 处 0.4219 vs RUN-001R 0.4012，Δ+0.0207；0.5 处 0.2655 vs 0.2649），但主指标 macro-AUC 未提升 → **25 轮上限 + 早停未带来 AUC 增益，瓶颈不在训练轮数**。逐类 AUC 与 RUN-001R 互有升降（class7 +0.0213、class2 −0.0203），总体持平；class 1/3/4 在 0.5 阈值下 F1 为 0（support 24/46/68，稀有类），提交时需按类别单独选阈值。`num_workers` 由 8 提高到 16 只改变数据增强序列，不影响 shuffle 顺序与 AUC 口径。
+**结论**：最优 epoch 8，macro-AUC **0.7887**、F1@0.5 **0.2655**（`run_compare` 重算与训练时值一致）。epoch 8 后 valid_loss 由 0.326 升至 0.391、AUC 回落至 0.755，连续 5 轮无提升，`early_stop_patience: 5` 于第 13 轮触发早停，未跑满 25 轮。对比 RUN-001R（0.7903）Δ **−0.0016**，未达增益门槛；`run_compare` 重算的 F1 阈值曲线整体上移（0.2 处 0.4219 vs RUN-001R 0.4012，Δ+0.0207；0.5 处 0.2655 vs 0.2649），但主指标 macro-AUC 未提升 → **25 轮上限 + 早停未带来 AUC 增益，该次实验未证明增加训练轮数有收益**。逐类 AUC 与 RUN-001R 互有升降（class7 +0.0213、class2 −0.0203），总体持平；class 1/3/4 在 0.5 阈值下 F1 为 0（support 24/46/68，稀有类），若以类别 F1 为目标，可另行研究类别阈值；默认提交输出全部类别概率。`num_workers` 由 8 提高到 16 可能改变数据增强随机序列；不能据此保证训练指标不变。
 
 逐类 AUC（`outputs/compare/per_class.csv`，Δ 为四位小数相减）：
 
@@ -623,6 +623,8 @@ seed: 2026
 （其余字段全部继承 [configs/exp_densenet121.yaml](../configs/exp_densenet121.yaml)，
 即 cosine 调度 + `pos_weight: true` + 25 轮 + 早停 5 + `num_workers` 16。）
 
+上方保留原配置注释；其中 RUN-001 与 RUN-001R 均为 seed 42，0.0045 不是换 seed 的波动。
+
 | 项 | 值 |
 |---|---|
 | 相对父配置的差异 | 仅顶层 `seed: 2026`；其余与 RUN-006 完全一致 |
@@ -656,8 +658,9 @@ AUC 高 **+0.0033**（0.7913 vs 0.7880），F1@0.5 高 +0.0033（0.4103 vs 0.407
 （0.4103）、RUN-006 峰在 0.6（0.4098），曲线主体接近但 RUN-006-A 在 0.2–0.4 段略低
 （0.2 处 0.3614 vs 0.3674）。与同口径 ResNet-18 基线 RUN-003-B（0.7837）相比，
 RUN-006-A 高 **+0.0076**；DenseNet-121 的两个 seed（0.7880 / 0.7913）都高于基线，
-「方向性更好」在第二 seed 上复现，但 +0.0033 的 seed 间差与 +0.0043 的骨干差同量级，
-**仍不足以判定骨干优劣**，维持保守结论。
+其中只有 seed 42 的差值是配对骨干对照；seed 2026 缺少 ResNet-18 对照，
+不能认定骨干优势在第二个 seed 复现。两次 DenseNet 训练的代码版本与负载也不同，
+不能将 +0.0033 全部归因于 seed；**仍不足以判定骨干优劣**。
 
 逐类 AUC（`outputs/compare_run006a/per_class.csv`，Δ 为 RUN-006-A − RUN-006）：
 
@@ -681,23 +684,23 @@ RUN-006-A 高 **+0.0076**；DenseNet-121 的两个 seed（0.7880 / 0.7913）都�
 | RUN-001 | `exp_short.yaml` | 短周期基准（旧代码 59a7d15） | 6 | 6 | 0.7858 | 0.2796 | 28m41s | 末轮仍改善，仅作方向基准 |
 | RUN-001R | `exp_short.yaml` | 新代码回归（e8f194e） | 6 | 6 | 0.7903 | 0.2649 | 38m05s（并行） | 回归门通过（Δ+0.0045，在 0.7808~0.7908 内） |
 | RUN-002 | `exp_short_pos_weight.yaml` | +pos_weight | 6 | 5 | 0.7882 | 0.4048 | 33m06s（并行） | AUC Δ−0.0021 未达门，pos_weight 无效 |
-| RUN-003 | `default.yaml` | 25 轮冻结版（`num_workers` 16） | 13（早停）/25 | 8 | 0.7887 | 0.2655 | 38m | AUC Δ−0.0016 未达增益门，轮数不是瓶颈；提交文件 `outputs/submission_run003.csv` |
+| RUN-003 | `default.yaml` | 25 轮冻结版（`num_workers` 16） | 13（早停）/25 | 8 | 0.7887 | 0.2655 | 38m | AUC Δ−0.0016 未达增益门，该次实验未证明增加训练轮数有收益；提交文件 `outputs/submission_run003.csv` |
 | RUN-003-A | `exp_cosine.yaml` | +余弦调度（warmup 后衰减到 1e-5） | 10（早停）/25 | 5 | 0.7852 | 0.2855 | 29m47s | AUC Δ−0.0035 未达门，但最佳轮次前移、耗时缩短；调度不带来 AUC 增益 |
 | RUN-003-B | `exp_run003b.yaml` | 当前默认口径（+cosine +pos_weight），seed 42 | 13（早停）/25 | 8 | 0.7837 | 0.4040 | 33m44s | 同口径 ResNet-18 基线；四组 ResNet-18 口径中 macro-AUC 最低（vs RUN-003 Δ−0.0050），cosine + pos_weight 组合无增益；供 RUN-005 / RUN-006 单变量对照 |
 | RUN-002-A | `exp_pos_weight.yaml` | +pos_weight，seed 42 | 10（早停）/25 | 5 | 0.7872 | 0.4045 | 30m34s | AUC Δ−0.0015 未达门；F1@0.5 大涨但阈值峰右移到 0.6，上限与基线的 @0.2 持平 |
-| RUN-002-B | `exp_pos_weight.yaml` | +pos_weight，seed 2026 | 12（早停）/25 | 7 | 0.7871 | 0.4198 | 45m58s | 与 002-A 的 AUC 仅差 0.0001，seed 稳健；同样无 AUC 增益 |
+| RUN-002-B | `exp_pos_weight.yaml` | +pos_weight，seed 2026 | 12（早停）/25 | 7 | 0.7871 | 0.4198 | 45m58s | 与 002-A 的 AUC 仅差 0.0001，两次结果接近；未达原 AUC 增益门 |
 | RUN-005 | `exp_resnet50.yaml` | ResNet-50 + a1_in1k，+cosine +pos_weight | 14（早停）/25 | 9 | 0.7857 | 0.4193 | 43m23s | 同口径下 AUC 高于 RUN-003-B（Δ+0.0020）、F1@0.5 高 0.0153；低于 DenseNet-121（Δ−0.0023） |
 | RUN-006 | `exp_densenet121.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight | 13（早停）/25 | 8 | 0.7880 | 0.4070 | 44m32s | 同口径下 macro-AUC 最高（vs RUN-003-B Δ+0.0043），F1@0.5 仅高 0.0030；单 seed 差不足以判定骨干优劣 |
-| RUN-006-A | `exp_run006a.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight，seed 2026 | 10（早停）/25 | 5 | 0.7913 | 0.4103 | 34m14s（并行） | seed 复核：AUC 比 RUN-006 高 +0.0033、仍高于同口径 ResNet-18 基线（+0.0076）；seed 间差与骨干差同量级，骨干结论仍不足以判定优劣 |
+| RUN-006-A | `exp_run006a.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight，seed 2026 | 10（早停）/25 | 5 | 0.7913 | 0.4103 | 34m14s（并行） | seed 复核：AUC 比 RUN-006 高 +0.0033；缺少 seed 2026 的 ResNet-18 配对对照，尚不足以判定骨干优劣 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
 注：RUN-005 / RUN-006 的 macro-AUC 与 F1@0.5 取 `outputs/compare_backbones/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0013）；两组与 RUN-003-B 同为 cosine 调度 + `pos_weight: true` + seed 42，可与 RUN-003-B 直接作单变量骨干对照（`outputs/compare_backbone_s42/summary.md`），与 RUN-003 系列的 warmup / `pos_weight: false` 口径不同，历史数字只作参考。
-注：RUN-001R 与 RUN-002 并行执行（两路各 8 workers，16 核饱和），单轮耗时不可与 RUN-001 的串行口径直接对照；`num_workers` 不影响 shuffle 顺序，AUC 可直接对比。
+注：RUN-001R 与 RUN-002 并行执行（两路各 8 workers，16 核饱和），单轮耗时不可与 RUN-001 的串行口径直接对照；主进程负责 shuffle，但 `num_workers` 等运行差异可能影响训练结果。
 注：RUN-003 为独占串行运行（16 workers 独占 16 核），单轮约 3.3 分钟，可与 RUN-001 的串行口径对照；13 轮总耗时约 38 分钟（含启动与验证），未跑满 25 轮是因早停，不是被中断。
 注：RUN-003-B 同为独占串行运行，单轮约 2.6 分钟、13 轮共 33m44s；与 RUN-003 的差异主要来自机器负载（训练时 GPU 空闲），不影响 AUC 口径。
 
-注：RUN-006-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run006a/summary.md` 的重算值（`metrics.csv` 的 F1 差 0.0001、AUC 一致）；与 RUN-006 的差异只来自 seed，两组的 `num_workers` 16 都不影响 shuffle 顺序，AUC 可直接对比。RUN-006-A 与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），单轮耗时不可与 RUN-006 的独占 44m32s 对照。
+注：RUN-006-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run006a/summary.md` 的重算值（`metrics.csv` 的 F1 差 0.0001、AUC 一致）；与 RUN-006 的配置仅 seed 不同，但代码版本和运行负载不同，不能将结果差异完全归因于 seed。RUN-006-A 与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），单轮耗时不可与 RUN-006 的独占 44m32s 对照。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 

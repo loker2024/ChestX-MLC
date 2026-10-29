@@ -1,0 +1,6 @@
+# RUN-007：在 RUN-006 的 DenseNet-121 配置上比较正侧位 7:3 加权聚合。
+_base: exp_densenet121.yaml
+
+model:
+  aggregation: view_weighted
+  frontal_weight: 0.7
