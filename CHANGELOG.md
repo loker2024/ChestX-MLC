@@ -61,6 +61,8 @@
 - `22:35`（变更）`docs/experiments.md`：实验矩阵标注 RUN008-A/B/C/D 已完成并更新随机种子行；「执行与结果」新增 RUN-008 骨干对照四条结论（ConvNeXt-Tiny 在 6 轮预算下 0.8008、比 RUN-007-A 高 +0.0102 但预算不同且单 seed，只作候选方向；EfficientNet-B2 / V2-S 分别 +0.0046 / +0.0048 未达 +0.005 门；ConvNeXtV2-Nano 训练异常且 CC BY-NC 4.0 不合规、仅研究记录；四组两两并行、耗时不可横向比较）；待验证项「新骨干对照」补 RUN-008 结果；冻结结论说明同口径复核前不切换默认骨干。
 - `22:35`（变更）`docs/manual.md`：§2.2 现有配置表新增 `configs/exp_run008a~d.yaml` 四行，继承关系树补其位于 `exp_run007a.yaml` 之下的分支。
 
+- `23:05`（新增）`configs/exp_run009a.yaml`、`configs/exp_run009b.yaml`、`docs/train_plan09.md`：新增 RUN-009 两组骨干 @384×384 完整口径复核配置与训练计划——分别继承 RUN-008-B（EfficientNetV2-S RW）与 RUN-008-C（ConvNeXt-Tiny），只覆盖 `image.size: 320 → 384`、`train.epochs: 6 → 25`、`train.early_stop_patience: 0 → 5`，其余继承 RUN-007-A 的 seed 2026、正侧位 7:3 加权聚合、`pos_weight`、cosine 调度与 `batch_studies: 16`；计划记录目的与基线、权重许可来源、串行执行安排、判读门与回填口径。训练已按计划于 23:00:52 CST 启动 RUN-009-B，结束后串行启动 RUN-009-A；两组配置解析校验确认相对 RUN-007-A 仅差骨干、分辨率、轮数与早停四项。
+
 ## 2026-10-28
 
 - `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。
