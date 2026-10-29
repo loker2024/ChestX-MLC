@@ -599,6 +599,81 @@ metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）
 | 9 | 0.8829 | 0.9031 | +0.0202 |
 | 10 | 0.8591 | 0.8713 | +0.0122 |
 
+### RUN-006-A densenet121_s2026（`configs/exp_run006a.yaml`）
+
+RUN-006 的 seed 复核：只把随机种子从 42 换成 2026，其余继承 RUN-006。配置
+[configs/exp_run006a.yaml](../configs/exp_run006a.yaml)，完整内容：
+
+```yaml
+# RUN-006-A：RUN-006（DenseNet-121 骨干对照）的 seed 复现，只把随机种子从 42 换成 2026，
+# 其余配置完全继承 RUN-006 的口径（cosine 调度 + pos_weight: true，25 轮，早停 5）。
+#
+# 用途：RUN-003-B / RUN-005 / RUN-006 的骨干对照只有单 seed，DenseNet-121 比同口径
+# ResNet-18 基线高 0.0043，但差距落在历史同配置 seed 波动范围内（RUN-001 与 001R
+# 相差 0.0045）。本组用第二个 seed 复核 DenseNet-121 的 macro-AUC 是否稳定，给
+# 骨干结论补 seed 稳健性证据；与 RUN-006 的差异只应来自随机种子。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run006a.yaml --seed 2026 --tag densenet121_s2026
+_base: exp_densenet121.yaml
+
+seed: 2026
+```
+
+（其余字段全部继承 [configs/exp_densenet121.yaml](../configs/exp_densenet121.yaml)，
+即 cosine 调度 + `pos_weight: true` + 25 轮 + 早停 5 + `num_workers` 16。）
+
+| 项 | 值 |
+|---|---|
+| 相对父配置的差异 | 仅顶层 `seed: 2026`；其余与 RUN-006 完全一致 |
+| 运行命令 | `python src/run_train.py --config configs/exp_run006a.yaml --seed 2026 --tag densenet121_s2026` |
+| 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `a41033d`（含视图元信息支持，`aggregation: mean` 路径与 RUN-006 的 `da8fef7` 数值等价，`tests` 覆盖） |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
+| 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
+| 产物 | `outputs/20261029-051514_densenet121_s2026/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
+| 耗时 | 2026-10-29 13:15:14 → 13:49:28 CST，**10 轮即早停**（未跑满 25 轮），共 **34 分 14 秒**；与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），耗时不可与 RUN-006 的独占 44m32s 直接比较 |
+
+metrics.csv（10 轮原样复制，epoch 10 后因连续 5 轮无提升早停）：
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 0.9992 | 0.9595 | 0.7561 | 0.3769 |
+| 2 | 3.00e-04 | 0.9616 | 0.9481 | 0.7664 | 0.3990 |
+| 3 | 3.00e-04 | 0.9237 | 0.9369 | 0.7764 | 0.4023 |
+| 4 | 2.99e-04 | 0.9032 | 0.9235 | 0.7851 | 0.4079 |
+| 5 | 2.94e-04 | 0.8816 | 0.9046 | **0.7913** | 0.4102 |
+| 6 | 2.87e-04 | 0.8608 | 0.9200 | 0.7881 | 0.3936 |
+| 7 | 2.77e-04 | 0.8304 | 0.9170 | 0.7911 | 0.4139 |
+| 8 | 2.65e-04 | 0.7981 | 0.9623 | 0.7903 | 0.4305 |
+| 9 | 2.50e-04 | 0.7512 | 0.9830 | 0.7863 | 0.4212 |
+| 10 | 2.33e-04 | 0.7073 | 1.0248 | 0.7842 | 0.4168 |
+
+**结论**：最优 epoch 5，macro-AUC **0.7913**、F1@0.5 **0.4103**（`run_compare`
+重算；`metrics.csv` 训练时记录 F1 0.4102，AUC 一致）。epoch 5 后 valid_loss 由 0.90
+回升至 1.02、AUC 回落，连续 5 轮无提升，于第 10 轮早停。对比 RUN-006（seed 42）：
+AUC 高 **+0.0033**（0.7913 vs 0.7880），F1@0.5 高 +0.0033（0.4103 vs 0.4070）；
+最佳轮次由 8 前移到 5，早停由 13 轮提前到 10 轮。阈值曲线上 RUN-006-A 峰在 0.5
+（0.4103）、RUN-006 峰在 0.6（0.4098），曲线主体接近但 RUN-006-A 在 0.2–0.4 段略低
+（0.2 处 0.3614 vs 0.3674）。与同口径 ResNet-18 基线 RUN-003-B（0.7837）相比，
+RUN-006-A 高 **+0.0076**；DenseNet-121 的两个 seed（0.7880 / 0.7913）都高于基线，
+「方向性更好」在第二 seed 上复现，但 +0.0033 的 seed 间差与 +0.0043 的骨干差同量级，
+**仍不足以判定骨干优劣**，维持保守结论。
+
+逐类 AUC（`outputs/compare_run006a/per_class.csv`，Δ 为 RUN-006-A − RUN-006）：
+
+| class_id | RUN-006 DenseNet-121 s42 | RUN-006-A DenseNet-121 s2026 | Δ（006-A − 006） |
+|---|---|---|---|
+| 1 | 0.6948 | 0.7405 | +0.0457 |
+| 2 | 0.8191 | 0.8212 | +0.0022 |
+| 3 | 0.7684 | 0.7929 | +0.0245 |
+| 4 | 0.7073 | 0.7023 | −0.0050 |
+| 5 | 0.8706 | 0.8640 | −0.0067 |
+| 6 | 0.7646 | 0.7684 | +0.0038 |
+| 7 | 0.7854 | 0.7637 | −0.0216 |
+| 8 | 0.6951 | 0.7070 | +0.0119 |
+| 9 | 0.9031 | 0.8894 | −0.0137 |
+| 10 | 0.8713 | 0.8631 | −0.0082 |
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -613,6 +688,7 @@ metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）
 | RUN-002-B | `exp_pos_weight.yaml` | +pos_weight，seed 2026 | 12（早停）/25 | 7 | 0.7871 | 0.4198 | 45m58s | 与 002-A 的 AUC 仅差 0.0001，seed 稳健；同样无 AUC 增益 |
 | RUN-005 | `exp_resnet50.yaml` | ResNet-50 + a1_in1k，+cosine +pos_weight | 14（早停）/25 | 9 | 0.7857 | 0.4193 | 43m23s | 同口径下 AUC 高于 RUN-003-B（Δ+0.0020）、F1@0.5 高 0.0153；低于 DenseNet-121（Δ−0.0023） |
 | RUN-006 | `exp_densenet121.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight | 13（早停）/25 | 8 | 0.7880 | 0.4070 | 44m32s | 同口径下 macro-AUC 最高（vs RUN-003-B Δ+0.0043），F1@0.5 仅高 0.0030；单 seed 差不足以判定骨干优劣 |
+| RUN-006-A | `exp_run006a.yaml` | DenseNet-121 + ra_in1k，+cosine +pos_weight，seed 2026 | 10（早停）/25 | 5 | 0.7913 | 0.4103 | 34m14s（并行） | seed 复核：AUC 比 RUN-006 高 +0.0033、仍高于同口径 ResNet-18 基线（+0.0076）；seed 间差与骨干差同量级，骨干结论仍不足以判定优劣 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -620,6 +696,8 @@ metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）
 注：RUN-001R 与 RUN-002 并行执行（两路各 8 workers，16 核饱和），单轮耗时不可与 RUN-001 的串行口径直接对照；`num_workers` 不影响 shuffle 顺序，AUC 可直接对比。
 注：RUN-003 为独占串行运行（16 workers 独占 16 核），单轮约 3.3 分钟，可与 RUN-001 的串行口径对照；13 轮总耗时约 38 分钟（含启动与验证），未跑满 25 轮是因早停，不是被中断。
 注：RUN-003-B 同为独占串行运行，单轮约 2.6 分钟、13 轮共 33m44s；与 RUN-003 的差异主要来自机器负载（训练时 GPU 空闲），不影响 AUC 口径。
+
+注：RUN-006-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run006a/summary.md` 的重算值（`metrics.csv` 的 F1 差 0.0001、AUC 一致）；与 RUN-006 的差异只来自 seed，两组的 `num_workers` 16 都不影响 shuffle 顺序，AUC 可直接对比。RUN-006-A 与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），单轮耗时不可与 RUN-006 的独占 44m32s 对照。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 
@@ -630,4 +708,4 @@ metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）
 | GPU | RTX 3090 24G（驱动 535.247.01，CUDA 12.2） |
 | Python / 框架 | Python 3.12、torch 2.10.0+cu128、timm 1.0.30、torchvision 0.25.0+cu128 |
 | 数据根目录 | `/root/sj-tmp`（`data/` 下以软链接挂入，数据本身不入库） |
-| 随机种子 | 42（RUN-002-B 为 2026，其余 run 均为 42） |
+| 随机种子 | 42（RUN-002-B / RUN-006-A 为 2026，其余 run 均为 42） |

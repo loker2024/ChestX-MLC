@@ -1,0 +1,13 @@
+# RUN-006-A：RUN-006（DenseNet-121 骨干对照）的 seed 复现，只把随机种子从 42 换成 2026，
+# 其余配置完全继承 RUN-006 的口径（cosine 调度 + pos_weight: true，25 轮，早停 5）。
+#
+# 用途：RUN-003-B / RUN-005 / RUN-006 的骨干对照只有单 seed，DenseNet-121 比同口径
+# ResNet-18 基线高 0.0043，但差距落在历史同配置 seed 波动范围内（RUN-001 与 001R
+# 相差 0.0045）。本组用第二个 seed 复核 DenseNet-121 的 macro-AUC 是否稳定，给
+# 骨干结论补 seed 稳健性证据；与 RUN-006 的差异只应来自随机种子。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run006a.yaml --seed 2026 --tag densenet121_s2026
+_base: exp_densenet121.yaml
+
+seed: 2026

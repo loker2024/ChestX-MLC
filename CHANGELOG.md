@@ -25,6 +25,11 @@
 - `12:58`（变更）`docs/experiments.md`：实验矩阵 RUN-003-B 标已完成；「执行与结果」新增 RUN-003-B 结论（四组 ResNet-18 口径差异均 ≤0.005，cosine + `pos_weight` 无 AUC 增益）与 2026-10-29 同口径骨干对照（ResNet-50 比基线高 0.0020、DenseNet-121 高 0.0043），修正此前「新骨干未超过 ResNet-18 历史结果」的不可比说法；冻结结论与待验证项同步更新。
 - `12:58`（变更）`docs/manual.md`、`docs/train_plan04.md`：manual 配置表与继承树标注 RUN-003-B 已完成、骨干说明段改为同口径结论；train_plan04 由两组扩为三组（加 RUN-003-B 同口径基线），训练命令与 `run_compare` 输出同步为 `compare_backbone_s42`。
 
+- `13:55`（新增）`configs/exp_run006a.yaml`、`tests/test_config.py`：新增 RUN-006-A 配置——以 `_base: exp_densenet121.yaml` 继承 RUN-006 全部口径，只覆盖顶层 `seed: 2026`；补 `test_run006a_experiment_config_loads`，断言两份配置除 seed 外零差异。本机 `python -m pytest -q` 186 passed / 3 skipped。
+- `13:55`（新增）`docs/train_plan05.md`：新增 RUN-006-A（DenseNet-121 的 seed 复核）训练计划，记录配置差异、启动前配置核对脚本、训练 / 对照命令与判读门。
+- `13:55`（变更）`docs/training_log.md`：回填 RUN-006-A `densenet121_s2026` 实测——原样贴入配置与 10 轮 `metrics.csv`，记录命令、起止时间（北京 13:15:14 → 13:49:28）、产物目录与耗时；最优 epoch 5、macro-AUC 0.7913、F1@0.5 0.4103，第 10 轮早停（34m14s，与 experiment4 的 EfficientNet-B2 实验并行执行，耗时不可与 RUN-006 的独占 44m32s 直接对照）；补逐类 AUC 对比表与 seed 复核结论，汇总表、环境表种子行与注脚同步更新。
+- `13:55`（变更）`docs/experiments.md`、`docs/manual.md`：实验矩阵加 RUN-006-A 行；「执行与结果」补 seed 复核结论（AUC 比 RUN-006 高 +0.0033，DenseNet-121 两个 seed 均高于同口径 ResNet-18 基线，但 seed 间差与骨干差同量级，仍不足以判定骨干优劣）；待验证项「新骨干对照」与冻结结论补 RUN-006-A；manual 配置表、继承树与骨干说明段同步。
+
 ## 2026-10-28
 
 - `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。
