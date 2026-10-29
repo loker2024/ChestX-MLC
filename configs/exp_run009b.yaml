@@ -1,0 +1,26 @@
+# RUN-009-B：RUN008-C 的 25 轮 + 384×384 完整口径复核。
+#
+# 继承 RUN-008-C（ConvNeXt-Tiny + 正侧位 7:3 加权聚合、seed 2026、320×320、
+# batch_studies 16、pos_weight + cosine），只改三处：
+#   1. image.size: 320 → 384
+#   2. train.epochs: 6 → 25
+#   3. train.early_stop_patience: 0 → 5
+#
+# 用途：RUN008-C 在 6 轮无早停预算下 macro-AUC 0.8008（比 RUN-007-A 高 +0.0102，
+# 超过 +0.005 判读门，6 轮内仍单调上升），是当前唯一有希望的候选方向；但预算与
+# RUN-007-A（25 轮上限、12 轮早停）不同且单 seed，不能据此切换默认骨干。本组用
+# 完整 25 轮 + patience 5 + 384×384 复核，判断该优势在完整口径与更高分辨率下
+# 是否保留。
+#
+# 串行执行：本组先跑，完成后自动启动 RUN-009-A。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run009b.yaml --seed 2026 --tag run009b_convnext_tiny_384_s2026
+_base: exp_run008c.yaml
+
+image:
+  size: 384
+
+train:
+  epochs: 25
+  early_stop_patience: 5

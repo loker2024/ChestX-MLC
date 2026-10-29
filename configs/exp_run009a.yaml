@@ -1,0 +1,26 @@
+# RUN-009-A：RUN008-B 的 25 轮 + 384×384 完整口径复核。
+#
+# 继承 RUN-008-B（EfficientNetV2-S RW + 正侧位 7:3 加权聚合、seed 2026、320×320、
+# batch_studies 16、pos_weight + cosine），只改三处：
+#   1. image.size: 320 → 384
+#   2. train.epochs: 6 → 25
+#   3. train.early_stop_patience: 0 → 5
+#
+# 用途：RUN008-B 在 6 轮无早停预算下 macro-AUC 0.7954（比 RUN-007-A 高 +0.0048，
+# 未达 +0.005 判读门）；RUN-007-B 的 384 探针（6 轮短跑）比 320 高 +0.0053，但轮数
+# 与 cosine 周期不同，不能单变量归因。本组把训练预算对齐为 25 轮上限 + patience 5、
+# 分辨率提到 384×384，判断「EfficientNetV2-S RW + 384」在完整口径下能否超过
+# RUN-007-A（0.7906 / 0.4198）与 RUN-008-C（0.8008 / 0.4382）。
+#
+# 串行执行：先跑 RUN-009-B，结束后再跑本组，避免共享 GPU 影响耗时对照。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run009a.yaml --seed 2026 --tag run009a_effv2s_384_s2026
+_base: exp_run008b.yaml
+
+image:
+  size: 384
+
+train:
+  epochs: 25
+  early_stop_patience: 5
