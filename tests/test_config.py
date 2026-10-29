@@ -181,6 +181,73 @@ def test_run007a_experiment_config_loads():
     assert differences == {"seed": (42, 2026)}
 
 
+def test_run007b_experiment_config_loads():
+    """RUN-007-B 只在 RUN-007-A 上改 image.size=384、train.epochs=6 两处。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    run007a = load_config(configs / "exp_run007a.yaml")
+    config = load_config(configs / "exp_run007b.yaml")
+
+    assert config.model.backbone == "densenet121.ra_in1k"
+    assert config.model.aggregation == "view_weighted"
+    assert config.model.frontal_weight == pytest.approx(0.7)
+    assert config.seed == 2026
+    assert config.image.size == 384
+    assert config.train.epochs == 6
+
+    # 与 RUN-007-A 逐字段比对：只允许 image.size 与 train.epochs 两处差异，
+    # 否则就不是「只提分辨率 + 缩短周期」的单变量探针。
+    base_dict = run007a.to_dict()
+    config_dict = config.to_dict()
+    image_diff = {
+        key: (base_dict["image"][key], config_dict["image"][key])
+        for key in base_dict["image"]
+        if base_dict["image"][key] != config_dict["image"][key]
+    }
+    train_diff = {
+        key: (base_dict["train"][key], config_dict["train"][key])
+        for key in base_dict["train"]
+        if base_dict["train"][key] != config_dict["train"][key]
+    }
+    assert image_diff == {"size": (320, 384)}
+    assert train_diff == {"epochs": (25, 6)}
+    assert {
+        key
+        for key in base_dict
+        if key not in {"image", "train"} and base_dict[key] != config_dict[key]
+    } == set()
+
+
+RUN008_BACKBONES = {
+    "a": "efficientnet_b2.ra_in1k",
+    "b": "efficientnetv2_rw_s.ra2_in1k",
+    "c": "convnext_tiny.fb_in1k",
+    "d": "convnextv2_nano.fcmae_ft_in1k",
+}
+
+
+@pytest.mark.parametrize(("key", "backbone"), sorted(RUN008_BACKBONES.items()))
+def test_run008_experiment_configs_load(key, backbone):
+    """RUN008-A/B/C/D 继承 RUN-007-A，只覆盖 model.backbone，其余字段逐项一致。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    run007a = load_config(configs / "exp_run007a.yaml").to_dict()
+    config = load_config(configs / f"exp_run008{key}.yaml").to_dict()
+
+    assert config["model"].pop("backbone") == backbone
+    assert run007a["model"].pop("backbone") == "densenet121.ra_in1k"
+    # 骨干之外的配置必须与 RUN-007-A 完全相同，否则就不是单变量对照。
+    assert config == run007a
+
+    config = load_config(configs / f"exp_run008{key}.yaml")
+    assert config.model.pretrained is True
+    assert config.model.num_classes == 10
+    assert config.model.aggregation == "view_weighted"
+    assert config.model.frontal_weight == pytest.approx(0.7)
+    assert config.image.size == 320
+    assert config.train.epochs == 25
+    assert config.train.batch_studies == 16
+    assert config.seed == 2026
+
+
 def test_eval_threshold_range_is_checked(tmp_path):
     text = BASE.replace(
         "eval:\n  batch_studies: 2", "eval:\n  batch_studies: 2\n  threshold: 1.5"

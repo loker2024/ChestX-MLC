@@ -1,0 +1,4 @@
+_base: exp_run007a.yaml
+
+model:
+  backbone: convnext_tiny.fb_in1k

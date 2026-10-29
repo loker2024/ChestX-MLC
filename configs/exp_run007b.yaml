@@ -1,0 +1,18 @@
+# RUN-007-B：在 RUN-007-A 的基础上只改两处——输入分辨率 320→384、训练 25→6 轮，
+# 其余口径（DenseNet-121、正侧位 7:3 加权聚合、pos_weight、warmup + cosine、
+# seed 2026、batch_studies 16）完全继承 RUN-007-A。
+#
+# 用途：RUN-007 / RUN-007-A 已在 320×320 下判定「正侧位 7:3 加权聚合」无稳定
+# 增益；本组把输入分辨率提到 384×384，用 6 轮短跑看更高分辨率能否带来更优的
+# valid macro-AUC 趋势。6 轮会把 cosine 周期压缩到 6 轮（warmup 2 轮占 1/3），
+# 指标不能与 RUN-007-A 的 12 轮早停结果直接比较，只用于判断方向。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_run007b.yaml --tag densenet121_viewweighted_s2026_384
+_base: exp_run007a.yaml
+
+image:
+  size: 384
+
+train:
+  epochs: 6

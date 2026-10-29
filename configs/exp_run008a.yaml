@@ -1,0 +1,4 @@
+_base: exp_run007a.yaml
+
+model:
+  backbone: efficientnet_b2.ra_in1k

@@ -1,0 +1,4 @@
+_base: exp_run007a.yaml
+
+model:
+  backbone: convnextv2_nano.fcmae_ft_in1k

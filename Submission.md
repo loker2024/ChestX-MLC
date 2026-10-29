@@ -28,3 +28,49 @@ DenseNet121、ImageNet 预训练（权重版本待核实）；320×320 输入、
 - 文件内容：1,414 个 study、14,140 条预测，包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列。
 - SHA-256：`2bbe6cf13e26bca48c0bba16742ba842aba0b0b415cdaee1de4025a74ac115d3`。
 - 归档文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
+
+## RUN-006-A
+
+来源：本项目训练产物；实验详情见 [训练记录](docs/training_log.md)。
+
+### 实验性能
+
+验证集 Study 级 Macro-AUC **0.7913**、Macro-F1 **0.4103**（阈值 0.5）；最佳 epoch 为第 5 轮。
+
+### 实验参数
+
+DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`、cosine 学习率调度、seed 2026；同一 study 的图片 logits 等权聚合。
+
+### 提交记录
+
+- 官方提交得分：**74.09**；状态：已正确评分（根据用户提供的截图记录）。
+- 提交 ID：`24767`；提交时间：2026-10-29 19:45:34。
+- 上传文件名：`submission_RUN-006-A.csv`。
+- 项目中的对应文件：[submission_densenet121_s2026.csv](outputs/submission_densenet121_s2026.csv)。
+- 文件内容：1,414 个 study、14,140 条预测，包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列。
+- SHA-256：`b6957a111ac5844890a7d18955c1519977ee864fbe8ae02c6d30af14c82fb479`。
+- 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
+
+## RUN-007-A
+
+来源：本项目训练产物；实验详情见 [训练记录](docs/training_log.md)。
+
+### 实验性能
+
+验证集 Study 级 Macro-AUC **0.7906**、Macro-F1 **0.4198**（阈值 0.5）；最佳 epoch 为第 7 轮。
+
+### 实验参数
+
+DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`、cosine 学习率调度、seed 2026；正侧位 logits 按 7:3 加权聚合，单视角或含未知视角时回退等权均值。
+
+### 提交记录
+
+- 官方提交得分：**74.82**；状态：已正确评分（根据用户提供的截图记录）。
+- 提交 ID：`24785`；提交时间：2026-10-29 19:57:22。
+- 上传文件名：`submission_RUN-007-A.csv`。
+- 项目中的对应文件：[submission_viewweighted_s2026.csv](outputs/submission_viewweighted_s2026.csv)。
+- 文件内容：1,414 个 study、14,140 条预测，包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列。
+- SHA-256：`c99f3ab85468cc8cc818ee8c21bf674b2266bce6eb7c392217ed2fc4a85e3ab4`。
+- 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
+
+两次官方得分分别为 74.09 和 74.82，与验证集 Macro-AUC 是不同的记录口径；仅凭两次提交无法确定得分差异的原因。
