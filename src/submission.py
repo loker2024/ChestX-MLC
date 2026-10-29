@@ -7,16 +7,29 @@ PROB_COLUMNS = [f'p{i}' for i in range(1, 11)]
 SUBMISSION_COLUMNS = ['Subject_id', 'Study_id', 'Predict_class', 'Probability']
 
 
-def aggregate_studies(frame: pd.DataFrame, predictions: pd.DataFrame) -> pd.DataFrame:
-    if predictions.Dicom_id.duplicated().any() or set(predictions.Dicom_id) != set(frame.Dicom_id):
+def align_image_predictions(frame: pd.DataFrame, predictions: pd.DataFrame) -> pd.DataFrame:
+    """兼容精简/带元数据CSV；按ID核对归属，绝不依赖行序或采用预测文件标签。"""
+    if frame.Dicom_id.duplicated().any() or predictions.Dicom_id.duplicated().any() or set(predictions.Dicom_id) != set(frame.Dicom_id):
         raise ValueError('图片预测 ID 缺失、重复或多余')
-    merged = frame[['Subject_id', 'Study_id', 'Dicom_id']].merge(predictions, on='Dicom_id', validate='one_to_one')
+    for key in ('Subject_id', 'Study_id'):
+        if key in predictions:
+            identities = frame[['Dicom_id', key]].merge(predictions[['Dicom_id', key]],
+                on='Dicom_id',validate='one_to_one',suffixes=('_official','_prediction'))
+            if not identities[key+'_official'].eq(identities[key+'_prediction']).all():
+                raise ValueError(f'图片预测{key}归属不匹配')
+    selected = predictions[['Dicom_id', *PROB_COLUMNS]].copy()
+    selected[PROB_COLUMNS] = selected[PROB_COLUMNS].apply(pd.to_numeric,errors='raise')
+    merged = frame.merge(selected, on='Dicom_id', validate='one_to_one')
     values = merged[PROB_COLUMNS].to_numpy(dtype=float)
     if not np.isfinite(values).all() or ((values < 0) | (values > 1)).any():
         raise ValueError('非法图片概率')
-    if merged.groupby('Study_id').Subject_id.nunique().gt(1).any():
-        raise ValueError('检查的患者归属不唯一')
-    return merged.groupby(['Subject_id', 'Study_id'], sort=True, as_index=False)[PROB_COLUMNS].mean()
+    return merged
+
+
+def aggregate_studies(frame: pd.DataFrame, predictions: pd.DataFrame,
+                      method: str = 'G0') -> pd.DataFrame:
+    from .aggregation import aggregate_predictions
+    return aggregate_predictions(frame,predictions,method)
 
 
 def make_submission(studies: pd.DataFrame, threshold: float | None = None) -> pd.DataFrame:

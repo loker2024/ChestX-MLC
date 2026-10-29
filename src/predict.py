@@ -14,13 +14,14 @@ import numpy as np
 import pandas as pd
 import torch
 
-from .data import ChestXrayDataset, make_loader
+from .data import ChestXrayDataset, make_loader, normalization_for_settings
 from .evaluate import study_metrics
 from .experiments import sha256
 from .model import load_model
 from .submission import aggregate_studies, make_submission, check_submission, PROB_COLUMNS
 from .train import seed_everything
 from .devices import select_device, synchronize
+from .prediction_outputs import image_prediction_table
 
 
 def prediction_config(model_path: Path, data_config: Path | None = None) -> tuple[dict, str]:
@@ -132,8 +133,9 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
             raise ValueError('模板包含不支持的字段（如 Gate），请先确认官方语义，不能猜填')
     folder = model_path.parent
     config, config_source = prediction_config(model_path,data_config)
-    if config.get('preprocess') != 'RGB letterbox /255' or config.get('threshold') != 0.5:
-        raise ValueError('此入口仅支持现有 RGB 等比例补边 /255 与0.5阈值配置')
+    normalization = normalization_for_settings(config)
+    if config.get('threshold') != 0.5:
+        raise ValueError('归一化记录与检查点预处理冲突，或阈值不是0.5')
     if config.get('aggregation') != 'mean image probabilities per Study_id':
         raise ValueError('检查聚合配置不支持')
     seed_everything(config['seed'])
@@ -163,12 +165,13 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
         for name in (('valid', 'test') if split == 'both' else (split,)):
             started = time.perf_counter()
             data = config['data'][name]
-            dataset = ChestXrayDataset(data['csv'], data['images'], labeled=name == 'valid', size=config['size'])
+            dataset = ChestXrayDataset(data['csv'], data['images'], labeled=name == 'valid', size=config['size'],
+                                       normalization=normalization)
             expected = (1422,859) if name == 'valid' else (2218,1414)
             if not allow_nonofficial_counts and (len(dataset), dataset.frame.Study_id.nunique()) != expected:
                 raise ValueError('官方数据规模不符')
             expected = (len(dataset), dataset.frame.Study_id.nunique())
-            loader = make_loader(dataset, config['batch_size'])
+            loader = make_loader(dataset, config['batch_size'], num_workers=0)
             records, total_loss, count = [], 0.0, 0
             inference_start = time.perf_counter()
             with torch.no_grad():
@@ -203,7 +206,18 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
                     dump(output / 'validation_metrics.json', metrics)
                     raise
                 dump(output / 'validation_metrics.json', metrics)
-            image_predictions.to_csv(output / f'{name}_image_predictions.csv', index=False, encoding='utf-8')
+            image_table = image_prediction_table(dataset.frame, image_predictions)
+            image_path = output / f'{name}_image_predictions.csv'
+            image_table.to_csv(image_path, index=False, encoding='utf-8')
+            image_reread = pd.read_csv(image_path, dtype=str, keep_default_na=False, encoding='utf-8')
+            reconstructed = aggregate_studies(dataset.frame, image_reread[['Dicom_id', *PROB_COLUMNS]].assign(
+                **{p: pd.to_numeric(image_reread[p], errors='raise') for p in PROB_COLUMNS}))
+            matched_images = studies[['Subject_id','Study_id']].merge(reconstructed,
+                on=['Subject_id','Study_id'],how='left',validate='one_to_one',sort=False)
+            np.testing.assert_allclose(matched_images[PROB_COLUMNS], studies[PROB_COLUMNS], rtol=0, atol=1e-15)
+            if not image_reread[['Dicom_id','Subject_id','Study_id']].equals(
+                    image_table[['Dicom_id','Subject_id','Study_id']]):
+                raise ValueError('图片级CSV回读ID错位')
             path = output / ('val_study_predictions.csv' if name == 'valid' else 'test_study_predictions.csv')
             studies.to_csv(path, index=False, encoding='utf-8')
             reread = pd.read_csv(path, dtype={'Subject_id':str,'Study_id':str}, encoding='utf-8')
@@ -215,7 +229,8 @@ def run(model_path: Path, split: str, submission_mode: str | None = None,
                     'probability_max': float(studies[PROB_COLUMNS].max().max()),
                     'decode_preprocess_transfer_forward_seconds': seconds,
                     'amortized_ms_per_image': seconds/count*1000,
-                    'split_total_seconds': time.perf_counter()-started, 'csv_reread_passed': True}
+                    'split_total_seconds': time.perf_counter()-started, 'csv_reread_passed': True,
+                    'image_csv_reread_passed': True, 'image_to_study_mean_verified': True}
             report['splits'][name] = info
             if name == 'test':
                 submission_path = output / 'submission.csv'

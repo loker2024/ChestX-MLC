@@ -13,7 +13,7 @@ from torch import nn
 import torchvision
 
 from .data import ChestXrayDataset, make_loader
-from .model import build_model, load_model
+from .model import build_model, load_model, classification_head
 from .devices import select_device
 
 
@@ -27,8 +27,20 @@ def seed_everything(seed: int) -> None:
     torch.backends.cudnn.deterministic = True
 
 
+def make_optimizer(model: nn.Module, settings: dict) -> torch.optim.AdamW:
+    """PT1显式分组学习率，旧实验仍用原单组AdamW。"""
+    if 'backbone_lr' in settings or 'head_lr' in settings:
+        head = classification_head(model)
+        head_ids = {id(p) for p in head.parameters()}
+        backbone = [p for p in model.parameters() if id(p) not in head_ids]
+        groups = [{'params':backbone,'lr':settings['backbone_lr'],'name':'backbone'},
+                  {'params':list(head.parameters()),'lr':settings['head_lr'],'name':'head'}]
+        return torch.optim.AdamW(groups,weight_decay=settings['weight_decay'])
+    return torch.optim.AdamW(model.parameters(),lr=settings['learning_rate'],weight_decay=settings['weight_decay'])
+
+
 def train_step(model: nn.Module, images: torch.Tensor, labels: torch.Tensor,
-               optimizer: torch.optim.Optimizer) -> tuple[float, list[int]]:
+               optimizer: torch.optim.Optimizer, *, study_index: torch.Tensor | None = None) -> tuple[float, list[int]]:
     model.train()
     optimizer.zero_grad(set_to_none=True)
     logits = model(images)
@@ -38,7 +50,11 @@ def train_step(model: nn.Module, images: torch.Tensor, labels: torch.Tensor,
         raise ValueError('标签必须是有限的 0/1 值')
     if not torch.isfinite(logits).all():
         raise ValueError('模型输出包含非有限值')
-    loss = nn.BCEWithLogitsLoss()(logits, labels)
+    if study_index is None:
+        loss = nn.BCEWithLogitsLoss()(logits, labels)
+    else:
+        from .study_training import study_balanced_bce
+        loss = study_balanced_bce(logits,labels,study_index)
     if not torch.isfinite(loss):
         raise ValueError('损失不是有限数值')
     loss.backward()
@@ -51,9 +67,15 @@ def train_step(model: nn.Module, images: torch.Tensor, labels: torch.Tensor,
 
 
 def save_model(model: nn.Module, path: Path, metadata: dict) -> None:
+    architecture = getattr(model,'cxr_backbone','resnet18')
+    if metadata.get('backbone',architecture) != architecture:
+        raise ValueError('模型架构与保存元数据不一致')
+    backend=getattr(model,'cxr_backend','torchvision')
+    if metadata.get('model_backend',backend)!=backend:
+        raise ValueError('模型后端与保存元数据不一致')
     # 排他创建，避免覆盖已有模型；保存结构和预处理信息以便重新加载。
     with path.open('xb') as handle:
-        torch.save({'architecture': 'resnet18', 'num_classes': 10,
+        torch.save({'architecture': architecture, 'model_backend':backend, 'num_classes': 10,
                     'state_dict': model.state_dict(), 'metadata': metadata}, handle)
 
 

@@ -3,26 +3,42 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score, f1_score
 import torch
+from pathlib import Path
 
 from .data import parse_labels
-from .fingerprints import dataset_fingerprint, EVALUATION_PROTOCOL
+from .fingerprints import dataset_fingerprint, aggregation_protocol
+from .prediction_outputs import image_prediction_table
+from .aggregation import aggregate_predictions, method_info
 
 
-def study_metrics(frame: pd.DataFrame, predictions: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+def study_metrics(frame: pd.DataFrame, predictions: pd.DataFrame,
+                  method: str = 'G0') -> tuple[pd.DataFrame, dict]:
+    studies = aggregate_predictions(frame,predictions,method)
+    return score_study_predictions(frame,studies,
+        aggregation_protocol(method,method_info(predictions,method)['logits_source']))
+
+
+def score_study_predictions(frame: pd.DataFrame, studies: pd.DataFrame,
+                            protocol: dict | None = None) -> tuple[pd.DataFrame, dict]:
+    """只从官方frame取标签；对已经聚合的完整Study表按ID计分。"""
     columns = [f'p{i}' for i in range(1, 11)]
-    if predictions['Dicom_id'].duplicated().any() or set(predictions['Dicom_id']) != set(frame['Dicom_id']):
-        raise ValueError('验证预测 ID 缺失、重复或多余')
-    merged = frame.merge(predictions, on='Dicom_id', validate='one_to_one')
-    probabilities = merged[columns].to_numpy()
+    if studies.Study_id.duplicated().any() or set(studies.Study_id) != set(frame.Study_id):
+        raise ValueError('Study预测ID缺失、重复或多余')
+    merged = frame[['Subject_id','Study_id']].drop_duplicates().merge(
+        studies[['Subject_id','Study_id',*columns]],on=['Subject_id','Study_id'],validate='one_to_one',how='outer',indicator=True)
+    if not merged['_merge'].eq('both').all():
+        raise ValueError('Study预测患者归属不匹配')
+    probabilities = merged[columns].to_numpy(dtype=float)
     if not np.isfinite(probabilities).all() or ((probabilities < 0) | (probabilities > 1)).any():
         raise ValueError('预测概率无效')
     rows, truths = [], []
-    for study_id, group in merged.groupby('Study_id', sort=True):
+    by_study = studies.set_index('Study_id')
+    for study_id, group in frame.groupby('Study_id', sort=True):
         labels = np.stack(group['Predict_class'].map(parse_labels))
         if not (labels == labels[0]).all() or group['Subject_id'].nunique() != 1:
             raise ValueError('检查标签或患者归属冲突')
         row = {'Subject_id': group['Subject_id'].iloc[0], 'Study_id': study_id}
-        row.update(dict(zip(columns, group[columns].mean().to_numpy())))
+        row.update(dict(zip(columns, by_study.loc[study_id,columns].to_numpy(dtype=float))))
         rows.append(row)
         truths.append(labels[0])
     result = pd.DataFrame(rows)
@@ -38,11 +54,12 @@ def study_metrics(frame: pd.DataFrame, predictions: pd.DataFrame) -> tuple[pd.Da
                'f1_zero_division': 0,
                'positive_studies': truth.sum(axis=0).astype(int).tolist(),
                'validation_fingerprint': dataset_fingerprint(frame),
-               'evaluation_protocol': dict(EVALUATION_PROTOCOL)}
+               'evaluation_protocol': dict(protocol if protocol is not None else aggregation_protocol())}
     return result, metrics
 
 
-def evaluate(model: torch.nn.Module, loader, device: str) -> tuple[pd.DataFrame, dict]:
+def evaluate(model: torch.nn.Module, loader, device: str,
+             image_output: Path | None = None) -> tuple[pd.DataFrame, dict]:
     model.eval()
     records, total_loss, count = [], 0.0, 0
     with torch.no_grad():
@@ -58,6 +75,10 @@ def evaluate(model: torch.nn.Module, loader, device: str) -> tuple[pd.DataFrame,
             count += len(images)
             for image_id, probs in zip(batch['Dicom_id'], logits.sigmoid().cpu().numpy()):
                 records.append({'Dicom_id': image_id, **{f'p{i+1}': float(p) for i, p in enumerate(probs)}})
-    result, metrics = study_metrics(loader.dataset.frame, pd.DataFrame(records))
+    images = pd.DataFrame(records)
+    result, metrics = study_metrics(loader.dataset.frame, images)
+    if image_output is not None:
+        image_prediction_table(loader.dataset.frame, images).to_csv(
+            image_output, index=False, encoding='utf-8', mode='x')
     metrics.update(validation_loss=total_loss / count, validation_images=count)
     return result, metrics

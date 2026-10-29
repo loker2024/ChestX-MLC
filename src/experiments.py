@@ -14,6 +14,8 @@ from .fingerprints import comparison_group
 
 REQUIRED = ['best_model.pth', 'train_config.json', 'history.csv',
             'val_study_predictions.csv', 'validation_metrics.json']
+FIXED_EXPERIMENT_IDS = ('PT1','PT2_ES','PT2_WC_ES','B1_DenseNet121','B1_DenseNet121_ImageNet','B1_DenseNet121_320_Study','B1_DenseNet121_RA_320_Study','A1_DenseNet121_320_Study_LightAug','B2_EfficientNetB2_320_Study')
+EXPERIMENT_ID_PATTERN = re.compile(r'(?:exp_[0-9]+|E[0-9]{2}_[A-Za-z0-9_-]+|'+ '|'.join(FIXED_EXPERIMENT_IDS)+r')')
 
 
 def sha256(path: Path) -> str:
@@ -53,13 +55,23 @@ def _validate(files: dict[str, Path]) -> tuple[dict,dict,pd.DataFrame]:
 
 
 def register(source: Path, experiment_id: str, notes: str,
-             validation_run: Path | None = None) -> Path:
-    if not re.fullmatch(r'exp_[0-9]+', experiment_id):
-        raise ValueError('实验编号应为 exp_001 等格式')
+             validation_run: Path | None = None,
+             extra_files: dict[str, Path] | None = None) -> Path:
+    if not EXPERIMENT_ID_PATTERN.fullmatch(experiment_id):
+        raise ValueError('实验编号应为 exp_001 或 E01_resnet18 等格式')
     destination = Path('outputs/experiments') / experiment_id
     if destination.exists():
         raise FileExistsError('实验已存在，拒绝覆盖')
     files = {name:source/name for name in REQUIRED}
+    reserved = {*REQUIRED, 'experiment_notes.md', 'provenance.json', 'registration_complete.json'}
+    for name, path in (extra_files or {}).items():
+        relative = Path(name)
+        if relative.is_absolute() or relative.drive or '..' in relative.parts or not relative.parts or relative.parts[0] in reserved:
+            raise ValueError('附加归档路径不合法或与必需文件冲突')
+        if not path.is_file():
+            raise FileNotFoundError(path)
+    if set(files) & set(extra_files or {}):
+        raise ValueError('不能替换必需归档文件')
     if validation_run is not None:
         report = json.loads((validation_run/'prediction_report.json').read_text(encoding='utf-8'))
         if report['model_sha256'] != sha256(files['best_model.pth']) or not report.get('model_unchanged'):
@@ -74,6 +86,7 @@ def register(source: Path, experiment_id: str, notes: str,
         metrics = fresh
         if comparison_group(metrics) is None:
             raise ValueError('验证复测缺少可验证的划分和评估协议指纹')
+    files.update(extra_files or {})
     hashes = {name:sha256(path) for name,path in files.items()}
     root = destination.parent.resolve()
     root.mkdir(parents=True,exist_ok=True)
@@ -83,13 +96,14 @@ def register(source: Path, experiment_id: str, notes: str,
         if stage.parent != root:
             raise RuntimeError('临时目录超出实验根目录')
         for name,path in files.items():
+            (stage/name).parent.mkdir(parents=True,exist_ok=True)
             shutil.copy2(path,stage/name)
             if sha256(stage/name) != hashes[name] or sha256(path) != hashes[name]:
                 raise RuntimeError('实验快照校验失败或源文件同时发生变化')
         if validation_run:
             (stage/'validation_metrics.json').write_text(json.dumps(metrics,ensure_ascii=False,indent=2,allow_nan=False),encoding='utf-8')
         _validate({name:stage/name for name in REQUIRED})
-        snapshot_hashes = {name:sha256(stage/name) for name in REQUIRED}
+        snapshot_hashes = {name:sha256(stage/name) for name in files}
         (stage/'experiment_notes.md').write_text(
             f'# {experiment_id}\n\n来源：{source.resolve()}\n\n{notes}\n\n'
             f'最佳 Epoch：{metrics["epoch"]}；Macro-AUC：{metrics["macro_auc"]}；Macro-F1：{metrics["macro_f1"]}。\n'
@@ -106,32 +120,60 @@ def register(source: Path, experiment_id: str, notes: str,
 
 def rebuild_summary() -> None:
     rows = []
-    for folder in sorted(Path('outputs/experiments').glob('exp_*')):
+    root = Path('outputs/experiments')
+    # 保留旧exp_*损坏目录的诊断/隔离行为，不用严格ID过滤把告警静默吞掉。
+    folders = sorted(set(root.glob('exp_*')) | set(root.glob('E[0-9][0-9]_*')) |
+                     {root/name for name in FIXED_EXPERIMENT_IDS if (root/name).is_dir()})
+    for folder in folders:
         try:
             config,metrics,history = _validate({name:folder/name for name in REQUIRED})
             notes = (folder/'experiment_notes.md').read_text(encoding='utf-8').strip()
             provenance = json.loads((folder/'provenance.json').read_text(encoding='utf-8'))
-            if any(sha256(folder/name) != provenance['sha256'][name] for name in REQUIRED):
+            if any(sha256(folder/name) != digest for name,digest in provenance['sha256'].items()):
                 raise ValueError('登记后实验快照被修改')
+            if not set(REQUIRED).issubset(provenance['sha256']):
+                raise ValueError('溯源缺少必需文件')
+            experiment = config.get('experiment_config', {})
+            if (folder/'experiment_config.json').is_file():
+                experiment = json.loads((folder/'experiment_config.json').read_text(encoding='utf-8'))
         except (OSError,ValueError,KeyError,TypeError) as exc:
             warnings.warn(f'跳过不完整或损坏的实验 {folder.name}: {exc}',RuntimeWarning)
             continue
         group = comparison_group(metrics)
-        rows.append({'experiment_id': folder.name, 'model_name': 'ResNet18',
+        parameters = {key:config[key] for key in ('epochs','size','batch_size','seed','learning_rate',
+                      'weight_decay','optimizer','preprocess','aggregation','backbone_lr','head_lr',
+                      'normalization','validation_mode','pretrained','augmentation','sampler','loss_reduction',
+                      'studies_per_batch','max_images_per_batch','num_workers','pin_memory','scheduler_unit',
+                      'model_backend','model_backend_version','pretrained_model','pretrained_recipe','pretrained_weight_sha256') if key in config}
+        rows.append({'experiment_id': folder.name, 'model_name': config.get('backbone','resnet18'),
+                     'main_change':experiment.get('main_change',notes),
+                     'training_parameters':json.dumps(parameters,ensure_ascii=False,sort_keys=True),
+                     'optimizer':config.get('optimizer'), 'random_seed':config.get('seed'),
+                     'scheduler':experiment.get('scheduler'), 'augmentation':experiment.get('augmentation'),
+                     'sampler':experiment.get('sampler'), 'loss_function':experiment.get('loss_function',experiment.get('loss')),
+                     'study_aggregation':config.get('aggregation'),
                      'epochs': int(history.epoch.max()), 'best_epoch': metrics['epoch'],
                      'image_size': config['size'], 'learning_rate': config['learning_rate'],
                      'batch_size': config['batch_size'], 'macro_auc': metrics['macro_auc'],
+                     'studies_per_batch':config.get('studies_per_batch'),
+                     'max_images_per_batch':config.get('max_images_per_batch'),
+                     'loss_reduction':config.get('loss_reduction','image_mean_bce'),
+                     'optimizer_steps_total':int(history.optimizer_steps.sum()) if 'optimizer_steps' in history else None,
                      'macro_f1': metrics['macro_f1'], 'model_path': str((folder / 'best_model.pth').resolve()),
                      'notes': notes, 'comparison_group':group or ('unverified:'+folder.name),
                      'comparison_status':'verified' if group else 'unverified_legacy',
                      'notes_path': str((folder / 'experiment_notes.md').resolve())})
     # 汇总表为可重建索引；实验目录本身不可覆盖。
-    columns = ['experiment_id','model_name','epochs','best_epoch','image_size','learning_rate',
-               'batch_size','macro_auc','macro_f1','model_path','notes','comparison_group','comparison_status','notes_path']
+    columns = ['experiment_id','model_name','main_change','training_parameters','optimizer','random_seed',
+               'scheduler','augmentation','sampler','loss_function','study_aggregation',
+               'epochs','best_epoch','image_size','learning_rate',
+               'batch_size','studies_per_batch','max_images_per_batch','loss_reduction','optimizer_steps_total',
+               'macro_auc','macro_f1','model_path','notes','comparison_group','comparison_status','notes_path']
     summary = pd.DataFrame(rows,columns=columns).sort_values(['comparison_group','macro_auc'],ascending=[True,False],na_position='last')
     summary['rank_in_group'] = pd.array([None]*len(summary),dtype='Int64')
     eligible = summary.comparison_status.eq('verified') & summary.macro_auc.notna()
-    summary.loc[eligible,'rank_in_group'] = summary.loc[eligible].groupby('comparison_group').cumcount()+1
+    summary.loc[eligible,'rank_in_group'] = summary.loc[eligible].groupby('comparison_group').macro_auc.rank(
+        method='dense',ascending=False).astype('Int64')
     output = Path('outputs').resolve()
     output.mkdir(exist_ok=True)
     temporary = output/('.summary-'+uuid4().hex+'.tmp')
