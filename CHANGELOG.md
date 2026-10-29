@@ -8,6 +8,13 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-10-29
+
+- `11:55`（变更）`docs/training_log.md`：回填 RUN-005 `resnet50_s42` 与 RUN-006 `densenet121_s42` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；RUN-005 最优 epoch 9（macro-AUC 0.7857 / F1@0.5 0.4193，第 14 轮早停）、RUN-006 最优 epoch 8（0.7880 / 0.4070，第 13 轮早停），补两组逐类 AUC 对比表；汇总表新增两行，并加「继承 cosine + `pos_weight: true`、与历史 warmup + `pos_weight: false` 口径不同」的脚注。
+- `11:55`（变更）`docs/experiments.md`：实验矩阵标注 RUN-005 / RUN-006 已完成；「执行与结果」新增 2026-10-29 骨干对照三条结论（ResNet-50 未超过 ResNet-18 历史水平、DenseNet-121 macro-AUC 最高但 F1 更低、单 seed 差不足以判定骨干优劣）；待验证项「新骨干对照」改为已验证（无增益）并注明 T4 耗时 / 权重许可核验仍待做；冻结结论注明默认骨干维持 `resnet18`。
+- `12:00`（变更）远端训练环境（不涉及仓库文件）：验证集图片由嵌套的 `/root/sj-tmp/valid/valid/subject_*` 上移为 `/root/sj-tmp/valid/subject_*`，与 train / test 目录结构一致；`check_data.py --full` 复检通过后从头重跑 RUN-005，避免训练中途移动图片。
+- `12:05`（变更）`docs/manual.md`：§2.2 现有配置文件中 `exp_resnet50.yaml` / `exp_densenet121.yaml` 的「训练待排期」改为「已完成（RUN-005 / RUN-006）」；骨干说明段更新为已按 train_plan04 完成、结果见训练记录与调优记录、默认骨干维持 `resnet18`，并把「许可证核验与 T4 耗时」限定为仅当后续切换骨干时才需补做。
+
 ## 2026-10-28
 
 - `09:06`（变更）`docs/training_log.md`：回填 RUN-001R `short_baseline_r2` 与 RUN-002 `short_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；001R 末轮 macro-AUC 0.7903（较旧 RUN-001 高 0.0045，达回归门）、002 最优 macro-AUC 0.7882 判 `pos_weight` 无效（Δ−0.0021 未达门）；补两 run 并行（两路各 8 workers）导致单轮耗时不可与串行 RUN-001 对照的口径说明；汇总表补两行并加并行耗时脚注。
