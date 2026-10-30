@@ -75,6 +75,36 @@ def test_fit_one_epoch_updates_weights(config: Config) -> None:
     assert set(result["best_state"]) == set(model.state_dict())
 
 
+def test_frozen_fit_only_passes_trainable_parameters_to_optimizer(
+    config: Config, monkeypatch
+) -> None:
+    config = replace(config, model=replace(config.model, freeze_backbone=True))
+    train_loader, val_loader = _loaders(config)
+    model = build_model(config)
+    named_parameters = dict(model.named_parameters())
+    before = {
+        name: parameter.detach().clone()
+        for name, parameter in named_parameters.items()
+        if not parameter.requires_grad
+    }
+    captured: list[torch.nn.Parameter] = []
+    original_adamw = torch.optim.AdamW
+
+    def recording_adamw(parameters, **kwargs):
+        captured.extend(list(parameters))
+        return original_adamw(captured, **kwargs)
+
+    monkeypatch.setattr(engine.torch.optim, "AdamW", recording_adamw)
+    fit(config, model, train_loader, val_loader, torch.device("cpu"))
+
+    expected = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    assert {id(parameter) for parameter in captured} == {
+        id(parameter) for parameter in expected
+    }
+    for name, value in before.items():
+        assert torch.equal(model.state_dict()[name], value)
+
+
 def test_warmup_ramps_learning_rate(config: Config) -> None:
     # 配置要求 warmup_epochs < epochs，所以用 3 轮训练、前 2 轮 warmup。
     config = replace(config, train=replace(config.train, epochs=3, warmup_epochs=2))

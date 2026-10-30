@@ -128,6 +128,7 @@ def train_one_epoch(
 ) -> float:
     """训练一个 epoch，返回按 study 数加权的平均 loss。"""
     model.train()
+    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     use_amp = scaler.is_enabled()  # 只有 CUDA 上才会是 True
     total_loss = 0.0
     total_studies = 0
@@ -150,7 +151,7 @@ def train_one_epoch(
             # 裁剪必须放在“反缩放”之后、optimizer.step() 之前，
             # 否则裁的是放大过的梯度，阈值 5.0 就失去意义了。
             scaler.unscale_(optimizer)
-            nn.utils.clip_grad_norm_(model.parameters(), config.train.grad_clip)
+            nn.utils.clip_grad_norm_(trainable_parameters, config.train.grad_clip)
         scaler.step(optimizer)
         scaler.update()
 
@@ -236,8 +237,11 @@ def fit(
     早停计数都沿用旧值。`on_epoch_end` 在调度器推进后调用，保存的状态可直接
     用于下一轮；旧版断点的调度器尚未推进，恢复时按已完成轮次补上一步。
     """
+    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    if not trainable_parameters:
+        raise ValueError("模型没有可训练参数")
     optimizer = torch.optim.AdamW(
-        model.parameters(),
+        trainable_parameters,
         lr=config.train.lr,
         weight_decay=config.train.weight_decay,
     )
