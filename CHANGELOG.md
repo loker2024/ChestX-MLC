@@ -34,7 +34,6 @@
 - `17:19`（新增）`configs/exp_A001a.yaml`：新增实验 A-001-a 配置——以 A-001 为基准只把 `image.hflip` 由 `false` 改为 `true`（训练随机水平翻转），其余逐项沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视图加权聚合、8 轮上限 + 早停 2、seed 42）；文件为完整展开配置、无 `_base`。
 - `17:22`（变更）`.gitignore`：忽略本机工具产物目录 `.playwright-cli/` 与 `.workbuddy/`，避免 `git status` 出现未跟踪项。
 - `17:26`（新增）`configs/exp_A001c.yaml`、`tests/test_config.py`：新增实验 A-001-C 配置——以 `_base: exp_A001.yaml` 只把 `model.freeze_backbone` 由 `false` 改为 `true`（冻结 ImageNet 预训练 ConvNeXt-Tiny 骨干、仅训练分类头；训练时骨干固定为 `eval()` 保持 BatchNorm running statistics 不变），其余口径逐字段沿用 A-001（320×320 letterbox、7:3 视角加权、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001c_experiment_config_loads` 断言除该字段外与 A-001 逐字段一致及关键字段。本机 `python -m pytest tests/test_config.py -q` 33 passed；合成模型验证 ConvNeXt-Tiny 冻结后 `total_params` 27,827,818 / `trainable_params` 7,690（仅分类头），骨干 `eval` + 分类头 `train` 状态正确。
-
 - **17:38**（变更）`docs/training_log.md`：回填 A-001-B（A-001 的 ASL 损失对照，ConvNeXt-Tiny @320×320 / seed=42 / 6 轮早停）实测——best epoch 4 macro-AUC 0.7970 / F1@0.5 0.4103，与 A-001（0.8038 / 0.4255）差 AUC −0.0068、F1@0.5 −0.0152；记录运行命令、起止时间 16:57:34→17:32:15（34m41s）、V100 显存 13.8–14.3 GB、阈值曲线与逐类 AUC 对比及判读，汇总表新增 A-001-B 行。
 - **17:38**（变更）`docs/experiments.md`：实验矩阵新增 A-001-B 行；「执行与结果」补 A-001-B 结论（A-001 口径下 ASL 未达增益门、−0.0068 超 ±0.005 且约 2 倍 seed 波动、替换同时移除 `pos_weight` 非纯单变量、单 seed 不判死）；待验证表新增「损失函数设计（ASL / focal）」行。
 - **17:38**（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_A001b.yaml` 行，继承树说明补 A-001-B 归属。

@@ -113,6 +113,7 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
 `outputs/20261030-165734_A-001b_convnext_tiny_asl_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
 只覆盖损失五项（`train.loss: asl`、`train.pos_weight: false`、`asl_gamma_pos: 0`、`asl_gamma_neg: 4`、
 `asl_clip: 0.05`），6/8 轮触发早停，best epoch 4：
+
 - valid macro-AUC **0.7970** / F1@0.5 **0.4103**；独占 V100-SXM2-32G 训练 34m41s，显存约 13.8–14.3 GB。
 - 与 A-001（BCE + `pos_weight`：0.8038 / 0.4255）相比 **AUC −0.0068、F1@0.5 −0.0152**：AUC 差超过
   ±0.005 判读门，约为已观测 seed 波动（0.0033）的 2 倍 → A-001 口径下 ASL 无增益，不切换默认损失。
