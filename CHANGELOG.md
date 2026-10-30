@@ -10,6 +10,7 @@
 
 ## 2026-10-30
 
+- `19:01`（新增）`src/infer/ensemble.py`、`tests/test_ensemble.py`：新增概率加权 / logits 加权融合函数、权重归一化、Study_id 对齐与输入校验；8 项专项测试通过。
 - `18:52`（新增）`docs/superpowers/plans/2026-10-30-ensemble.md`：拆分多模型融合实现任务，覆盖融合函数、study-level logits、train/valid 指标产物、test submission 与全量验证。
 - `18:49`（新增）`docs/superpowers/specs/2026-10-30-ensemble-design.md`：确定多模型融合设计，支持概率加权与 logits 加权；`valid` / `train` 复用现有 Macro-AUC、Macro-F1 和逐类报告，`test` 输出完整 10 类 submission。
 
