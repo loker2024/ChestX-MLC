@@ -1159,6 +1159,94 @@ RUN-007-A（−0.0103 / −0.0098），C 高 +0.0184，且 C 在 0.2–0.7 全�
    并行执行限制，只能作为候选方向。若要切换默认骨干，需补同预算（6 轮）的 DenseNet-121
    对照、第二 seed 复核，并完成权重许可 / SHA-256 材料与赛题指定 T4 端到端耗时实测。
 
+## RUN-009 骨干 @384×384 完整口径复核（EfficientNetV2-S RW）
+
+按 [train_plan09.md](train_plan09.md) 执行：在 RUN-008 的 6 轮 320×320 骨干对照基础上，把输入
+分辨率提到 384×384、训练预算恢复为 25 轮上限 + 早停 5，复核 RUN-008-B 的 EfficientNetV2-S RW。
+原计划串行先跑 RUN-009-B（ConvNeXt-Tiny）、后跑 RUN-009-A；实际训练环境换为新实例
+（V100-SXM2-32G），原串行脚本 `/root/run009.sh` 不在该实例上，遂先启动 RUN-009-A，并在第 6 轮
+结束后按用户要求停止，**RUN-009-B 未执行**。
+
+### RUN-009-A run009a_effv2s_384_s2026（`configs/exp_run009a.yaml`）
+
+配置 [configs/exp_run009a.yaml](../configs/exp_run009a.yaml)，完整内容：
+
+```yaml
+_base: exp_run008b.yaml
+
+image:
+  size: 384
+
+train:
+  epochs: 25
+  early_stop_patience: 5
+```
+
+（其余字段全部继承 [configs/exp_run008b.yaml](../configs/exp_run008b.yaml) → `exp_run007a.yaml`：
+`efficientnetv2_rw_s.ra2_in1k`、正侧位 7:3 加权聚合、`pos_weight: true`、warmup 2 轮后 cosine
+衰减到 1e-5、`batch_studies: 16`、`num_workers: 16`、CUDA AMP、letterbox、ImageNet 归一化、
+seed 2026。）
+
+| 项 | 值 |
+|---|---|
+| 相对父配置的差异 | `image.size: 320 → 384`、`train.epochs: 6 → 25`、`train.early_stop_patience: 0 → 5`；其余继承 RUN-008-B |
+| 运行命令 | `HF_HUB_OFFLINE=1 python src/run_train.py --config configs/exp_run009a.yaml --seed 2026 --tag run009a_effv2s_384_s2026` |
+| 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / 375 GB 内存 / seed 2026；代码 `bf7e276` |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A / RUN-008 同一份；`check_data.py --full` 全部通过） |
+| 预训练 | 已加载 `efficientnetv2_rw_s.ra2_in1k`（HF commit `ee38fe1c…`、96,483,448 B、SHA-256 `81379566…`、Apache-2.0；本地缓存校验通过后离线加载，`train.log` 打印「预训练权重: 已加载」） |
+| 产物 | `outputs/20261030-140736_run009a_effv2s_384_s2026/`（`best.pt` 89,586,379 B / `last.pt` / `metrics.csv` / `train.log`） |
+| 耗时 | 2026-10-30 14:07:36 → 14:50 CST，**6/25 轮后按用户要求停止**（非早停、非跑满），共约 **41 分钟**；单轮约 6.7 分钟；显存峰值约 15.9 GB（独占运行） |
+
+启动前一次失败与处理：首次 14:03 启动时 HuggingFace 直连失败（`[Errno 99] Cannot assign
+requested address ... huggingface.co/timm/efficientnetv2_rw_s.ra2_in1k/...`，重试 5 次后
+`src/model/network.py` 捕获异常并回退随机初始化），已终止并删除该次 run 目录；改用
+`HF_ENDPOINT=https://hf-mirror.com` 预下载权重（`/root/.cache/huggingface/hub/models--timm--efficientnetv2_rw_s.ra2_in1k/`，
+文件 96,483,448 B、SHA-256 `81379566b6b222f182fa010a993ce396e97b08568bb4f87241b61b064294a65e`，
+与 RUN-008-B 记录一致），再以 `HF_HUB_OFFLINE=1` 重启，`train.log` 确认预训练权重加载成功。
+
+metrics.csv（6 轮原样复制，epoch 6 结束后停止）：
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 1.0076 | 0.9082 | 0.7805 | 0.3984 |
+| 2 | 3.00e-04 | 0.9244 | 0.9107 | 0.7914 | 0.3977 |
+| 3 | 3.00e-04 | 0.8679 | 0.9361 | 0.7865 | 0.4128 |
+| 4 | 2.99e-04 | 0.8190 | 0.9323 | 0.7900 | 0.4040 |
+| 5 | 2.94e-04 | 0.7482 | 0.9507 | **0.7944** | 0.4185 |
+| 6 | 2.87e-04 | 0.6699 | 1.0356 | 0.7930 | 0.4270 |
+
+**结论**：最优 epoch 5，macro-AUC **0.7944**、F1@0.5 **0.4185**（取自 `last.pt` 的
+`extras.best_metrics`；`run_eval.py` 在 valid 上重算 macro-AUC **0.7945**、F1@0.5 **0.4178**，
+差 ≤0.0007）。比 RUN-007-A（0.7906 / 0.4198）AUC **+0.0038**、F1@0.5 −0.0020，**未达 +0.005
+判读门**（门槛 0.7956）；比同骨干 320×320 固定 6 轮的 RUN-008-B（0.7954 / 0.4100）AUC 低
+**−0.0010**，即本组没有超过该骨干 6 轮 320 短跑的水平。epoch 5 之后 valid_loss 由 0.9507 升到
+1.0356、AUC 回落，train_loss 仍单调下降，出现过拟合迹象。**本组只跑 6/25 轮即按用户要求
+停止，cosine 周期未走完（第 6 轮 lr 仍有 2.87e-4），不能据此判定 25 轮完整预算下的最终水平**；
+停止原因是人工中断，不是早停触发。
+
+产物说明：训练脚本 `src/run_train.py:256-267` 只在训练完整结束后才把 `best_state` 落盘为
+`best.pt`，本次提前停止后该文件缺失；已用临时脚本从 `last.pt` 的 `extras.best_state`（epoch 5）
+导出 `best.pt`（复用 `common.checkpoint.save_checkpoint`，epoch / metrics / config / seed /
+metadata 的写法与训练脚本一致），上表指标与 `run_eval.py` 结果均基于该文件。
+
+逐类 AUC（`run_eval.py`，Δ 为四位小数相减）：
+
+| class_id | support | RUN-007-A 320 | RUN-008-B 320 / 6 轮 | RUN-009-A 384 | Δ（009A−007A） |
+|---|---|---|---|---|---|
+| 1 | 24 | 0.7208 | 0.7137 | 0.7274 | +0.0066 |
+| 2 | 37 | 0.7944 | 0.8395 | 0.8620 | +0.0676 |
+| 3 | 46 | 0.7650 | 0.7669 | 0.7857 | +0.0207 |
+| 4 | 68 | 0.6975 | 0.7400 | 0.6864 | −0.0111 |
+| 5 | 115 | 0.8752 | 0.8610 | 0.8700 | −0.0052 |
+| 6 | 177 | 0.7794 | 0.7786 | 0.7651 | −0.0143 |
+| 7 | 193 | 0.7718 | 0.7708 | 0.7729 | +0.0011 |
+| 8 | 214 | 0.7205 | 0.7065 | 0.6981 | −0.0224 |
+| 9 | 260 | 0.9039 | 0.9070 | 0.9013 | −0.0026 |
+| 10 | 306 | 0.8778 | 0.8700 | 0.8759 | −0.0019 |
+
+差异集中在稀有类 2/3 提升（+0.0676 / +0.0207）与常见类 6/8 回落（−0.0143 / −0.0224）；
+macro-AUC 仅高 +0.0038，没有达到判读门，也没有单类大幅退化。
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -1181,6 +1269,7 @@ RUN-007-A（−0.0103 / −0.0098），C 高 +0.0184，且 C 在 0.2–0.7 全�
 | RUN008-C | `exp_run008c.yaml` | ConvNeXt-Tiny + fb_in1k，6 轮无早停 | 6 | 5 | 0.8008 | 0.4382 | 24m18s（前 14 分钟与 D 并行） | 与 RUN-007-A 差 AUC +0.0102、F1 +0.0184，超过门；但训练预算不同、单 seed，仅作候选方向 |
 | RUN008-D | `exp_run008d.yaml` | ConvNeXtV2-Nano + fcmae_ft_in1k，6 轮无早停（仅研究） | 6 | 2 | 0.4977 | 0.1604 | 22m39s（单独） | 训练异常（逐类 AUC≈随机，原因未定位）；CC BY-NC 4.0 不合规，不参与判读、不用于提交 |
 | RUN-007-B | `exp_run007b.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合 + 384×384，seed 2026，6 轮短跑 | 6 | 5 | 0.7959 | 0.4227 | 23m42s | 探针：6 轮内达 0.7959（比 007A 的 12 轮 0.7906 高 +0.0053），但轮数与调度不同、不可单变量归因分辨率；待 25 轮完整对照 |
+| RUN-009-A | `exp_run009a.yaml` | EfficientNetV2-S RW + ra2_in1k，384×384，25 轮上限 | 6（用户要求停止）/25 | 5 | 0.7944 | 0.4185 | 约 41m（V100，独占） | 未达门：vs RUN-007-A AUC +0.0038（门 0.7956）、F1 −0.0020；比 RUN-008-B 低 −0.0010；6/25 轮提前停止（非早停），不能判定完整预算 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -1195,6 +1284,7 @@ RUN-007-A（−0.0103 / −0.0098），C 高 +0.0184，且 C 在 0.2–0.7 全�
 注：RUN008 四组的 macro-AUC 与 F1@0.5 取 `outputs/compare_run008/summary.md` 的重算值（A/B/C 与 `metrics.csv` 的差异 ≤0.0001，D 的 AUC 差 0.0120 因输出近似随机）；四组固定 6 轮无早停，与 RUN-007-A 的 25 轮上限 / 12 轮早停不同，差值只作方向性参考。
 注：RUN008 四组按 A+B / C+D 两两并行执行，单轮耗时受共享 GPU 影响，不可与串行 run 对照；D 组第一次并行运行于 21:52 按用户要求停止并删除，22:02 起单独重跑。
 注：RUN008-D 权重为 CC BY-NC 4.0，按赛题第 1 条不能用于提交；该组训练异常（逐类 AUC 0.46–0.54），不参与骨干判读。
+注：RUN-009-A 的 macro-AUC 与 F1@0.5 取 `last.pt` 的 `extras.best_metrics`（`run_eval.py` 重算 0.7945 / 0.4178，差 ≤0.0007）；与 RUN-007-A / RUN-008-B 的差值同时来自分辨率（384 vs 320）与训练预算（25 轮上限 vs 固定 6 轮）改变，且本组只跑 6/25 轮即按用户要求停止，不能作单变量归因；硬件为 V100-SXM2-32G（与 RUN-001~008 的 RTX 3090 是不同实例），耗时不可横向对照。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 

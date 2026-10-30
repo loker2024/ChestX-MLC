@@ -8,6 +8,15 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-10-30
+
+- `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
+- `14:02`（变更）远端训练环境（不涉及仓库文件）：autodl 训练环境项目由 `/root/autodl-tmp/ChestX-MLC` 整体迁移至系统盘 `/root/ChestX-MLC`（代码 + `.venv`，合计约 7.4G），`data/` 保留在数据盘 `/root/autodl-tmp/ChestX-MLC/data` 并以软链接接入；venv 内 22 个脚本的绝对路径已修正，`torch 2.10.0+cu128`、CUDA 可用，`pytest` 194 passed / 1 skipped。
+- `14:55`（变更）`docs/training_log.md`：回填 RUN-009-A `run009a_effv2s_384_s2026` 实测——EfficientNetV2-S RW @384×384，6/25 轮后按用户要求停止（非早停），最优 epoch 5（macro-AUC 0.7944 / F1@0.5 0.4185，`run_eval` 重算 0.7945 / 0.4178）；补运行命令、V100-SXM2-32G 环境、HF 直连失败与 `HF_HUB_OFFLINE=1` 重启经过、显存峰值约 15.9 GB、逐类 AUC 对比；汇总表新增一行并加注「未达门、6/25 轮提前停止、硬件不同不可横向对照」。
+- `14:55`（变更）`docs/experiments.md`：实验矩阵新增 RUN-009-A 行（实际 6/25 轮后停止）；「执行与结果」新增 2026-10-30 结论（384 + 完整轮数在 6 轮内未见增量、未达 +0.005 门、比 RUN-008-B 低 −0.0010、出现过拟合迹象、不能判定 25 轮完整预算）；「更高分辨率 / TTA」待验证项补 RUN-009-A 结果。
+- `14:55`（变更）`docs/train_plan09.md`：执行记录由「计划串行 009-B → 009-A」改为实际执行（新 V100 实例、先跑 RUN-009-A、6/25 轮后按用户要求停止、RUN-009-B 未执行、`best.pt` 由 `last.pt` 导出）。
+- `14:55`（变更）远端训练环境（不涉及仓库文件）：RUN-009-A 提前停止导致 `best.pt` 缺失，用临时脚本从 `last.pt` 的 `extras.best_state`（epoch 5）导出 `outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt`（89,586,379 B），供 `run_eval.py` 与后续耗时自检使用。
+
 ## 2026-10-29
 
 - `11:55`（变更）`docs/training_log.md`：回填 RUN-005 `resnet50_s42` 与 RUN-006 `densenet121_s42` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；RUN-005 最优 epoch 9（macro-AUC 0.7857 / F1@0.5 0.4193，第 14 轮早停）、RUN-006 最优 epoch 8（0.7880 / 0.4070，第 13 轮早停），补两组逐类 AUC 对比表；汇总表新增两行，并加「继承 cosine + `pos_weight: true`、与历史 warmup + `pos_weight: false` 口径不同」的脚注。

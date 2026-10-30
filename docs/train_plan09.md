@@ -53,9 +53,13 @@ python src/run_train.py --config configs/exp_run009b.yaml --seed 2026 --tag run0
 python src/run_train.py --config configs/exp_run009a.yaml --seed 2026 --tag run009a_effv2s_384_s2026 > outputs/run009a.nohup.log 2>&1
 ```
 
-启动状态：2026-10-29 23:00:52 CST（服务器 UTC 15:00:52）在代码 `8cc458d`（新增本组配置）上
-启动 RUN-009-B；RTX 3090 24G、torch 2.10.0+cu128、timm 1.0.30。显存实测首轮 8,160 MiB；
-RUN-009-A 启动时若 OOM 或显存逼近上限，按实际现象记录并停止，不擅自改 batch 后仍称为同口径。
+实际执行（2026-10-30）：原计划的串行脚本 `/root/run009.sh` 不在当前训练实例上（训练环境已换为
+V100-SXM2-32G，显存 32 GB、驱动 580.105.08，torch 2.10.0+cu128、timm 1.0.30，96 核 / 375 GB
+内存），在代码 `bf7e276` 上先启动 **RUN-009-A**（`HF_HUB_OFFLINE=1`，14:07:36 CST），显存峰值
+约 15.9 GB、单轮约 6.7 分钟；按用户要求在第 6 轮结束后（约 14:50）停止，未跑满 25 轮、未触发
+早停，**RUN-009-B 未执行**。首次启动时 HuggingFace 直连失败、预训练权重回退随机初始化，已改用
+hf-mirror 预下载并以 `HF_HUB_OFFLINE=1` 重启（详见 [训练记录](training_log.md)）。因提前停止，
+`best.pt` 由 `last.pt` 的 `extras.best_state` 导出后再评估。
 配置解析检查确认两组相对 RUN-007-A 只差骨干、`image.size`、`train.epochs`、
 `train.early_stop_patience` 四项。
 

@@ -25,6 +25,8 @@ env/
 # 这些是仓库根目录下的数据目录，写成 /data/ 而不是 data/：后者会按名字匹配
 # 任意层级，连源码包 src/data/ 也会被忽略掉。
 /data/
+/data
+# data 为软链接（指向数据盘）时同样忽略
 /datasets/
 /images/
 /raw/
