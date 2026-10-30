@@ -383,6 +383,51 @@ def test_a001d_experiment_config_loads():
     assert cfg.seed == 42
 
 
+# A-001-G1…G5 五组 ASL 超参对照：(gamma_pos, gamma_neg, clip)，与分组表一致。
+_A001_ASL_GROUPS = {
+    "G1": (0.0, 2.0, 0.05),
+    "G2": (0.0, 6.0, 0.05),
+    "G3": (0.0, 4.0, 0.0),
+    "G4": (0.0, 4.0, 0.10),
+    "G5": (1.0, 4.0, 0.05),
+}
+
+
+@pytest.mark.parametrize("group", sorted(_A001_ASL_GROUPS))
+def test_a001g_experiment_config_loads(group):
+    """A-001-G1…G5 只调 ASL 的 gamma / clip，其余口径与 A-001 逐字段一致。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    gamma_pos, gamma_neg, clip = _A001_ASL_GROUPS[group]
+    path = configs / f"exp_A001_{group}.yaml"
+    a001 = load_config(configs / "exp_A001.yaml").to_dict()
+    config = load_config(path).to_dict()
+
+    # 五组都是「A-001 换 ASL 损失」，只在 gamma_pos / gamma_neg / clip 上分组不同。
+    assert config["train"].pop("loss") == "asl"
+    assert config["train"].pop("pos_weight") is False
+    assert config["train"].pop("asl_gamma_pos") == pytest.approx(gamma_pos)
+    assert config["train"].pop("asl_gamma_neg") == pytest.approx(gamma_neg)
+    assert config["train"].pop("asl_clip") == pytest.approx(clip)
+    for key in ("loss", "pos_weight", "asl_gamma_pos", "asl_gamma_neg", "asl_clip"):
+        a001["train"].pop(key)
+    assert config == a001
+
+    text = path.read_text(encoding="utf-8")
+    assert any(line.strip() == "_base: exp_A001.yaml" for line in text.splitlines())
+
+    cfg = load_config(path)
+    assert cfg.model.backbone == "convnext_tiny.fb_in1k"
+    assert cfg.model.pretrained is True
+    assert cfg.model.aggregation == "view_weighted"
+    assert cfg.image.size == 320
+    assert cfg.train.epochs == 8
+    assert cfg.train.early_stop_patience == 2
+    assert cfg.train.lr_scheduler == "cosine"
+    assert cfg.train.loss == "asl"
+    assert cfg.train.pos_weight is False
+    assert cfg.seed == 42
+
+
 def test_asl_loss_rejects_pos_weight_combination():
     """ASL 自带非对称重加权，再叠加 pos_weight 会破坏口径，配置阶段直接报错。"""
     with pytest.raises(ValueError, match="pos_weight"):

@@ -1,0 +1,23 @@
+# 实验 A-001-G5：A-001 的 ASL 正样本聚焦对照（gamma_pos 0 → 1）。
+#
+# 以 `configs/exp_A001b.yaml` 的 ASL 口径为参照，只调正样本聚焦指数：
+#   - A-001-B（参照）：ASL gamma_pos 0 / gamma_neg 4 / clip 0.05
+#   - A-001-G5：gamma_pos 0 → 1（对正样本也做聚焦，检查是否有帮助）
+# 其余口径逐字段沿用 A-001：ConvNeXt-Tiny（convnext_tiny.fb_in1k，ImageNet
+# 预训练）、320×320 letterbox、正侧位 7:3 加权聚合、8 轮上限 + cosine 调度、
+# 早停 patience 2、seed 42。
+#
+# ASL 自带正负样本非对称重加权，不再叠加 `pos_weight`，因此显式置 false
+# （配置校验会拒绝 ASL + pos_weight 同时开启）。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_A001_G5.yaml --seed 42 --tag A-001-G5_convnext_tiny_asl_s42
+
+_base: exp_A001.yaml
+
+train:
+  loss: asl
+  pos_weight: false
+  asl_gamma_pos: 1.0
+  asl_gamma_neg: 4.0
+  asl_clip: 0.05
