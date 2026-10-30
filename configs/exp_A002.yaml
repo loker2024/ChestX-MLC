@@ -1,0 +1,26 @@
+# 实验 A-002：A-001 的轻量 CNN 骨干对照（ConvNeXt-Tiny → MobileNetV3-Small 0.5×）。
+#
+# 以 `configs/exp_A001.yaml` 为唯一变更基准（`_base` 继承），只动三处：
+#   1. `model.backbone`: convnext_tiny.fb_in1k → mobilenetv3_small_050.lamb_in1k
+#      （10 类头共 578,474 参数，对比 A-001 的 27,827,818）
+#   2. `train.epochs`: 8 → 25（轻量模型换更大训练预算）
+#   3. `train.early_stop_patience`: 2 → 5（配合更长的轮数上限）
+# 注意 `train.epochs` 同时决定 cosine 衰减周期（末轮正好到 `lr_min`），
+# 所以相对 A-001 的 cosine 周期也由 5 步变为 22 步；比较时不能把轮数差
+# 当成模型收敛快慢的证据，详见 `docs/train_plan10.md`。
+# 其余口径逐字段沿用 A-001：320×320 letterbox、ImageNet 归一化、关闭水平翻转、
+# `view_weighted` 聚合（正位 0.7 / 侧位 0.3）、BCE + `pos_weight`、
+# batch 16 studies、lr 0.0003、weight decay 0.01、warmup 2、最低 lr 0.00001、
+# AMP、grad clip 5.0、num_workers 16、seed 42。
+#
+# 用法（在仓库根目录执行；权重需已在缓存）：
+#     HF_HUB_OFFLINE=1 python src/run_train.py --config configs/exp_A002.yaml --seed 42 --tag A-002_mobilenetv3_small050_s42
+
+_base: exp_A001.yaml
+
+model:
+  backbone: mobilenetv3_small_050.lamb_in1k
+
+train:
+  epochs: 25
+  early_stop_patience: 5

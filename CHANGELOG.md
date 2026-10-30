@@ -66,6 +66,7 @@
 
 - `22:28`（新增）`docs/train_plan10.md`：制定 A-002 约 58 万参数 MobileNetV3-Small 对照计划，记录配置、预训练权重核验、执行步骤、判读门及结果回填要求；尚未创建配置或训练。
 - `22:32`（变更）`docs/train_plan10.md`：A-002 调整为最多 25 轮、早停 patience 5；说明与 A-001 的训练预算和 cosine 周期不同，并补充同预算骨干配对的复核条件。
+- `22:38`（新增）`configs/exp_A002.yaml`、`tests/test_config.py`：新增实验 A-002 配置——以 `_base: exp_A001.yaml` 继承 A-001，只覆盖三处：`model.backbone` 改为 `mobilenetv3_small_050.lamb_in1k`（10 类头 578,474 参数，对比 A-001 的 27,827,818）、`train.epochs: 8 → 25`、`train.early_stop_patience: 2 → 5`；其余口径逐字段沿用 A-001（320×320 letterbox、ImageNet 归一化、无水平翻转、正侧位 7:3 加权聚合、BCE + `pos_weight`、warmup 2 后 cosine、`batch_studies: 16`、seed 42）。注意 `epochs` 同时决定 cosine 周期（5 → 22 步），比较时不能把轮数差当作收敛快慢证据。补 `test_a002_experiment_config_loads` 断言除上述三项外与 A-001 逐字段一致、`_base` 行存在及关键字段。本机 `python -m pytest tests/test_config.py -q` 40 passed。
 
 ## 2026-10-29
 
