@@ -1,6 +1,7 @@
 """模型与损失：study 级均值聚合、参数规模、BCE 的 pos_weight 计算。"""
 
 from pathlib import Path
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -46,6 +47,32 @@ def test_build_model_parameter_count_is_deployment_friendly():
     params = sum(parameter.numel() for parameter in model.parameters())
 
     assert 10_000_000 < params < 13_000_000
+
+
+def test_freeze_backbone_leaves_only_classifier_trainable():
+    config = replace(
+        _config(),
+        model=replace(_config().model, freeze_backbone=True),
+    )
+    model = build_model(config)
+    classifier = model.get_classifier()
+
+    assert isinstance(classifier, torch.nn.Module)
+    classifier_parameters = {id(parameter) for parameter in classifier.parameters()}
+    trainable_parameters = {
+        id(parameter) for parameter in model.parameters() if parameter.requires_grad
+    }
+    assert classifier_parameters
+    assert trainable_parameters == classifier_parameters
+    assert all(
+        parameter.requires_grad
+        for parameter in classifier.parameters()
+    )
+    assert all(
+        not parameter.requires_grad
+        for parameter in model.parameters()
+        if id(parameter) not in classifier_parameters
+    )
 
 
 def test_aggregate_logits_averages_within_each_study():

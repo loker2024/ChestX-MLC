@@ -23,6 +23,7 @@
 - `15:50`（变更）`docs/manual.md`：§2.2 配置表与继承关系补 `configs/exp_A001.yaml`（完整展开、无继承）。
 - `15:50`（变更）远端训练环境（不涉及仓库文件）：本机无法直连 HuggingFace 与 hf-mirror，改从 ModelScope 下载 `timm/convnext_tiny.fb_in1k`（`model.safetensors` 114,374,272 B、SHA-256 `08b9dc9c3a3a29421de7996761e176501896d1ae7fc3085cf56a643772329276`，与 RUN008-C 记录一致）并按 HF 缓存结构放置后以 `HF_HUB_OFFLINE=1` 启动 A-001，`train.log` 确认「预训练权重: 已加载」。
 - `16:42`（新增）`src/common/config.py`、`configs/exp_freeze_head.yaml`、`tests/test_config.py`：增加 `model.freeze_backbone` 配置开关，默认关闭；新增冻结骨干、仅训练分类头的实验配置与加载断言。
+- `16:43`（新增）`src/model/network.py`、`tests/test_model.py`：通过 timm `get_classifier()` 实现通用骨干冻结逻辑，仅解冻分类头，并在分类头不可识别或无参数时明确报错。
 
 ## 2026-10-29
 

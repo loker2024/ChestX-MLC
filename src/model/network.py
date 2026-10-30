@@ -23,6 +23,24 @@ from torch import nn
 from common.config import Config
 
 
+def _freeze_backbone(model: nn.Module, backbone: str) -> None:
+    """冻结模型参数，只解冻 timm 暴露的分类头。"""
+    classifier_getter = getattr(model, "get_classifier", None)
+    if not callable(classifier_getter):
+        raise ValueError(f"骨干 {backbone!r} 没有可识别的分类头（缺少 get_classifier）")
+    classifier = classifier_getter()
+    if not isinstance(classifier, nn.Module):
+        raise ValueError(f"骨干 {backbone!r} 的分类头不是 nn.Module")
+    classifier_parameters = list(classifier.parameters())
+    if not classifier_parameters:
+        raise ValueError(f"骨干 {backbone!r} 的分类头没有可训练参数")
+
+    for parameter in model.parameters():
+        parameter.requires_grad_(False)
+    for parameter in classifier_parameters:
+        parameter.requires_grad_(True)
+
+
 def build_model(cfg: Config) -> nn.Module:
     """按配置构建 timm 图像分类模型，输出每张图的 10 类 logits。
 
@@ -52,6 +70,8 @@ def build_model(cfg: Config) -> nn.Module:
             num_classes=cfg.model.num_classes,
         )
         model.pretrained_loaded = False
+    if cfg.model.freeze_backbone:
+        _freeze_backbone(model, cfg.model.backbone)
     return model
 
 
