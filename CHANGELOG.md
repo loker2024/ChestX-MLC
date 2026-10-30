@@ -10,6 +10,9 @@
 
 ## 2026-10-30
 
+- `20:56`（变更）`outputs/submission_ensemble_3m_prob_211_rank1.csv`、`outputs/submission_ensemble_3m_prob_111_rank2.csv`、`Submission.md`：按“直接在 csv 上改名字、标注清楚”的要求整理融合提交文件——删除重复归档副本，把两个 `submission.csv` 分别直接改名为 `submission_ensemble_3m_prob_211_rank1.csv`（第一名，权重 2:1:1）与 `submission_ensemble_3m_prob_111_rank2.csv`（第二名，权重 1:1:1），文件名同时标注 valid 排名与融合权重；更新 `Submission.md` 两节的路径引用。
+- `20:52`（变更）`Submission.md`、`outputs/submission_ensemble_3m_prob_111_rank2.csv`：归档 valid 融合矩阵排名第二的候选提交——3 模型（A-001 / RUN-009-A / A-001-D）probability 等权融合、权重 1:1:1，valid Macro-AUC 0.8100 / Macro-F1@0.5 0.4409；`submission.csv` 由 `python src/run_ensemble.py --split test --out outputs/ensemble/test_w111` 生成并通过 `validate_submission` 校验（1,414 个 study、14,140 行），下载回本机后直接改名为 `outputs/submission_ensemble_3m_prob_111_rank2.csv` 保存，记录 SHA-256。
+- `20:20`（变更）`Submission.md`、`outputs/submission_ensemble_3m_prob_211_rank1.csv`：归档多模型融合候选提交——3 模型（A-001 / RUN-009-A / A-001-D）probability 融合、权重 2:1:1，valid Macro-AUC 0.8104 / Macro-F1@0.5 0.4389；`submission.csv` 由训练环境 `python src/run_ensemble.py --split test --out outputs/ensemble/test` 生成并已通过 `validate_submission` 校验（1,414 个 study、14,140 行），下载回本机后直接改名为 `outputs/submission_ensemble_3m_prob_211_rank1.csv` 保存（被 Git 忽略），报告完整融合对比、命令与 SHA-256。
 - `20:09`（新增）`configs/exp_A001_G1.yaml`…`configs/exp_A001_G5.yaml`、`tests/test_config.py`：新增 A-001-G1…G5 五组 ASL 超参对照配置——均以 `_base: exp_A001.yaml` 继承 A-001，只把损失换成 ASL（`train.loss: asl`、`train.pos_weight: false`）并各自覆盖 `asl_gamma_pos / asl_gamma_neg / asl_clip`：G1（0 / 2 / 0.05，减弱负样本抑制）、G2（0 / 6 / 0.05，更强负样本抑制）、G3（0 / 4 / 0.00，关闭概率移位）、G4（0 / 4 / 0.10，增大概率移位）、G5（1 / 4 / 0.05，正样本聚焦）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视角加权聚合、8 轮 cosine、早停 2、seed 42）。补参数化测试 `test_a001g_experiment_config_loads`（5 组），断言除 ASL 五项外与 A-001 逐字段一致、`_base` 行存在及关键字段。本机 `python -m pytest tests/test_config.py -q` 39 passed。
 - `19:21`（修复）`src/run_ensemble.py`、`tests/test_ensemble.py`：融合前新增跨模型 `Study_id -> Subject_id` 一致性校验，避免不同 test 数据源静默生成错误患者 ID；补回归测试。
 - `19:09`（新增）`configs/exp_A001d.yaml`、`tests/test_config.py`：新增实验 A-001-D 配置——以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位加权，study 内图片等权均值，`frontal_weight` 保留原值但不参与计算）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001d_experiment_config_loads` 断言除聚合方式外逐字段一致。本机 `python -m pytest tests/test_config.py -q` 34 passed。
@@ -60,6 +63,9 @@
 - **19:55**（变更）`docs/training_log.md`：回填 A-001-D 实测——ConvNeXt-Tiny @320×320，以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位 0.7/0.3 加权），8/8 轮跑满，最优 epoch 6（macro-AUC **0.7931** / F1@0.5 0.4340，`run_eval.py` 重算一致）；记录运行命令、V100-SXM2-32G 环境、40m03s 耗时与约 14.0 GB 显存、阈值曲线与逐类 AUC（4 升 6 降）；汇总表新增一行并加注。
 - **19:55**（变更）`docs/experiments.md`：实验矩阵新增 A-001-D 行；「执行与结果」新增 A-001-D 结论（取消正侧位加权 AUC −0.0107、超 ±0.005 判读门、约 3.2 倍 seed 波动；F1 峰位 0.6→0.5 属校准差 → 等权不优于加权）；「视图元信息（ViewPosition）」与「聚合方式消融」两个待验证项同步更新。
 - **19:55**（变更）远端训练环境（不涉及仓库文件）：A-001-D 于 2026-10-30 19:06:45–19:46:48 在 autodl V100-SXM2-32G 独占执行（产物 `outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/`，`best.pt` 111,384,875 B / `last.pt` 445,536,427 B，8 轮跑满无早停）；训练记录在训练环境内回填并提交。
+
+- `22:28`（新增）`docs/train_plan10.md`：制定 A-002 约 58 万参数 MobileNetV3-Small 对照计划，记录配置、预训练权重核验、执行步骤、判读门及结果回填要求；尚未创建配置或训练。
+- `22:32`（变更）`docs/train_plan10.md`：A-002 调整为最多 25 轮、早停 patience 5；说明与 A-001 的训练预算和 cosine 周期不同，并补充同预算骨干配对的复核条件。
 
 ## 2026-10-29
 
