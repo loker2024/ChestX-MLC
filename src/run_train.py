@@ -146,6 +146,26 @@ def _write_metrics(path: Path, history: list[dict[str, float]]) -> None:
     pd.DataFrame(history).to_csv(path, index=False, encoding=CSV_ENCODING)
 
 
+def _checkpoint_metadata(
+    model: torch.nn.Module,
+    config: Config,
+    device: torch.device,
+    pretrained_loaded: bool,
+) -> dict[str, Any]:
+    """生成可核对模型训练口径的 checkpoint 元数据。"""
+    total_params = sum(parameter.numel() for parameter in model.parameters())
+    trainable_params = sum(
+        parameter.numel() for parameter in model.parameters() if parameter.requires_grad
+    )
+    return {
+        "pretrained_loaded": pretrained_loaded,
+        "device": str(device),
+        "freeze_backbone": config.model.freeze_backbone,
+        "total_params": total_params,
+        "trainable_params": trainable_params,
+    }
+
+
 def _save_last_checkpoint(
     path: Path,
     model: torch.nn.Module,
@@ -166,7 +186,7 @@ def _save_last_checkpoint(
         metrics=progress.best_metrics,
         config=config,
         seed=config.seed,
-        metadata={"pretrained_loaded": pretrained_loaded, "device": str(device)},
+        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded),
         extras={
             "best_auc": progress.best_auc,
             "best_epoch": progress.best_epoch,
@@ -263,7 +283,7 @@ def run_training(
         metrics=result["best_metrics"],
         config=config,
         seed=config.seed,
-        metadata={"pretrained_loaded": pretrained_loaded, "device": str(device)},
+        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded),
     )
     print(f"最优权重已保存: {checkpoint_path}")
     return result
