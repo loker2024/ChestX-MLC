@@ -10,6 +10,8 @@
 
 ## 2026-10-30
 
+- `18:49`（新增）`docs/superpowers/specs/2026-10-30-ensemble-design.md`：确定多模型融合设计，支持概率加权与 logits 加权；`valid` / `train` 复用现有 Macro-AUC、Macro-F1 和逐类报告，`test` 输出完整 10 类 submission。
+
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
 - `14:02`（变更）远端训练环境（不涉及仓库文件）：autodl 训练环境项目由 `/root/autodl-tmp/ChestX-MLC` 整体迁移至系统盘 `/root/ChestX-MLC`（代码 + `.venv`，合计约 7.4G），`data/` 保留在数据盘 `/root/autodl-tmp/ChestX-MLC/data` 并以软链接接入；venv 内 22 个脚本的绝对路径已修正，`torch 2.10.0+cu128`、CUDA 可用，`pytest` 194 passed / 1 skipped。
 - `14:55`（变更）`docs/training_log.md`：回填 RUN-009-A `run009a_effv2s_384_s2026` 实测——EfficientNetV2-S RW @384×384，6/25 轮后按用户要求停止（非早停），最优 epoch 5（macro-AUC 0.7944 / F1@0.5 0.4185，`run_eval` 重算 0.7945 / 0.4178）；补运行命令、V100-SXM2-32G 环境、HF 直连失败与 `HF_HUB_OFFLINE=1` 重启经过、显存峰值约 15.9 GB、逐类 AUC 对比；汇总表新增一行并加注「未达门、6/25 轮提前停止、硬件不同不可横向对照」。
