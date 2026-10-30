@@ -32,6 +32,7 @@
 - `17:05`（新增）`docs/manual.md`、`docs/experiments.md`：登记 `exp_freeze_head.yaml` 与 RUN-010 待执行实验，补充 `model.freeze_backbone`、checkpoint 参数计数说明及远程训练命令；明确本机未执行真实 GPU 训练。
 - `17:11`（修复）`src/model/network.py`、`src/train/engine.py`、`tests/test_engine.py`：冻结模式下将骨干切到 `eval()`，保持 BatchNorm running statistics 不变，同时恢复分类头的 `train()` 状态并补回归断言。
 - `17:19`（新增）`configs/exp_A001a.yaml`：新增实验 A-001-a 配置——以 A-001 为基准只把 `image.hflip` 由 `false` 改为 `true`（训练随机水平翻转），其余逐项沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视图加权聚合、8 轮上限 + 早停 2、seed 42）；文件为完整展开配置、无 `_base`。
+- `17:22`（变更）`.gitignore`：忽略本机工具产物目录 `.playwright-cli/` 与 `.workbuddy/`，避免 `git status` 出现未跟踪项。
 
 ## 2026-10-29
 
