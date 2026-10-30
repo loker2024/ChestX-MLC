@@ -133,6 +133,8 @@ train:
 | `configs/exp_run008d.yaml` | RUN008-D：ConvNeXtV2-Nano 骨干对照（研究用，CC BY-NC 4.0 不能提交；训练异常），已完成 | `_base: exp_run007a.yaml` | `model.backbone: convnextv2_nano.fcmae_ft_in1k`、`train.epochs: 6`、`train.early_stop_patience: 0` |
 | `configs/exp_A001.yaml` | A-001：RUN-008-C 的重跑（ConvNeXt-Tiny @320×320，epoch=8 / 早停 2 / seed 42），已完成 | 无（完整展开，不继承 `default.yaml`） | 与 `exp_run008c.yaml` 展开结果仅差 `train.epochs: 8`、`train.early_stop_patience: 2`、`seed: 42` |
 | `configs/exp_A001b.yaml` | A-001-B：A-001 的 ASL 损失对照（ASL 替代 BCE + `pos_weight`，其余口径不变），已完成 | `_base: exp_A001.yaml` | 只覆盖 `train.loss: asl`、`train.pos_weight: false`、`train.asl_gamma_pos: 0.0`、`train.asl_gamma_neg: 4.0`、`train.asl_clip: 0.05` 五项 |
+| `configs/exp_A001a.yaml` | A-001-a：A-001 的训练随机水平翻转对照（只把 `image.hflip` 改 true），已完成 | 无（完整展开，不继承 `default.yaml`） | 与 `exp_A001.yaml` 展开结果仅差 `image.hflip: true` |
+| `configs/exp_A001c.yaml` | A-001-C：A-001 的冻结骨干对照（`freeze_backbone: true`，只训练分类头），已完成 | `_base: exp_A001.yaml` | 只覆盖 `model.freeze_backbone: true` |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
 
@@ -162,6 +164,8 @@ default.yaml
 
 > `configs/exp_A001.yaml` 为 A-001 的完整展开配置，不使用 `_base` 继承，故未画入上面的继承树。
 > `configs/exp_A001b.yaml` 以 `_base: exp_A001.yaml` 继承 A-001，只覆盖损失相关五项，未单独画入继承树。
+> `configs/exp_A001a.yaml` 为 A-001-a 的完整展开配置、不使用 `_base` 继承，故未画入上面的继承树。
+> `configs/exp_A001c.yaml` 以 `_base: exp_A001.yaml` 继承 A-001，只覆盖 `model.freeze_backbone: true`，未单独画入继承树。
 >
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
 
