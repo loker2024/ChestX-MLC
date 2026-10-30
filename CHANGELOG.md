@@ -11,6 +11,7 @@
 ## 2026-10-30
 
 - `19:09`（新增）`configs/exp_A001d.yaml`、`tests/test_config.py`：新增实验 A-001-D 配置——以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位加权，study 内图片等权均值，`frontal_weight` 保留原值但不参与计算）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001d_experiment_config_loads` 断言除聚合方式外逐字段一致。本机 `python -m pytest tests/test_config.py -q` 34 passed。
+- `19:12`（新增）`src/run_ensemble.py`、`tests/test_ensemble.py`、`docs/manual.md`：新增多模型融合 CLI；支持概率 / logits 加权、`train` / `valid` AUC-F1 重算、`test` submission 校验和使用说明；专项测试 12 passed。
 - `19:05`（新增）`src/infer/predict.py`、`tests/test_ensemble.py`：新增 study-level logits 推理入口并复用现有聚合逻辑；专项与模型推理测试 28 passed / 1 skipped。
 - `19:01`（新增）`src/infer/ensemble.py`、`tests/test_ensemble.py`：新增概率加权 / logits 加权融合函数、权重归一化、Study_id 对齐与输入校验；8 项专项测试通过。
 - `18:52`（新增）`docs/superpowers/plans/2026-10-30-ensemble.md`：拆分多模型融合实现任务，覆盖融合函数、study-level logits、train/valid 指标产物、test submission 与全量验证。

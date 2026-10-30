@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 import torch
 from torch import nn
+import yaml
 
 from infer.ensemble import fuse_prediction_frames, normalize_weights
 from infer.predict import predict_loader_logits
+from common.checkpoint import save_checkpoint
+from common.config import load_config
+from model.network import build_model
 
 
 def _probability_frame(study_ids: list[str], values: list[float]) -> pd.DataFrame:
@@ -106,3 +113,112 @@ def test_predict_loader_logits_aggregates_images_by_study() -> None:
 
     assert logits["Study_id"].tolist() == ["study_a", "study_b"]
     np.testing.assert_allclose(logits["z1"], [2.0, 5.0])
+
+
+def _make_run_pair(tmp_path: Path, labeled_split: dict, write_config) -> tuple[Path, Path]:
+    config_path = write_config(
+        {
+            "train": (labeled_split["csv"], labeled_split["images"]),
+            "valid": (labeled_split["csv"], labeled_split["images"]),
+            "test": (labeled_split["csv"], labeled_split["images"]),
+        }
+    )
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    raw["model"] = {"pretrained": False}
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    config = load_config(config_path)
+
+    runs = []
+    for index in range(2):
+        torch.manual_seed(index)
+        model = build_model(config)
+        run_dir = tmp_path / f"run_{index}"
+        checkpoint = save_checkpoint(run_dir / "best.pt", model, config=config, seed=index)
+        runs.append(checkpoint)
+    return runs[0], runs[1]
+
+
+def test_run_ensemble_valid_writes_metrics_and_threshold_curve(
+    tmp_path: Path, labeled_split: dict, write_config
+) -> None:
+    import run_ensemble
+
+    checkpoint_a, checkpoint_b = _make_run_pair(tmp_path, labeled_split, write_config)
+    output_dir = tmp_path / "ensemble_valid"
+
+    run_ensemble.main(
+        [
+            "--checkpoint",
+            str(checkpoint_a),
+            str(checkpoint_b),
+            "--weights",
+            "1,3",
+            "--fusion",
+            "probability",
+            "--split",
+            "valid",
+            "--thresholds",
+            "0.3,0.5",
+            "--out",
+            str(output_dir),
+        ]
+    )
+
+    metrics = json.loads((output_dir / "metrics.json").read_text(encoding="utf-8"))
+    assert metrics["fusion"] == "probability"
+    np.testing.assert_allclose(metrics["weights"], [0.25, 0.75])
+    assert {"macro_auc", "macro_f1"} <= set(metrics)
+    assert len(pd.read_csv(output_dir / "per_class.csv")) == 10
+    assert pd.read_csv(output_dir / "f1_curve.csv")["threshold"].tolist() == [0.3, 0.5]
+    assert set(pd.read_csv(output_dir / "predictions.csv").columns) == {
+        "Study_id",
+        *(f"p{class_id}" for class_id in range(1, 11)),
+    }
+
+
+def test_run_ensemble_test_writes_validated_submission(
+    tmp_path: Path, labeled_split: dict, write_config
+) -> None:
+    import run_ensemble
+
+    checkpoint_a, checkpoint_b = _make_run_pair(tmp_path, labeled_split, write_config)
+    output_dir = tmp_path / "ensemble_test"
+
+    run_ensemble.main(
+        [
+            "--checkpoint",
+            str(checkpoint_a),
+            str(checkpoint_b),
+            "--fusion",
+            "logit",
+            "--split",
+            "test",
+            "--out",
+            str(output_dir),
+        ]
+    )
+
+    submission = pd.read_csv(output_dir / "submission.csv")
+    assert list(submission.columns) == [
+        "Subject_id",
+        "Study_id",
+        "Predict_class",
+        "Probability",
+    ]
+    assert submission.groupby("Study_id").size().tolist() == [10, 10]
+    assert submission["Probability"].between(0.0, 1.0).all()
+
+
+def test_run_ensemble_rejects_config_count_mismatch(tmp_path: Path) -> None:
+    import run_ensemble
+
+    with pytest.raises(ValueError, match="--config 数量"):
+        run_ensemble.main(
+            [
+                "--checkpoint",
+                str(tmp_path / "a.pt"),
+                str(tmp_path / "b.pt"),
+                "--config",
+                str(tmp_path / "only.yaml"),
+            ]
+        )

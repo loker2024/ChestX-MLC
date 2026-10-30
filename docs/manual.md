@@ -626,7 +626,40 @@ python src/run_infer.py \
 
 因为 `config.yaml` 记录的是训练时的 `backbone`、聚合方式与权重、`image.size` 和数据路径，能避免“用新默认配置推理旧权重”导致的结构或预处理不一致。
 
-### 4.5 多 run 对比：`run_compare.py`
+### 4.5 多模型融合：`run_ensemble.py`
+
+```bash
+# 在 valid 上做概率加权，并重新计算 Macro-AUC / Macro-F1
+python src/run_ensemble.py \
+    --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/best.pt \
+    --weights 0.5,0.5 \
+    --fusion probability \
+    --split valid \
+    --thresholds 0.3,0.4,0.5,0.6,0.7 \
+    --out outputs/ensemble_valid
+
+# 在 test 上做 logits 加权并生成提交文件
+python src/run_ensemble.py \
+    --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/best.pt \
+    --weights 1,3 \
+    --fusion logit \
+    --split test \
+    --out outputs/ensemble_test
+```
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `--checkpoint` | 必填 | 一个或多个 `best.pt`；每个模型先按自身 checkpoint 配置完成 study 聚合。 |
+| `--config` | 无 | 旧 checkpoint 没有内嵌配置时传入与 checkpoint 等数量的配置路径。 |
+| `--weights` | 等权 | 逗号分隔的全局模型权重，程序会归一化；必须非负且至少一个为正。 |
+| `--fusion` | `probability` | `probability` 对 sigmoid 概率加权；`logit` 对 study-level logits 加权后再 sigmoid。 |
+| `--split` | `test` | `train` / `valid` 会写指标产物；`test` 写提交文件。 |
+| `--thresholds` | 无 | `train` / `valid` 的 Macro-F1 阈值网格；AUC 不受阈值影响。 |
+| `--out` | `outputs/ensemble` | 输出目录。带标签 split 写 `metrics.json`、`per_class.csv`、`f1_curve.csv`、`predictions.csv`；test 写 `submission.csv`。 |
+
+融合前会按 `Study_id` 对齐所有模型结果，并检查 study 集合一致。`test` 默认输出每个 study 的全部 10 类概率，提交文件继续使用现有格式校验。
+
+### 4.6 多 run 对比：`run_compare.py`
 
 ```bash
 python src/run_compare.py \
@@ -644,7 +677,7 @@ python src/run_compare.py \
 
 脚本对每个 run：优先用 `best.pt` 的配置重建 valid loader → 重算 macro-AUC、多阈值 F1 和逐类指标 → 汇总配置要点。参与对比的 run 必须使用同一份验证数据，否则指标不是同一口径。
 
-### 4.6 测试
+### 4.7 测试
 
 ```bash
 python -m pytest
@@ -652,7 +685,7 @@ python -m pytest
 
 测试使用 `tests/` 下临时生成的合成小图，不读取真实影像；覆盖标签解析、索引、数据集、数据体检、指标、模型、训练、配置、续训、提交和端到端链路。
 
-### 4.7 入口与参数速查
+### 4.8 入口与参数速查
 
 | 入口 | 必填参数 | 常用可选参数 | 主要产物 |
 | --- | --- | --- | --- |
@@ -660,6 +693,7 @@ python -m pytest
 | `src/run_train.py` | 无 | `--config`、`--seed`、`--tag`、`--resume` | run 目录：`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`last.pt` |
 | `src/run_eval.py` | `--checkpoint` | `--config`、`--split`、`--thresholds` | 终端指标与逐类明细 |
 | `src/run_infer.py` | `--checkpoint` | `--config`、`--out`、`--threshold` | `submission.csv` |
+| `src/run_ensemble.py` | `--checkpoint` | `--config`、`--weights`、`--fusion`、`--split`、`--thresholds`、`--out` | 指标产物或融合 `submission.csv` |
 | `src/run_compare.py` | `--runs` | `--thresholds`、`--out`、`--device` | `summary.csv`、`per_class.csv`、`summary.md` |
 
 ---
