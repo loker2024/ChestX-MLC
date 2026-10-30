@@ -10,6 +10,7 @@
 
 ## 2026-10-30
 
+- `18:52`（新增）`docs/superpowers/plans/2026-10-30-ensemble.md`：拆分多模型融合实现任务，覆盖融合函数、study-level logits、train/valid 指标产物、test submission 与全量验证。
 - `18:49`（新增）`docs/superpowers/specs/2026-10-30-ensemble-design.md`：确定多模型融合设计，支持概率加权与 logits 加权；`valid` / `train` 复用现有 Macro-AUC、Macro-F1 和逐类报告，`test` 输出完整 10 类 submission。
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
