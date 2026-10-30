@@ -1,0 +1,63 @@
+# 实验 A-001-a：A-001 打开水平翻转增强的对照。
+#
+# 以 A-001（`configs/exp_A001.yaml`）为基准，只改一处：
+#   `image.hflip`: false → true（训练时随机水平翻转）
+# 其余字段逐项与 A-001 保持一致：convnext_tiny.fb_in1k、320×320、view_weighted 聚合、
+# 8 轮上限 + 早停 2、seed 42。
+#
+# 本文件是完整展开配置：不写 `_base`，所有字段按当前口径逐项填全，
+# 以后 `default.yaml` 或实验继承链再变也不影响本组实验的复现口径。
+#
+# 注意：胸片左右有方向含义（`default.yaml` 默认关闭 hflip），本组用于量化
+# 水平翻转增强对 valid 指标的影响，结论需结合逐类 AUC 解读。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_A001a.yaml --seed 42 --tag A-001-a_convnext_tiny_s42
+
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+
+image:
+  size: 320
+  letterbox: true
+  normalize: imagenet
+  hflip: true
+
+model:
+  backbone: convnext_tiny.fb_in1k
+  pretrained: true
+  num_classes: 10
+  aggregation: view_weighted
+  frontal_weight: 0.7
+
+train:
+  epochs: 8
+  batch_studies: 16
+  lr: 0.0003
+  weight_decay: 0.01
+  pos_weight: true
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 0.00001
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  early_stop_patience: 2
+
+eval:
+  batch_studies: 32
+  threshold: 0.5
+
+output:
+  run_dir: outputs
+
+seed: 42
+device: auto
