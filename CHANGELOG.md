@@ -33,6 +33,7 @@
 - `17:11`（修复）`src/model/network.py`、`src/train/engine.py`、`tests/test_engine.py`：冻结模式下将骨干切到 `eval()`，保持 BatchNorm running statistics 不变，同时恢复分类头的 `train()` 状态并补回归断言。
 - `17:19`（新增）`configs/exp_A001a.yaml`：新增实验 A-001-a 配置——以 A-001 为基准只把 `image.hflip` 由 `false` 改为 `true`（训练随机水平翻转），其余逐项沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视图加权聚合、8 轮上限 + 早停 2、seed 42）；文件为完整展开配置、无 `_base`。
 - `17:22`（变更）`.gitignore`：忽略本机工具产物目录 `.playwright-cli/` 与 `.workbuddy/`，避免 `git status` 出现未跟踪项。
+- `17:26`（新增）`configs/exp_A001c.yaml`、`tests/test_config.py`：新增实验 A-001-C 配置——以 `_base: exp_A001.yaml` 只把 `model.freeze_backbone` 由 `false` 改为 `true`（冻结 ImageNet 预训练 ConvNeXt-Tiny 骨干、仅训练分类头；训练时骨干固定为 `eval()` 保持 BatchNorm running statistics 不变），其余口径逐字段沿用 A-001（320×320 letterbox、7:3 视角加权、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001c_experiment_config_loads` 断言除该字段外与 A-001 逐字段一致及关键字段。本机 `python -m pytest tests/test_config.py -q` 33 passed；合成模型验证 ConvNeXt-Tiny 冻结后 `total_params` 27,827,818 / `trainable_params` 7,690（仅分类头），骨干 `eval` + 分类头 `train` 状态正确。
 
 ## 2026-10-29
 

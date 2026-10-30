@@ -1,0 +1,20 @@
+# 实验 A-001-C：A-001 的冻结骨干对照（全量微调 → 冻结骨干、仅训练分类头）。
+#
+# 以 `configs/exp_A001.yaml` 为唯一变更基准（`_base` 继承），只动一处：
+#   `model.freeze_backbone`: false → true
+# 冻结 ImageNet 预训练的 ConvNeXt-Tiny 全部骨干参数，只保留 timm 分类头可训练；
+# 同时训练循环会把骨干固定为 eval()，BatchNorm 的 running statistics 不再更新。
+# 其余口径逐字段沿用 A-001：convnext_tiny.fb_in1k、320×320 letterbox、
+# 正侧位 7:3 加权聚合、BCE + `pos_weight`、8 轮上限 + cosine 调度、早停 patience 2、seed 42。
+#
+# 学习率等超参刻意保持 A-001 原值，使「是否冻结」成为唯一变量；
+# checkpoint metadata 会记录 `freeze_backbone`、`total_params` 与 `trainable_params`，
+# 用于确认冻结确实生效（可训练参数应只有分类头约 30K 量级）。
+#
+# 用法（在仓库根目录执行）：
+#     HF_HUB_OFFLINE=1 python src/run_train.py --config configs/exp_A001c.yaml --seed 42 --tag A-001c_convnext_tiny_freeze_s42
+
+_base: exp_A001.yaml
+
+model:
+  freeze_backbone: true

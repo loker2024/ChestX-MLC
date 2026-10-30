@@ -328,6 +328,33 @@ def test_a001b_experiment_config_loads():
     assert cfg.seed == 42
 
 
+def test_a001c_experiment_config_loads():
+    """A-001-C 只把 A-001 的骨干冻结（仅训练分类头），其余逐字段一致。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    a001 = load_config(configs / "exp_A001.yaml").to_dict()
+    config = load_config(configs / "exp_A001c.yaml").to_dict()
+
+    # 唯一差异：冻结骨干；其余字段（含损失、调度、轮数、seed）沿用 A-001。
+    assert config["model"].pop("freeze_backbone") is True
+    assert a001["model"].pop("freeze_backbone") is False
+    assert config == a001
+
+    text = (configs / "exp_A001c.yaml").read_text(encoding="utf-8")
+    assert any(line.strip() == "_base: exp_A001.yaml" for line in text.splitlines())
+
+    cfg = load_config(configs / "exp_A001c.yaml")
+    assert cfg.model.backbone == "convnext_tiny.fb_in1k"
+    assert cfg.model.pretrained is True
+    assert cfg.model.freeze_backbone is True
+    assert cfg.image.size == 320
+    assert cfg.train.epochs == 8
+    assert cfg.train.early_stop_patience == 2
+    assert cfg.train.lr_scheduler == "cosine"
+    assert cfg.train.pos_weight is True
+    assert cfg.train.loss == "bce"
+    assert cfg.seed == 42
+
+
 def test_asl_loss_rejects_pos_weight_combination():
     """ASL 自带非对称重加权，再叠加 pos_weight 会破坏口径，配置阶段直接报错。"""
     with pytest.raises(ValueError, match="pos_weight"):
