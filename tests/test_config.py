@@ -254,6 +254,38 @@ def test_run008_experiment_configs_load(key, backbone):
     assert config.seed == 2026
 
 
+def test_a001_experiment_config_loads():
+    """A-001 是 RUN008-C 的完整展开重跑：不继承，只差训练预算与 seed 三处。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    run008c = load_config(configs / "exp_run008c.yaml").to_dict()
+    config = load_config(configs / "exp_A001.yaml").to_dict()
+
+    assert config["train"].pop("epochs") == 8
+    assert config["train"].pop("early_stop_patience") == 2
+    run008c["train"].pop("epochs")
+    run008c["train"].pop("early_stop_patience")
+    assert config["seed"] == 42
+    run008c["seed"] = 42
+    # 除训练预算与 seed 外，A-001 与 RUN008-C 逐字段一致。
+    assert config == run008c
+
+    text = (configs / "exp_A001.yaml").read_text(encoding="utf-8")
+    # 完整展开：没有 `_base` 顶层键（注释里提到 `_base` 不算）。
+    assert not any(line.strip().startswith("_base:") for line in text.splitlines())
+
+    cfg = load_config(configs / "exp_A001.yaml")
+    assert cfg.image.size == 320
+    assert cfg.model.backbone == "convnext_tiny.fb_in1k"
+    assert cfg.model.pretrained is True
+    assert cfg.model.aggregation == "view_weighted"
+    assert cfg.model.frontal_weight == pytest.approx(0.7)
+    assert cfg.train.epochs == 8
+    assert cfg.train.early_stop_patience == 2
+    assert cfg.train.lr_scheduler == "cosine"
+    assert cfg.train.pos_weight is True
+    assert cfg.seed == 42
+
+
 def test_eval_threshold_range_is_checked(tmp_path):
     text = BASE.replace(
         "eval:\n  batch_studies: 2", "eval:\n  batch_studies: 2\n  threshold: 1.5"

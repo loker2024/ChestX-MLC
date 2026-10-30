@@ -1247,6 +1247,78 @@ metadata 的写法与训练脚本一致），上表指标与 `run_eval.py` 结�
 差异集中在稀有类 2/3 提升（+0.0676 / +0.0207）与常见类 6/8 回落（−0.0143 / −0.0224）；
 macro-AUC 仅高 +0.0038，没有达到判读门，也没有单类大幅退化。
 
+## A-001：RUN-008-C 重跑（epoch=8 / patience=2 / 320×320 / seed=42）
+
+用户要求在 RUN008-C 基础上重跑：训练上限改为 8 轮、早停 patience 2、输入 320×320、seed 42，
+配置独立完整展开（不继承），实验命名 A-001。除上述三项外，其余字段与 `configs/exp_run008c.yaml`
+展开后的最终配置逐字段一致（`tests/test_config.py::test_a001_experiment_config_loads` 断言）。
+
+配置 [configs/exp_A001.yaml](../configs/exp_A001.yaml)：完整展开、无 `_base`，内容与
+`exp_run008c.yaml` 展开结果相比仅三处不同：`train.epochs: 8`、`train.early_stop_patience: 2`、
+顶层 `seed: 42`；其余字段（骨干 `convnext_tiny.fb_in1k`、`image.size: 320`、letterbox、ImageNet
+归一化、无水平翻转、正侧位 7:3 加权聚合、`pos_weight: true`、warmup 2 轮后 cosine 衰减到 1e-5、
+`batch_studies: 16`、`lr: 0.0003`、`weight_decay: 0.01`、CUDA AMP、`grad_clip: 5.0`、
+`num_workers: 16` 等）与 RUN008-C 同值。
+
+| 项 | 值 |
+|---|---|
+| 相对 RUN008-C 的差异 | `train.epochs: 6 → 8`、`train.early_stop_patience: 0 → 2`、`seed: 2026 → 42`；其余全部一致（完整展开，无 `_base`） |
+| 运行命令 | `HF_HUB_OFFLINE=1 python src/run_train.py --config configs/exp_A001.yaml --seed 42 --tag A-001_convnext_tiny_s42` |
+| 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `0475bc7` + 本 run 的配置与测试改动 |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A / RUN-008 同一份） |
+| 预训练 | 已加载 `convnext_tiny.fb_in1k`（HF commit `b43a6303…`、114,374,272 B、SHA-256 `08b9dc9c…`、Apache-2.0）；本环境无法直连 HuggingFace 与 hf-mirror，从 ModelScope 下载 `timm/convnext_tiny.fb_in1k` 后按 HF 缓存结构放置（SHA-256 与 RUN008-C 记录一致），`HF_HUB_OFFLINE=1` 离线加载 |
+| 产物 | `outputs/20261030-150749_A-001_convnext_tiny_s42/`（`best.pt` 111,384,683 B / `last.pt` / `metrics.csv` / `train.log`） |
+| 耗时 | 2026-10-30 15:07:49 → 15:41:50 CST，共 **34 分 01 秒**（6 轮后早停触发，单轮约 5.7 分钟）；显存峰值约 11.7 GB（独占运行） |
+
+metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 0.9916 | 0.9412 | 0.7738 | 0.3932 |
+| 2 | 3.00e-04 | 0.9332 | 0.9315 | 0.7881 | 0.4076 |
+| 3 | 3.00e-04 | 0.8894 | 0.9057 | 0.7940 | 0.4137 |
+| 4 | 2.72e-04 | 0.8466 | 0.8856 | **0.8038** | 0.4255 |
+| 5 | 2.00e-04 | 0.7613 | 0.9333 | 0.8016 | 0.4289 |
+| 6 | 1.10e-04 | 0.6161 | 1.0194 | 0.8012 | 0.4308 |
+
+**结论**：最优 epoch 4，macro-AUC **0.8038**、F1@0.5 **0.4255**（`run_eval.py` 在 valid 上
+重算，与 `metrics.csv` 一致）；第 5、6 轮 AUC 连续低于 epoch 4，`early_stop_patience: 2` 于第
+6 轮后触发早停（训练日志「连续 2 个 epoch 没有提升，提前结束训练」）。与 RUN008-C
+（0.8008 / 0.4382，6 轮固定无早停、seed 2026、RTX 3090）相比：macro-AUC **+0.0030**、
+F1@0.5 **−0.0127**；但两者同时差 seed（42 vs 2026）、训练上限（8 vs 6 轮，cosine 周期长度也
+随之不同：epoch 4 的 lr 为 2.72e-4 vs RUN008-C 的 2.27e-4）与早停（2 vs 0）三项，**不是单变量
+对照**，AUC 差（+0.0030）也小于已观测的 seed 波动（DenseNet-121 的 seed 波动 0.0033）。
+F1@0.5 的 −0.0127 在 0.2–0.7 全阈值段均存在（Δ −0.011~−0.028），与 RUN008-C 的 `pos_weight`
+校准形态不同，不能据此判定 F1 变差；F1 峰值两 run 都在 0.6（A-001 0.4328 / RUN008-C 0.4438）。
+
+阈值曲线（`run_eval.py`）：
+
+| threshold | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 |
+|---|---|---|---|---|---|---|
+| A-001 | 0.3641 | 0.3835 | 0.4046 | 0.4255 | 0.4328 | 0.4205 |
+| RUN008-C | 0.3914 | 0.4116 | 0.4259 | 0.4382 | 0.4438 | 0.4416 |
+
+逐类 AUC（A-001 来自 `run_eval.py`，RUN008-C 来自 `outputs/compare_run008/per_class.csv` 的
+重算值；Δ 为四位小数相减）：
+
+| class_id | support | RUN008-C | A-001 | Δ（A-001−RUN008-C） |
+|---|---|---|---|---|
+| 1 | 24 | 0.7394 | 0.7438 | +0.0044 |
+| 2 | 37 | 0.8078 | 0.8537 | +0.0459 |
+| 3 | 46 | 0.7969 | 0.7889 | −0.0080 |
+| 4 | 68 | 0.7250 | 0.7374 | +0.0124 |
+| 5 | 115 | 0.8782 | 0.8719 | −0.0063 |
+| 6 | 177 | 0.7823 | 0.7867 | +0.0044 |
+| 7 | 193 | 0.7854 | 0.7801 | −0.0053 |
+| 8 | 214 | 0.7092 | 0.7048 | −0.0044 |
+| 9 | 260 | 0.9091 | 0.8955 | −0.0136 |
+| 10 | 306 | 0.8742 | 0.8754 | +0.0012 |
+
+逐类 6 升 4 降：class2 +0.0459（support 仅 37）、class4 +0.0124 提升最大，class9 −0.0136、
+class3 −0.0080 回落；没有单类大幅退化。**判读**：A-001 在更宽的轮数上限 + 早停下，6 轮内达到
+0.8038，与 RUN008-C 的 0.8008 同量级；由于三项配置差异同时改变、且只用单 seed，只能说明
+「RUN008-C 的 ConvNeXt-Tiny 水平在本组复现」，不能归因于扩展轮数或早停策略。
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -1270,6 +1342,7 @@ macro-AUC 仅高 +0.0038，没有达到判读门，也没有单类大幅退化�
 | RUN008-D | `exp_run008d.yaml` | ConvNeXtV2-Nano + fcmae_ft_in1k，6 轮无早停（仅研究） | 6 | 2 | 0.4977 | 0.1604 | 22m39s（单独） | 训练异常（逐类 AUC≈随机，原因未定位）；CC BY-NC 4.0 不合规，不参与判读、不用于提交 |
 | RUN-007-B | `exp_run007b.yaml` | DenseNet-121 + 正侧位 7:3 加权聚合 + 384×384，seed 2026，6 轮短跑 | 6 | 5 | 0.7959 | 0.4227 | 23m42s | 探针：6 轮内达 0.7959（比 007A 的 12 轮 0.7906 高 +0.0053），但轮数与调度不同、不可单变量归因分辨率；待 25 轮完整对照 |
 | RUN-009-A | `exp_run009a.yaml` | EfficientNetV2-S RW + ra2_in1k，384×384，25 轮上限 | 6（用户要求停止）/25 | 5 | 0.7944 | 0.4185 | 约 41m（V100，独占） | 未达门：vs RUN-007-A AUC +0.0038（门 0.7956）、F1 −0.0020；比 RUN-008-B 低 −0.0010；6/25 轮提前停止（非早停），不能判定完整预算 |
+| A-001 | `exp_A001.yaml` | ConvNeXt-Tiny + fb_in1k，epoch=8 / patience=2 / seed=42（RUN008-C 重跑） | 6（早停）/8 | 4 | **0.8038** | 0.4255 | 34m01s（独占，V100） | 与 RUN008-C（0.8008 / 0.4382）差 AUC +0.0030、F1 −0.0127；seed/轮数/早停三项同时不同，非单变量对照，AUC 差在 seed 波动内 → 视为 RUN008-C 水平复现 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -1285,6 +1358,7 @@ macro-AUC 仅高 +0.0038，没有达到判读门，也没有单类大幅退化�
 注：RUN008 四组按 A+B / C+D 两两并行执行，单轮耗时受共享 GPU 影响，不可与串行 run 对照；D 组第一次并行运行于 21:52 按用户要求停止并删除，22:02 起单独重跑。
 注：RUN008-D 权重为 CC BY-NC 4.0，按赛题第 1 条不能用于提交；该组训练异常（逐类 AUC 0.46–0.54），不参与骨干判读。
 注：RUN-009-A 的 macro-AUC 与 F1@0.5 取 `last.pt` 的 `extras.best_metrics`（`run_eval.py` 重算 0.7945 / 0.4178，差 ≤0.0007）；与 RUN-007-A / RUN-008-B 的差值同时来自分辨率（384 vs 320）与训练预算（25 轮上限 vs 固定 6 轮）改变，且本组只跑 6/25 轮即按用户要求停止，不能作单变量归因；硬件为 V100-SXM2-32G（与 RUN-001~008 的 RTX 3090 是不同实例），耗时不可横向对照。
+注：A-001 的 macro-AUC 与 F1@0.5 由 `run_eval.py` 在 valid 上重算（与 `metrics.csv` 一致）；与 RUN008-C 同时差 seed（42 vs 2026）、训练上限（8 vs 6 轮）与早停（2 vs 0），且 cosine 周期长度随 epochs 改变，差值不能单变量归因；硬件为 V100-SXM2-32G（与 RUN-001~008 的 RTX 3090 不同实例），耗时不可横向对照；RUN008-C 的逐类与阈值曲线取自 `outputs/compare_run008/`（RTX 3090 环境重算，同 valid split、同指标函数）。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 

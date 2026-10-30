@@ -17,6 +17,12 @@
 - `14:55`（变更）`docs/train_plan09.md`：执行记录由「计划串行 009-B → 009-A」改为实际执行（新 V100 实例、先跑 RUN-009-A、6/25 轮后按用户要求停止、RUN-009-B 未执行、`best.pt` 由 `last.pt` 导出）。
 - `14:55`（变更）远端训练环境（不涉及仓库文件）：RUN-009-A 提前停止导致 `best.pt` 缺失，用临时脚本从 `last.pt` 的 `extras.best_state`（epoch 5）导出 `outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt`（89,586,379 B），供 `run_eval.py` 与后续耗时自检使用。
 
+- `15:50`（新增）`configs/exp_A001.yaml`、`tests/test_config.py`：新增 A-001 实验配置（RUN-008-C 重跑：`train.epochs: 8`、`train.early_stop_patience: 2`、输入 320×320、`seed: 42`），完整展开、无 `_base`，与 `exp_run008c.yaml` 展开结果仅差这三处；补 `test_a001_experiment_config_loads` 断言除三处外逐字段一致、文本无 `_base:` 行及关键字段。本机 `python -m pytest -q` 193 passed / 3 skipped，训练环境 195 passed / 1 skipped。
+- `15:50`（变更）`docs/training_log.md`：回填 A-001 `A-001_convnext_tiny_s42` 实测——ConvNeXt-Tiny @320×320、8 轮上限 + 早停 2，第 6 轮早停，最优 epoch 4（macro-AUC **0.8038** / F1@0.5 0.4255，与 `run_eval.py` 重算一致）；记录运行命令、V100-SXM2-32G 环境、ModelScope 权重下载（SHA-256 与 RUN008-C 一致）与 `HF_HUB_OFFLINE=1` 加载、34m01s 耗时、阈值曲线与逐类 AUC 对比；汇总表新增一行并加注「与 RUN008-C 三项配置同时不同，非单变量对照」。
+- `15:50`（变更）`docs/experiments.md`：实验矩阵新增 A-001 行；「执行与结果」新增 A-001 结论（ConvNeXt-Tiny 在 seed 42、8 轮上限、早停 2 下复现 0.8038，与 RUN008-C 差异混杂、不足以判定骨干优劣）；「冻结结论」与「新骨干对照」待验证项同步更新。
+- `15:50`（变更）`docs/manual.md`：§2.2 配置表与继承关系补 `configs/exp_A001.yaml`（完整展开、无继承）。
+- `15:50`（变更）远端训练环境（不涉及仓库文件）：本机无法直连 HuggingFace 与 hf-mirror，改从 ModelScope 下载 `timm/convnext_tiny.fb_in1k`（`model.safetensors` 114,374,272 B、SHA-256 `08b9dc9c3a3a29421de7996761e176501896d1ae7fc3085cf56a643772329276`，与 RUN008-C 记录一致）并按 HF 缓存结构放置后以 `HF_HUB_OFFLINE=1` 启动 A-001，`train.log` 确认「预训练权重: 已加载」。
+
 ## 2026-10-29
 
 - `11:55`（变更）`docs/training_log.md`：回填 RUN-005 `resnet50_s42` 与 RUN-006 `densenet121_s42` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；RUN-005 最优 epoch 9（macro-AUC 0.7857 / F1@0.5 0.4193，第 14 轮早停）、RUN-006 最优 epoch 8（0.7880 / 0.4070，第 13 轮早停），补两组逐类 AUC 对比表；汇总表新增两行，并加「继承 cosine + `pos_weight: true`、与历史 warmup + `pos_weight: false` 口径不同」的脚注。

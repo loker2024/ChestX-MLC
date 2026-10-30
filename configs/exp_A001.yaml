@@ -1,0 +1,61 @@
+# 实验 A-001：RUN008-C 的重跑配置。
+#
+# 以 RUN008-C（`configs/exp_run008c.yaml` 展开后的口径）为基准，按本次要求改三处：
+#   1. `train.epochs`: 6 → 8
+#   2. `train.early_stop_patience`: 0 → 2（8 轮上限 + 连续 2 轮无提升早停）
+#   3. `seed`: 2026 → 42
+# 分辨率维持 320×320（`image.size: 320`）。
+#
+# 本文件是完整展开配置：不写 `_base`，所有字段按当前口径逐项填全，
+# 以后 `default.yaml` 或实验继承链再变也不影响本组实验的复现口径。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_A001.yaml --seed 42 --tag A-001_convnext_tiny_s42
+
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+
+image:
+  size: 320
+  letterbox: true
+  normalize: imagenet
+  hflip: false
+
+model:
+  backbone: convnext_tiny.fb_in1k
+  pretrained: true
+  num_classes: 10
+  aggregation: view_weighted
+  frontal_weight: 0.7
+
+train:
+  epochs: 8
+  batch_studies: 16
+  lr: 0.0003
+  weight_decay: 0.01
+  pos_weight: true
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 0.00001
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  early_stop_patience: 2
+
+eval:
+  batch_studies: 32
+  threshold: 0.5
+
+output:
+  run_dir: outputs
+
+seed: 42
+device: auto

@@ -130,6 +130,7 @@ train:
 | `configs/exp_run008b.yaml` | RUN008-B：EfficientNetV2-S（RW）骨干对照（6 轮无早停，与 RUN008-A 并行），已完成 | `_base: exp_run007a.yaml` | `model.backbone: efficientnetv2_rw_s.ra2_in1k`、`train.epochs: 6`、`train.early_stop_patience: 0` |
 | `configs/exp_run008c.yaml` | RUN008-C：ConvNeXt-Tiny 骨干对照（6 轮无早停，与 RUN008-D 并行），已完成 | `_base: exp_run007a.yaml` | `model.backbone: convnext_tiny.fb_in1k`、`train.epochs: 6`、`train.early_stop_patience: 0` |
 | `configs/exp_run008d.yaml` | RUN008-D：ConvNeXtV2-Nano 骨干对照（研究用，CC BY-NC 4.0 不能提交；训练异常），已完成 | `_base: exp_run007a.yaml` | `model.backbone: convnextv2_nano.fcmae_ft_in1k`、`train.epochs: 6`、`train.early_stop_patience: 0` |
+| `configs/exp_A001.yaml` | A-001：RUN-008-C 的重跑（ConvNeXt-Tiny @320×320，epoch=8 / 早停 2 / seed 42），已完成 | 无（完整展开，不继承 `default.yaml`） | 与 `exp_run008c.yaml` 展开结果仅差 `train.epochs: 8`、`train.early_stop_patience: 2`、`seed: 42` |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
 
@@ -156,6 +157,8 @@ default.yaml
 └── exp_example.yaml
 ```
 
+> `configs/exp_A001.yaml` 为 A-001 的完整展开配置，不使用 `_base` 继承，故未画入上面的继承树。
+>
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
 
 骨干实验的实测结果和选择依据见 [调优记录](experiments.md)；各 run 的运行配置与指标见 [训练记录](training_log.md)。
