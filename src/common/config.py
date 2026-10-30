@@ -96,6 +96,10 @@ class TrainConfig:
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
     num_workers: int = 8
     early_stop_patience: int = 5  # valid 指标连续多少个 epoch 不提升就停；0 表示关闭早停
+    loss: str = "bce"  # "bce"=BCEWithLogitsLoss；"asl"=Asymmetric Loss（自带重加权）
+    asl_gamma_pos: float = 0.0  # ASL 正样本聚焦指数；论文默认 0，即不衰减正样本
+    asl_gamma_neg: float = 4.0  # ASL 负样本聚焦指数；越大，简单负样本被压制得越狠
+    asl_clip: float = 0.05  # ASL 概率移位量 m：负样本概率先推低 m 再取对数
 
     def __post_init__(self) -> None:
         if self.epochs < 1:
@@ -128,6 +132,20 @@ class TrainConfig:
         if self.early_stop_patience < 0:
             raise ValueError(
                 f"train.early_stop_patience 必须 >= 0，当前为 {self.early_stop_patience}"
+            )
+        if self.loss not in {"bce", "asl"}:
+            raise ValueError(f"train.loss 只能是 'bce' 或 'asl'，当前为 {self.loss!r}")
+        if self.asl_gamma_pos < 0 or self.asl_gamma_neg < 0:
+            raise ValueError(
+                f"train.asl_gamma_pos / asl_gamma_neg 必须 >= 0，"
+                f"当前为 {self.asl_gamma_pos} / {self.asl_gamma_neg}"
+            )
+        if not 0.0 <= self.asl_clip < 1.0:
+            raise ValueError(f"train.asl_clip 必须落在 [0, 1)，当前为 {self.asl_clip}")
+        if self.loss == "asl" and self.pos_weight:
+            raise ValueError(
+                "train.loss=asl 时不能再开启 train.pos_weight：ASL 自带正负样本非对称"
+                "重加权，叠加 pos_weight 会破坏论文口径，请显式设 pos_weight: false"
             )
 
 

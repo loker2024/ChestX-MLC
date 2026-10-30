@@ -237,6 +237,10 @@ data:
 | `train.grad_clip` | 浮点 | `5.0` | `>= 0` | 梯度范数裁剪上限；`0` 表示不裁剪。 |
 | `train.num_workers` | 整数 | `8` | `>= 0` | DataLoader 工作进程数，train / valid / test 共用。Windows 或调试时可设为 `0`。 |
 | `train.early_stop_patience` | 整数 | `5` | `>= 0` | valid macro-AUC 连续多少个 epoch 不提升就停止；`0` 关闭早停。AUC 为 NaN 的轮次不算提升。 |
+| `train.loss` | 字符串 | `bce` | `bce` / `asl` | 训练损失。`bce` 为普通二分类交叉熵；`asl` 为非对称损失（Ben-Baruch et al., ICCV 2021），自带正负样本非对称重加权，因此不能与 `train.pos_weight` 同时开启。 |
+| `train.asl_gamma_pos` | 浮点 | `0.0` | `>= 0` | ASL 正样本聚焦指数；论文默认 `0`，即不衰减正样本。 |
+| `train.asl_gamma_neg` | 浮点 | `4.0` | `>= 0` | ASL 负样本聚焦指数；越大，简单负样本被压制得越狠。 |
+| `train.asl_clip` | 浮点 | `0.05` | `[0, 1)` | ASL 概率移位量 `m`：负样本概率先加 `m` 再取对数，等价于把负样本概率推低 `m`；`0` 表示关闭移位。 |
 
 ### 2.8 `eval`：验证与推理
 

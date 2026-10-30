@@ -1,5 +1,6 @@
-"""模型与损失：study 级均值聚合、参数规模、BCE 的 pos_weight 计算。"""
+"""模型与损失：study 级均值聚合、参数规模、BCE 的 pos_weight 与 ASL 计算。"""
 
+import math
 from pathlib import Path
 from dataclasses import replace
 
@@ -8,12 +9,12 @@ import pytest
 import torch
 
 from common.config import Config, DataConfig, ModelConfig, SplitConfig, TrainConfig
-from model.losses import build_loss
+from model.losses import AsymmetricLoss, build_loss
 from infer.predict import predict_loader
 from model.network import aggregate_logits, build_model
 
 
-def _config(pretrained: bool = False, pos_weight: bool = False) -> Config:
+def _config(pretrained: bool = False, pos_weight: bool = False, loss: str = "bce") -> Config:
     """只关心模型与损失的配置。
 
     data 里的路径只是占位：build_model / build_loss 都不会去读数据，
@@ -23,7 +24,7 @@ def _config(pretrained: bool = False, pos_weight: bool = False) -> Config:
     return Config(
         data=DataConfig(train=split, valid=split, test=split),
         model=ModelConfig(backbone="resnet18", pretrained=pretrained),
-        train=TrainConfig(pos_weight=pos_weight),
+        train=TrainConfig(pos_weight=pos_weight, loss=loss),
     )
 
 
@@ -175,6 +176,66 @@ def test_pos_weight_all_positive_class_is_not_zero():
     loss = build_loss(_config(pos_weight=True), labels)
 
     assert loss.pos_weight[0] == 1.0
+
+
+def test_build_loss_returns_asl_with_configured_hyperparameters():
+    """`train.loss=asl` 时构建 ASL，超参从配置透传，且不需要训练标签统计。"""
+    config = _config(loss="asl")
+
+    loss = build_loss(config)
+
+    assert isinstance(loss, AsymmetricLoss)
+    assert (loss.gamma_pos, loss.gamma_neg, loss.clip) == (0.0, 4.0, 0.05)
+
+
+def test_asl_reduces_to_bce_when_focus_and_shift_are_off():
+    """gamma=0、clip=0 时 ASL 应等于普通 BCE：验证实现没有引入额外偏差。"""
+    torch.manual_seed(0)
+    logits = torch.randn(16, 10) * 3
+    targets = (torch.rand(16, 10) > 0.7).float()
+
+    asl = AsymmetricLoss(gamma_pos=0.0, gamma_neg=0.0, clip=0.0)
+    bce = torch.nn.BCEWithLogitsLoss()
+
+    assert torch.allclose(asl(logits, targets), bce(logits, targets), atol=1e-6)
+
+
+def test_asl_matches_hand_computed_reference():
+    """2×2 手算：正样本项不衰减，负样本项先移位再按 (1-p_neg)^gamma_neg 聚焦。"""
+    logits = torch.zeros(1, 2)
+    targets = torch.tensor([[1.0, 0.0]])
+
+    loss = AsymmetricLoss(gamma_pos=0.0, gamma_neg=4.0, clip=0.05)(logits, targets)
+
+    # σ(0)=0.5；负样本概率移位为 1-0.5+0.05=0.55
+    expected_pos = -math.log(0.5)
+    expected_neg = -math.log(0.55) * (1 - 0.55) ** 4
+    assert loss.item() == pytest.approx((expected_pos + expected_neg) / 2, rel=1e-6)
+
+
+def test_asl_clip_and_gamma_neg_monotonically_suppress_negative_loss():
+    """clip 越大、gamma_neg 越大，简单负样本的 loss 越小（方向性检查）。"""
+    torch.manual_seed(0)
+    logits = torch.randn(8, 10)
+    targets = torch.zeros(8, 10)
+
+    plain = AsymmetricLoss(gamma_pos=0.0, gamma_neg=0.0, clip=0.0)(logits, targets)
+    shifted = AsymmetricLoss(gamma_pos=0.0, gamma_neg=0.0, clip=0.05)(logits, targets)
+    focused = AsymmetricLoss(gamma_pos=0.0, gamma_neg=4.0, clip=0.05)(logits, targets)
+
+    assert shifted < plain
+    assert focused < shifted
+
+
+def test_asl_gradient_is_finite_for_extreme_logits():
+    """极端 logits 也不应产生 nan / inf 梯度（混合精度下会先统一到 fp32）。"""
+    logits = torch.tensor([[-30.0, 30.0]], requires_grad=True)
+    targets = torch.tensor([[1.0, 0.0]])
+
+    AsymmetricLoss()(logits, targets).backward()
+
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
 
 
 def test_predict_loader_empty_raises():

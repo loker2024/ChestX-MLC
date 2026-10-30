@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from common.config import config_from_dict, load_config
+from common.config import TrainConfig, config_from_dict, load_config
 
 BASE = """data:
   train: {csv: data/train.csv, images: data/images/train}
@@ -295,6 +295,52 @@ def test_a001_experiment_config_loads():
     assert cfg.train.lr_scheduler == "cosine"
     assert cfg.train.pos_weight is True
     assert cfg.seed == 42
+
+def test_a001b_experiment_config_loads():
+    """A-001-B 只把 A-001 的损失从 BCE(+pos_weight) 换成 ASL，其余逐字段一致。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    a001 = load_config(configs / "exp_A001.yaml").to_dict()
+    config = load_config(configs / "exp_A001b.yaml").to_dict()
+
+    # 只覆盖损失方案相关的五个字段，其余沿用 A-001。
+    assert config["train"].pop("loss") == "asl"
+    assert config["train"].pop("pos_weight") is False
+    assert config["train"].pop("asl_gamma_pos") == 0.0
+    assert config["train"].pop("asl_gamma_neg") == 4.0
+    assert config["train"].pop("asl_clip") == 0.05
+    a001["train"].pop("loss")
+    a001["train"].pop("pos_weight")
+    a001["train"].pop("asl_gamma_pos")
+    a001["train"].pop("asl_gamma_neg")
+    a001["train"].pop("asl_clip")
+    assert config == a001
+
+    text = (configs / "exp_A001b.yaml").read_text(encoding="utf-8")
+    assert any(line.strip() == "_base: exp_A001.yaml" for line in text.splitlines())
+
+    cfg = load_config(configs / "exp_A001b.yaml")
+    assert cfg.model.backbone == "convnext_tiny.fb_in1k"
+    assert cfg.image.size == 320
+    assert cfg.train.epochs == 8
+    assert cfg.train.lr_scheduler == "cosine"
+    assert cfg.train.pos_weight is False
+    assert cfg.train.loss == "asl"
+    assert cfg.seed == 42
+
+
+def test_asl_loss_rejects_pos_weight_combination():
+    """ASL 自带非对称重加权，再叠加 pos_weight 会破坏口径，配置阶段直接报错。"""
+    with pytest.raises(ValueError, match="pos_weight"):
+        TrainConfig(loss="asl", pos_weight=True)
+
+
+def test_invalid_loss_and_asl_hyperparameters_are_rejected():
+    with pytest.raises(ValueError, match="train.loss"):
+        TrainConfig(loss="focal")
+    with pytest.raises(ValueError, match="asl_gamma"):
+        TrainConfig(loss="asl", asl_gamma_neg=-1.0)
+    with pytest.raises(ValueError, match="asl_clip"):
+        TrainConfig(loss="asl", asl_clip=1.0)
 
 
 def test_eval_threshold_range_is_checked(tmp_path):

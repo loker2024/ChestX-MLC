@@ -55,7 +55,7 @@
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
 | `network.py` | timm 骨干（默认 ResNet-18）+ 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets, views=None, frontal_weight=0.7) -> Tensor[B, 10]` |
-| `losses.py` | BCEWithLogitsLoss；可选按训练集频率计算 `pos_weight`，并显式指定设备 | `build_loss(cfg, train_labels=None, device=None)` |
+| `losses.py` | `train.loss` 选择 BCEWithLogitsLoss（可选按训练集频率计算 `pos_weight`）或 ASL 非对称损失；并显式指定设备 | `build_loss(cfg, train_labels=None, device=None)` |
 
 ### 3.4 train：训练逻辑
 
@@ -99,7 +99,7 @@
 1. `data.index.read_split` 读取 CSV 并递归索引图片，返回 `list[StudyRecord]`。
 2. `data.dataset.StudyDataset` 按 study 取图，`collate_studies` 拼成 `images / offsets / labels`。
 3. `model.network` 逐图输出 logits，`aggregate_logits` 按 `offsets` 和可选视角信息聚合每个 study 的 logits。
-4. `train.engine` 以 `BCEWithLogitsLoss` 训练，按 valid macro-AUC 保存最优权重。
+4. `train.engine` 按 `train.loss` 以 BCE（可选 `pos_weight`）或 ASL 训练，按 valid macro-AUC 保存最优权重。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
 7. `src/cost.py` 加载同一份 checkpoint 与配置，按单图串行计时，并在完整测试索引可用时补齐 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
