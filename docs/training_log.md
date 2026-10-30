@@ -1418,6 +1418,8 @@ support 更充分的骨干或更长轮数另开对照，而不是在单 seed 上
 | RUN-009-A | `exp_run009a.yaml` | EfficientNetV2-S RW + ra2_in1k，384×384，25 轮上限 | 6（用户要求停止）/25 | 5 | 0.7944 | 0.4185 | 约 41m（V100，独占） | 未达门：vs RUN-007-A AUC +0.0038（门 0.7956）、F1 −0.0020；比 RUN-008-B 低 −0.0010；6/25 轮提前停止（非早停），不能判定完整预算 |
 | A-001 | `exp_A001.yaml` | ConvNeXt-Tiny + fb_in1k，epoch=8 / patience=2 / seed=42（RUN008-C 重跑） | 6（早停）/8 | 4 | **0.8038** | 0.4255 | 34m01s（独占，V100） | 与 RUN008-C（0.8008 / 0.4382）差 AUC +0.0030、F1 −0.0127；seed/轮数/早停三项同时不同，非单变量对照，AUC 差在 seed 波动内 → 视为 RUN008-C 水平复现 |
 | A-001-B | `exp_A001b.yaml` | A-001 的损失方案替换：BCE + `pos_weight` → ASL（gamma_pos 0 / gamma_neg 4 / clip 0.05） | 6（早停）/8 | 4 | 0.7970 | 0.4103 | 34m41s（独占，V100） | 与 A-001（0.8038 / 0.4255）差 AUC −0.0068、F1@0.5 −0.0152；超过 ±0.005 判读门且约 2 倍 seed 波动，单 seed + 同时移除 `pos_weight` → A-001 口径下 ASL 无增益，不切换默认损失 |
+| A-001-C | `exp_A001c.yaml` | A-001 的冻结骨干对照：ConvNeXt-Tiny 骨干全部冻结、仅训练分类头（768→10，7,690 / 27,827,818 可训练参数） | 8（跑满）/8 | 8 | **0.7264** | 0.3602 | 38m01s（独占，V100） | 与 A-001（0.8038 / 0.4255）差 AUC −0.0774、F1@0.5 −0.0653，远超 ±0.005 门 → 冻结 ImageNet 特征不可替代全量微调；checkpoint metadata 确认 `freeze_backbone: true`、`trainable_params: 7690` |
+| A-001-B(s2026) | `exp_A001b.yaml` + `--seed 2026` | A-001-B 的 seed 复核：与 seed 42 同配置、只换 seed 2026 | 7（早停）/8 | 5 | **0.7952** | 0.4182 | 37m29s（独占，V100） | 与 A-001-B(s42) 配对差 AUC −0.0018（seed 波动 ±0.0033 内）、F1@0.5 +0.0079；与 A-001（BCE，0.8038 / 0.4255）差 AUC −0.0086 仍超 ±0.005 门 → ASL 无增益在两 seed 复现，不切换默认损失 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -1434,6 +1436,8 @@ support 更充分的骨干或更长轮数另开对照，而不是在单 seed 上
 注：RUN008-D 权重为 CC BY-NC 4.0，按赛题第 1 条不能用于提交；该组训练异常（逐类 AUC 0.46–0.54），不参与骨干判读。
 注：RUN-009-A 的 macro-AUC 与 F1@0.5 取 `last.pt` 的 `extras.best_metrics`（`run_eval.py` 重算 0.7945 / 0.4178，差 ≤0.0007）；与 RUN-007-A / RUN-008-B 的差值同时来自分辨率（384 vs 320）与训练预算（25 轮上限 vs 固定 6 轮）改变，且本组只跑 6/25 轮即按用户要求停止，不能作单变量归因；硬件为 V100-SXM2-32G（与 RUN-001~008 的 RTX 3090 是不同实例），耗时不可横向对照。
 注：A-001 的 macro-AUC 与 F1@0.5 由 `run_eval.py` 在 valid 上重算（与 `metrics.csv` 一致）；与 RUN008-C 同时差 seed（42 vs 2026）、训练上限（8 vs 6 轮）与早停（2 vs 0），且 cosine 周期长度随 epochs 改变，差值不能单变量归因；硬件为 V100-SXM2-32G（与 RUN-001~008 的 RTX 3090 不同实例），耗时不可横向对照；RUN008-C 的逐类与阈值曲线取自 `outputs/compare_run008/`（RTX 3090 环境重算，同 valid split、同指标函数）。
+注：A-001-C 的 macro-AUC 与 F1@0.5 由 `run_eval.py` 在 valid 上重算（0.7264 / 0.3602；`metrics.csv` 的 best epoch 8 为 0.7264 / 0.3596，F1 差 0.0006）；checkpoint metadata 记录 `freeze_backbone: true`、`total_params: 27827818`、`trainable_params: 7690`；与 A-001 的差异同时来自可训练参数范围与骨干 `eval()` 模式（BN 统计不更新），非单一变量；硬件同为 V100-SXM2-32G。
+注：A-001-B(seed 2026) 的 macro-AUC 与 F1@0.5 由 `run_eval.py` 重算（0.7952 / 0.4182，与 `metrics.csv` 的 best epoch 5 一致）；与 A-001-B(s42) 是 seed 配对（同代码版本、同配置，仅 seed 不同），F1 峰位在 0.6（0.4254）与 s42 一致。
 
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 

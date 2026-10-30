@@ -38,6 +38,9 @@
 - **17:38**（变更）`docs/experiments.md`：实验矩阵新增 A-001-B 行；「执行与结果」补 A-001-B 结论（A-001 口径下 ASL 未达增益门、−0.0068 超 ±0.005 且约 2 倍 seed 波动、替换同时移除 `pos_weight` 非纯单变量、单 seed 不判死）；待验证表新增「损失函数设计（ASL / focal）」行。
 - **17:38**（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_A001b.yaml` 行，继承树说明补 A-001-B 归属。
 - **17:38**（变更）远端训练环境（不涉及仓库文件）：在 autodl V100-SXM2-32G 实例执行 A-001-B 训练（产物 `outputs/20261030-165734_A-001b_convnext_tiny_asl_s42/`，`best.pt` 111,384,875 B / `last.pt` 445,536,235 B）与 `run_eval.py` 重算；训练前 `.venv` 内 `pytest tests/test_model.py tests/test_config.py -q` 为 52 passed。
+- **18:56**（变更）`docs/training_log.md`：回填 A-001-C `A-001c_convnext_tiny_freeze_s42` 与 A-001-B（seed 2026）`A-001b_convnext_tiny_asl_s2026` 实测——A-001-C 为 ConvNeXt-Tiny 骨干冻结、仅训分类头（7,690 / 27,827,818 可训练参数），8 轮跑满 best epoch 8，macro-AUC **0.7264** / F1@0.5 0.3602（vs A-001 差 AUC −0.0774 / F1 −0.0653）；A-001-B(s2026) 为 seed 复核，7 轮早停 best epoch 5，macro-AUC **0.7952** / F1@0.5 0.4182（vs s42 配对差 AUC −0.0018 在 seed 波动内、vs A-001 BCE 差 AUC −0.0086 仍超门）；汇总表新增两行并加注耗时/显存/metadata 与口径说明。
+- **18:56**（变更）`docs/experiments.md`：实验矩阵新增 A-001-C 与 A-001-B(s2026) 两行；「执行与结果」新增 A-001-C 冻结骨干对照结论（逐轮增量从 +0.0215 衰减到 +0.0002、瓶颈在固定特征、不作提交候选）与 A-001-B(s2026) seed 复核结论（ASL 无增益在两 seed 复现、确认不切换默认损失）；「损失函数设计（ASL / focal）」待验证项补 seed 2026 复核，「冻结骨干、仅训练分类头」待验证项由「待执行」更新为「已验证（大幅退化）」（RUN-010 仍待执行）。
+- **18:56**（变更）远端训练环境（不涉及仓库文件）：A-001-C 由链式脚本在 A-001-B 结束后自动启动，产物 `outputs/20261030-173249_A-001c_convnext_tiny_freeze_s42`（best.pt 111,384,939 B，约 38m01s，显存约 6.0 GB）；A-001-B(s2026) 随后启动，产物 `outputs/20261030-181110_A-001b_convnext_tiny_asl_s2026`（best.pt 111,384,939 B，约 37m29s，显存约 12.2 GB）；两次运行均以 `HF_HUB_OFFLINE=1` 加载预训练权重，`run_eval.py` 阈值 0.3–0.7 扫描已完成。
 
 ## 2026-10-29
 

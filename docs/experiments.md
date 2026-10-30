@@ -44,6 +44,8 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | RUN-010 | `freeze_head_s42` | `configs/exp_freeze_head.yaml` | 25 | 是 | 冻结 ImageNet 预训练 ResNet-18、仅训练分类头；待 GPU 环境执行 |
 | A-001 | `A-001_convnext_tiny_s42` | `configs/exp_A001.yaml` | 8（早停 2，实际 6） | 是 | RUN-008-C 重跑：ConvNeXt-Tiny @320×320，epoch=8 / patience=2 / seed=42，完整展开不继承 |
 | A-001-B | `A-001b_convnext_tiny_asl_s42` | `configs/exp_A001b.yaml` | 8（早停 2，实际 6） | 否（ASL 与 `pos_weight` 互斥） | A-001 的损失对照：BCE + `pos_weight` → ASL（gamma_pos 0 / gamma_neg 4 / clip 0.05），其余口径全部不变 |
+| A-001-C | `A-001c_convnext_tiny_freeze_s42` | `configs/exp_A001c.yaml` | 8（跑满，无早停） | 是 | A-001 的冻结对照：ConvNeXt-Tiny 骨干全部冻结、仅训练分类头（768→10，7,690 可训练参数），其余口径全部不变 |
+| A-001-B(s2026) | `A-001b_convnext_tiny_asl_s2026` | `configs/exp_A001b.yaml` + `--seed 2026` | 8（早停 2，实际 7） | 否（ASL 与 `pos_weight` 互斥） | A-001-B 的 seed 复核：与 seed 42 同配置、只换 seed 到 2026 |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -123,6 +125,40 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
   纯损失单变量；ASL 的 `train_loss` / `valid_loss` 量纲与 BCE 不同，不可横向比较 loss，只看 AUC/F1；
   单 seed 不能据此断言 ASL 在所有骨干/口径下无效。
 
+**A-001-C 冻结骨干对照（仅训练分类头）**（配置 `configs/exp_A001c.yaml`，数字来自 `run_eval.py`，
+产物 `outputs/20261030-173249_A-001c_convnext_tiny_freeze_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
+只覆盖 `model.freeze_backbone: true`，ConvNeXt-Tiny 骨干全部冻结，训练时骨干走 `eval()` 模式（BN 统计不更新），
+仅分类头（768→10 Linear）可训练——checkpoint metadata 实测 `total_params: 27827818` /
+`trainable_params: 7690`，可训练比例约 0.03%；8 轮跑满未触发早停，best epoch 8：
+
+- valid macro-AUC **0.7264** / F1@0.5 **0.3602**（F1 峰值在 0.5；0.4 为 0.3551、0.6 为 0.3524）；
+  独占 V100-SXM2-32G 训练约 38m01s（17:32:49–18:10:50），显存约 6.0 GB——比 A-001 的约 13.8 GB 低一半以上。
+- 与 A-001（BCE + `pos_weight` 全量微调：0.8038 / 0.4255）相比 **AUC −0.0774、F1@0.5 −0.0653**，
+  远超 ±0.005 判读门（约为已观测 seed 波动 0.0033 的 23 倍）：冻结 ImageNet 特征 + 线性头在胸片上
+  信息量不足，不能替代全量微调，不作为提交候选。
+- 逐轮单调爬升但全程低平（0.6819→0.7034→0.7175→0.7208→0.7238→0.7256→0.7262→0.7264），每轮增量
+  从 +0.0215 衰减到 +0.0002，说明瓶颈在固定特征而非头部容量或训练时长——继续延长轮数或单独调分类头
+  学习率的收益有限；逐类 class5/class9/class10 AUC 0.8041/0.8131/0.8282 尚可（高频类），
+  class1/class4 仅 0.6672/0.6614，低频类退化最明显。
+- 口径注意：本组与 A-001 的差异是「可训练参数范围 + 骨干 `eval()` 模式（BN 不更新）」，不是纯单变量；
+  train_loss 与 A-001 同为 BCE 量纲（1.09→0.98）可比，但因可训练参数极少、过拟合风险低，8 轮未触发早停；
+  单 seed、单轮数上限，结论只针对本口径。
+
+**A-001-B（seed 2026）ASL 的 seed 复核**（配置 `configs/exp_A001b.yaml` + `--seed 2026`，数字来自
+`run_eval.py`，产物 `outputs/20261030-181110_A-001b_convnext_tiny_asl_s2026`，2026-10-30）：与
+A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 seed 复核惯例），7/8 轮触发早停，best epoch 5：
+
+- valid macro-AUC **0.7952** / F1@0.5 **0.4182**，F1 峰值在 0.6（0.4254）；独占 V100-SXM2-32G 训练
+  约 37m29s（18:11:10–18:48:39），显存约 12.2 GB；checkpoint metadata 确认 `seed: 2026`、`freeze_backbone: false`。
+- 与 A-001-B（seed 42：0.7970 / 0.4103）的 **seed 配对差 AUC −0.0018、F1@0.5 +0.0079**：AUC 差在已观测
+  seed 波动（±0.0033）内 → ASL 的 0.795–0.797 水平在第二个 seed 上复现；F1 峰位与 s42 同为 0.6，
+  说明 F1 的 seed 差属校准形态波动而非判别力变化。
+- 与 A-001（BCE，0.8038 / 0.4255）相比 AUC −0.0086、F1@0.5 −0.0073：AUC 差仍超过 ±0.005 判读门
+  （约 1.7 倍）→ **A-001 口径下 ASL 无增益的结论在两 seed 上复现，确认不切换默认损失**；剩余差异
+  仍可能来自 `pos_weight` 被移除（ASL 与 pos_weight 配置层互斥），本组不能把差异归因到 ASL 本身。
+- 口径注意：seed 2026 同时改变数据划分与初始化/增强随机性，本组与 A-001-B(s42) 构成 seed 配对，
+  与 A-001 的对照仍受损失方案差异混杂。
+
 ## 冻结结论
 
 1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
@@ -156,10 +192,10 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
 | 训练轮数 | 已验证 | 在正式基线之后调整 `train.epochs` | **RUN-003 已判无效**：epoch 8 达峰（0.7887）后过拟合、第 13 轮早停，25 轮上限未带来 AUC 增益（Δ−0.0016 vs RUN-001R），该次实验未证明增加训练轮数有收益 |
 | 学习率调度 | 已验证 | `train.lr_scheduler` / `train.lr_min` | **RUN-003-A 判无效**：余弦调度 best epoch 5、macro-AUC 0.7852 vs RUN-003 的 0.7887（Δ−0.0035，未达门）；但最佳轮次前移（8→5）、早停更快（13→10 轮）、耗时约 30 分钟 vs 38 分钟。当前默认配置为 `cosine`；该对照未证明 AUC 增益 |
 | `pos_weight` | 已验证 | `train.pos_weight: true` | **RUN-002-A/B 未达原 AUC 增益门**：完整周期双 seed macro-AUC 0.7872 / 0.7871，vs RUN-003 0.7887 为 Δ−0.0015 / −0.0016，均未达 +0.005 门；F1@0.5 提升（0.4045 / 0.4198）伴随阈值曲线右移，已测峰值与基线接近，当前默认开启 |
-| 损失函数设计（ASL / focal） | 已验证（未达增益门） | `train.loss` / `train.asl_gamma_pos` / `train.asl_gamma_neg` / `train.asl_clip` | **A-001-B 已做（2026-10-30）**：A-001 口径下用 ASL（gamma_pos 0 / gamma_neg 4 / clip 0.05）替代 BCE + `pos_weight`，best epoch 4 macro-AUC 0.7970 vs A-001 0.8038（Δ−0.0068，超过 ±0.005 门，F1@0.5 也低 −0.0152）；ASL 与 `pos_weight` 互斥（替换非纯单变量）且单 seed → 暂不切换默认损失；继续验证应换 support 更充分的骨干或更长轮数 |
+| 损失函数设计（ASL / focal） | 已验证（未达增益门） | `train.loss` / `train.asl_gamma_pos` / `train.asl_gamma_neg` / `train.asl_clip` | **A-001-B 已做（2026-10-30）**：A-001 口径下用 ASL（gamma_pos 0 / gamma_neg 4 / clip 0.05）替代 BCE + `pos_weight`，best epoch 4 macro-AUC 0.7970 vs A-001 0.8038（Δ−0.0068，超过 ±0.005 门，F1@0.5 也低 −0.0152）；ASL 与 `pos_weight` 互斥（替换非纯单变量）且单 seed → 暂不切换默认损失；继续验证应换 support 更充分的骨干或更长轮数；**seed 2026 复核（2026-10-30 晚）**：A-001-B(s2026) 0.7952 vs A-001-B(s42) 0.7970（Δ−0.0018，在 seed 波动内）、vs A-001 0.8038（Δ−0.0086 仍超门）→ ASL 无增益在两 seed 复现，默认损失不切换 |
 | 聚合方式消融 | 待评估 | 比较平均 logits、平均概率及最大聚合 | 当前使用平均 logits 后 sigmoid；其他方式尚未实现或实测 |
 | 更高分辨率 / TTA | 已验证（方向性） | `image.size`、`run_infer.py` 加翻转 TTA | **RUN-007-B 已做 384×384 + 6 轮短跑（macro-AUC 0.7959 / F1@0.5 0.4227）**：比 320 的 12 轮早停 0.7906 高 +0.0053，但轮数与 cosine 周期不同、不可单变量归因；需 25 轮完整对照再判定。**RUN-009-A（2026-10-30）**：EfficientNetV2-S RW @384×384 + 25 轮上限口径只跑 6/25 轮（用户要求停止），macro-AUC 0.7944，比同骨干 320×320 6 轮的 RUN-008-B（0.7954）低 −0.0010，未显示增量；25 轮完整对照仍待做。TTA 未做；448 显存未实测（3090 24G） |
-| 冻结骨干、仅训练分类头 | 待执行 | `configs/exp_freeze_head.yaml`、`model.freeze_backbone` | RUN-010：固定 ResNet-18、ImageNet 预训练、study 聚合和评估口径，只把可训练参数限制为分类头；执行命令见下方。 |
+| 冻结骨干、仅训练分类头 | 已验证（大幅退化） | `configs/exp_freeze_head.yaml` / `configs/exp_A001c.yaml`、`model.freeze_backbone` | **A-001-C 已做（2026-10-30）**：ConvNeXt-Tiny @320 冻结骨干、仅训分类头（7,690 / 27,827,818 可训练参数），8 轮跑满 best epoch 8 macro-AUC 0.7264 / F1@0.5 0.3602 vs A-001 0.8038 / 0.4255（ΔAUC −0.0774、ΔF1@0.5 −0.0653）；逐轮增量衰减到 +0.0002 说明瓶颈在固定特征 → 该口径不作提交候选。RUN-010（ResNet-18 冻结）仍待执行。 |
 
 ### 正侧位加权聚合配置
 
