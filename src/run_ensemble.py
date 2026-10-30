@@ -98,6 +98,22 @@ def _check_labeled_loaders(loaders: list[Any]) -> dict[str, np.ndarray]:
     return labels
 
 
+def _check_subject_loaders(loaders: list[Any]) -> dict[str, str]:
+    """检查所有模型数据源的 Study_id -> Subject_id 映射一致。"""
+    first_records = loaders[0].dataset.records
+    subjects = {record.study_id: record.subject_id for record in first_records}
+    for index, loader in enumerate(loaders[1:], start=2):
+        current = {record.study_id: record.subject_id for record in loader.dataset.records}
+        if set(current) != set(subjects):
+            raise ValueError(f"第 {index} 个模型的 Study_id 与第 1 个模型不一致")
+        for study_id, subject_id in subjects.items():
+            if current[study_id] != subject_id:
+                raise ValueError(
+                    f"第 {index} 个模型的 study {study_id} Subject_id 与第 1 个模型不一致"
+                )
+    return subjects
+
+
 def _write_labeled_outputs(
     output_dir: Path,
     predictions,
@@ -159,6 +175,7 @@ def main(argv: list[str] | None = None) -> None:
         else:
             prediction_frames.append(predict_loader(model, loader, device, config))
 
+    study_subjects = _check_subject_loaders(loaders)
     predictions = fuse_prediction_frames(prediction_frames, weights, args.fusion)
     output_dir = Path(args.out)
     if args.split in {"train", "valid"}:
@@ -175,9 +192,6 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
-    study_subjects = {
-        record.study_id: record.subject_id for record in loaders[0].dataset.records
-    }
     frame = build_submission_frame(predictions, study_subjects)
     submission_path = write_submission(frame, output_dir / "submission.csv")
     validate_submission(submission_path, configs[0].data.test.csv, require_all_classes=True)

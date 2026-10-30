@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -222,3 +223,21 @@ def test_run_ensemble_rejects_config_count_mismatch(tmp_path: Path) -> None:
                 str(tmp_path / "only.yaml"),
             ]
         )
+
+
+def test_run_ensemble_rejects_subject_mismatch() -> None:
+    import run_ensemble
+
+    loader_a = SimpleNamespace(
+        dataset=SimpleNamespace(
+            records=[SimpleNamespace(study_id="study_a", subject_id="subject_a")]
+        )
+    )
+    loader_b = SimpleNamespace(
+        dataset=SimpleNamespace(
+            records=[SimpleNamespace(study_id="study_a", subject_id="subject_b")]
+        )
+    )
+
+    with pytest.raises(ValueError, match="Subject_id"):
+        run_ensemble._check_subject_loaders([loader_a, loader_b])
