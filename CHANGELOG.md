@@ -56,6 +56,10 @@
 - **18:59**（变更）远端训练环境（不涉及仓库文件）：A-001-a 于 2026-10-30 15:46:52–16:23:50 在 autodl V100-SXM2-32G 独占执行（产物 `outputs/20261030-154652_A-001-a_convnext_tiny_s42/`，`best.pt` 111,384,683 B / `last.pt` 445,536,107 B，6 轮早停）；随后用 `.venv` 的 `run_eval.py` 对 A-001-a / A-001-C / A-001-B(s2026) 三组重算阈值与逐类指标并保存到 `outputs/eval_reports/`。
 - **18:59**（变更）远端训练环境（不涉及仓库文件）：训练环境 `.venv/bin/python -m pytest -q` 全量测试通过（208 passed / 1 skipped；本次文档回填未改动 `src/` 与 `tests/`）。
 
+- **19:55**（变更）`docs/training_log.md`：回填 A-001-D 实测——ConvNeXt-Tiny @320×320，以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位 0.7/0.3 加权），8/8 轮跑满，最优 epoch 6（macro-AUC **0.7931** / F1@0.5 0.4340，`run_eval.py` 重算一致）；记录运行命令、V100-SXM2-32G 环境、40m03s 耗时与约 14.0 GB 显存、阈值曲线与逐类 AUC（4 升 6 降）；汇总表新增一行并加注。
+- **19:55**（变更）`docs/experiments.md`：实验矩阵新增 A-001-D 行；「执行与结果」新增 A-001-D 结论（取消正侧位加权 AUC −0.0107、超 ±0.005 判读门、约 3.2 倍 seed 波动；F1 峰位 0.6→0.5 属校准差 → 等权不优于加权）；「视图元信息（ViewPosition）」与「聚合方式消融」两个待验证项同步更新。
+- **19:55**（变更）远端训练环境（不涉及仓库文件）：A-001-D 于 2026-10-30 19:06:45–19:46:48 在 autodl V100-SXM2-32G 独占执行（产物 `outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/`，`best.pt` 111,384,875 B / `last.pt` 445,536,427 B，8 轮跑满无早停）；训练记录在训练环境内回填并提交。
+
 ## 2026-10-29
 
 - `11:55`（变更）`docs/training_log.md`：回填 RUN-005 `resnet50_s42` 与 RUN-006 `densenet121_s42` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间、产物目录与耗时；RUN-005 最优 epoch 9（macro-AUC 0.7857 / F1@0.5 0.4193，第 14 轮早停）、RUN-006 最优 epoch 8（0.7880 / 0.4070，第 13 轮早停），补两组逐类 AUC 对比表；汇总表新增两行，并加「继承 cosine + `pos_weight: true`、与历史 warmup + `pos_weight: false` 口径不同」的脚注。
