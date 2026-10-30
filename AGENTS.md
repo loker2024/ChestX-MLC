@@ -71,6 +71,19 @@ git switch -c codex/add-training develop
 
 PR 写明目的、涉及文件、验证命令和结果；有关联 issue 时附链接。模型调整附实验对比，图示变更附预览。
 
+## 与 GitHub 同步
+
+与 GitHub 的同步（clone、fetch、push）统一使用 SSH 密钥方式，远端地址固定为 `git@github.com:loker2024/ChestX-MLC.git`；不使用 HTTPS 地址，也不使用账号密码或 Personal Access Token 推送。
+
+```bash
+git clone git@github.com:loker2024/ChestX-MLC.git
+# 已有仓库若 origin 仍为 HTTPS，改为 SSH 并确认
+git remote set-url origin git@github.com:loker2024/ChestX-MLC.git
+git remote -v
+```
+
+密钥为 `~/.ssh/id_ed25519`（公钥已添加到 GitHub 账号），用 `ssh -T git@github.com` 验证，输出 `Hi <username>! You've successfully authenticated` 即认证正常。私钥、口令和 token 一律不得写入仓库、提交记录或文档。本机与训练环境遵循同一约定。
+
 ## 变更日志与数据约束
 
 新增、修改或删除任何代码或文件，都必须同步记录到 `CHANGELOG.md`，包含路径、改动摘要及“新增／变更／修复／移除”类型。使用 Asia/Shanghai 日期和分钟级 `HH:MM`；日期倒序，同日条目按时间正序排列。
