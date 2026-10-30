@@ -30,6 +30,7 @@
 - `16:52`（变更）`docs/architecture.md`、`docs/manual.md`：更新损失模块与训练数据流描述，补 `train.loss` 及 ASL 三个超参的配置说明。
 - `17:03`（新增）`src/run_train.py`、`tests/test_run_train.py`：在 `best.pt` / `last.pt` metadata 中记录冻结状态、总参数量和可训练参数量，并补默认与冻结配置的 CLI 产物测试。
 - `17:05`（新增）`docs/manual.md`、`docs/experiments.md`：登记 `exp_freeze_head.yaml` 与 RUN-010 待执行实验，补充 `model.freeze_backbone`、checkpoint 参数计数说明及远程训练命令；明确本机未执行真实 GPU 训练。
+- `17:11`（修复）`src/model/network.py`、`src/train/engine.py`、`tests/test_engine.py`：冻结模式下将骨干切到 `eval()`，保持 BatchNorm running statistics 不变，同时恢复分类头的 `train()` 状态并补回归断言。
 
 ## 2026-10-29
 

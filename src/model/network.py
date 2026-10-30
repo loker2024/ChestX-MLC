@@ -41,6 +41,18 @@ def _freeze_backbone(model: nn.Module, backbone: str) -> None:
         parameter.requires_grad_(True)
 
 
+def set_frozen_backbone_eval(model: nn.Module) -> None:
+    """冻结模式下固定骨干的 BatchNorm 等运行状态，只让分类头处于 train 模式。"""
+    classifier_getter = getattr(model, "get_classifier", None)
+    if not callable(classifier_getter):
+        raise ValueError("冻结模型缺少可识别的分类头（get_classifier）")
+    classifier = classifier_getter()
+    if not isinstance(classifier, nn.Module):
+        raise ValueError("冻结模型的分类头不是 nn.Module")
+    model.eval()
+    classifier.train()
+
+
 def build_model(cfg: Config) -> nn.Module:
     """按配置构建 timm 图像分类模型，输出每张图的 10 类 logits。
 

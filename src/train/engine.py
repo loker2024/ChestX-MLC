@@ -38,7 +38,7 @@ from torch.utils.data import DataLoader
 from common.config import Config
 from common.metrics import macro_auc, macro_f1
 from model.losses import build_loss
-from model.network import aggregate_logits
+from model.network import aggregate_logits, set_frozen_backbone_eval
 
 
 @dataclass
@@ -128,6 +128,8 @@ def train_one_epoch(
 ) -> float:
     """训练一个 epoch，返回按 study 数加权的平均 loss。"""
     model.train()
+    if config.model.freeze_backbone:
+        set_frozen_backbone_eval(model)
     trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     use_amp = scaler.is_enabled()  # 只有 CUDA 上才会是 True
     total_loss = 0.0

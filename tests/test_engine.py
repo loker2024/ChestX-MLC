@@ -87,6 +87,11 @@ def test_frozen_fit_only_passes_trainable_parameters_to_optimizer(
         for name, parameter in named_parameters.items()
         if not parameter.requires_grad
     }
+    before_batch_norm_buffers = {
+        name: value.clone()
+        for name, value in model.state_dict().items()
+        if name.endswith("running_mean") or name.endswith("running_var")
+    }
     captured: list[torch.nn.Parameter] = []
     original_adamw = torch.optim.AdamW
 
@@ -102,6 +107,8 @@ def test_frozen_fit_only_passes_trainable_parameters_to_optimizer(
         id(parameter) for parameter in expected
     }
     for name, value in before.items():
+        assert torch.equal(model.state_dict()[name], value)
+    for name, value in before_batch_norm_buffers.items():
         assert torch.equal(model.state_dict()[name], value)
 
 
