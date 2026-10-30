@@ -1,0 +1,5 @@
+# 冻结 ImageNet 预训练骨干，仅训练分类头。
+_base: default.yaml
+
+model:
+  freeze_backbone: true

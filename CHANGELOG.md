@@ -22,6 +22,7 @@
 - `15:50`（变更）`docs/experiments.md`：实验矩阵新增 A-001 行；「执行与结果」新增 A-001 结论（ConvNeXt-Tiny 在 seed 42、8 轮上限、早停 2 下复现 0.8038，与 RUN008-C 差异混杂、不足以判定骨干优劣）；「冻结结论」与「新骨干对照」待验证项同步更新。
 - `15:50`（变更）`docs/manual.md`：§2.2 配置表与继承关系补 `configs/exp_A001.yaml`（完整展开、无继承）。
 - `15:50`（变更）远端训练环境（不涉及仓库文件）：本机无法直连 HuggingFace 与 hf-mirror，改从 ModelScope 下载 `timm/convnext_tiny.fb_in1k`（`model.safetensors` 114,374,272 B、SHA-256 `08b9dc9c3a3a29421de7996761e176501896d1ae7fc3085cf56a643772329276`，与 RUN008-C 记录一致）并按 HF 缓存结构放置后以 `HF_HUB_OFFLINE=1` 启动 A-001，`train.log` 确认「预训练权重: 已加载」。
+- `16:42`（新增）`src/common/config.py`、`configs/exp_freeze_head.yaml`、`tests/test_config.py`：增加 `model.freeze_backbone` 配置开关，默认关闭；新增冻结骨干、仅训练分类头的实验配置与加载断言。
 
 ## 2026-10-29
 
@@ -75,6 +76,7 @@
 - `22:35`（变更）`docs/training_log.md`：回填 RUN008-A/B/C/D 四组骨干对照实测——新增 RUN-008 章节，记录四组配置原文、运行命令、权重来源 / HF commit / SHA-256 与许可（EfficientNet-B2、EfficientNetV2-S RW、ConvNeXt-Tiny 为 Apache-2.0，ConvNeXtV2-Nano 为 CC BY-NC 4.0）、起止时间与耗时（北京 A 20:59:07→21:33:40、B 21:01:44→21:36:48、C 21:38:17→22:02:35、D 22:02:48→22:25:27）、产物目录、`metrics.csv` 原样与逐类 AUC；最优 macro-AUC：A 0.7952 / F1@0.5 0.4095（epoch 4）、B 0.7954 / 0.4100（epoch 2）、C 0.8008 / 0.4382（epoch 5）、D 0.4977 / 0.1604（epoch 2，训练异常）；记录四组与 RUN-007-A 的组间对照及并行 / 预算差异口径，汇总表新增 4 行与 3 条注脚。
 - `22:35`（变更）`docs/experiments.md`：实验矩阵标注 RUN008-A/B/C/D 已完成并更新随机种子行；「执行与结果」新增 RUN-008 骨干对照四条结论（ConvNeXt-Tiny 在 6 轮预算下 0.8008、比 RUN-007-A 高 +0.0102 但预算不同且单 seed，只作候选方向；EfficientNet-B2 / V2-S 分别 +0.0046 / +0.0048 未达 +0.005 门；ConvNeXtV2-Nano 训练异常且 CC BY-NC 4.0 不合规、仅研究记录；四组两两并行、耗时不可横向比较）；待验证项「新骨干对照」补 RUN-008 结果；冻结结论说明同口径复核前不切换默认骨干。
 - `22:35`（变更）`docs/manual.md`：§2.2 现有配置表新增 `configs/exp_run008a~d.yaml` 四行，继承关系树补其位于 `exp_run007a.yaml` 之下的分支。
+- `22:49`（变更）`AGENTS.md`：新增「与 GitHub 同步」一节，约定 clone / fetch / push 统一走 SSH 密钥方式，远端固定为 `git@github.com:loker2024/ChestX-MLC.git`，禁止 HTTPS 地址与账号密码 / Personal Access Token 推送；给出 HTTPS 远端改 SSH 的命令、`ssh -T git@github.com` 验证方式及「私钥 / 口令 / token 不得入库」约束。本机 `origin` 已由 HTTPS 改为 SSH 并验证 `git ls-remote` 可读。
 
 - `23:05`（新增）`configs/exp_run009a.yaml`、`configs/exp_run009b.yaml`、`docs/train_plan09.md`：新增 RUN-009 两组骨干 @384×384 完整口径复核配置与训练计划——分别继承 RUN-008-B（EfficientNetV2-S RW）与 RUN-008-C（ConvNeXt-Tiny），只覆盖 `image.size: 320 → 384`、`train.epochs: 6 → 25`、`train.early_stop_patience: 0 → 5`，其余继承 RUN-007-A 的 seed 2026、正侧位 7:3 加权聚合、`pos_weight`、cosine 调度与 `batch_studies: 16`；计划记录目的与基线、权重许可来源、串行执行安排、判读门与回填口径。训练已按计划于 23:00:52 CST 启动 RUN-009-B，结束后串行启动 RUN-009-A；两组配置解析校验确认相对 RUN-007-A 仅差骨干、分辨率、轮数与早停四项。
 

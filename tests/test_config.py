@@ -39,6 +39,7 @@ def test_default_config_loads():
     config = load_config(Path(__file__).resolve().parents[1] / "configs/default.yaml")
 
     assert config.model.backbone == "resnet18"
+    assert config.model.freeze_backbone is False
     assert config.image.size == 320
     assert config.train.pos_weight is True
     assert config.train.lr_scheduler == "cosine"
@@ -136,6 +137,16 @@ def test_run003b_experiment_config_loads():
     assert config.train.early_stop_patience == 5
     assert config.train.num_workers == 16
     assert config.seed == 42
+
+
+def test_freeze_head_experiment_config_only_enables_freezing():
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    base = load_config(configs / "default.yaml").to_dict()
+    config = load_config(configs / "exp_freeze_head.yaml").to_dict()
+
+    assert config["model"]["freeze_backbone"] is True
+    base["model"]["freeze_backbone"] = True
+    assert config == base
 
 
 def test_run006a_experiment_config_loads():

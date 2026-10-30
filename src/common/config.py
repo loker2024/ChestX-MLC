@@ -62,6 +62,7 @@ class ModelConfig:
     backbone: str = "resnet18"  # timm 的模型名
     pretrained: bool = True  # 是否加载 ImageNet 预训练权重
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
+    freeze_backbone: bool = False  # 是否冻结骨干，仅训练分类头
     aggregation: str = "mean"
     frontal_weight: float = 0.7
 
