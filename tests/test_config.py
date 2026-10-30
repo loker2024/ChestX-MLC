@@ -355,6 +355,34 @@ def test_a001c_experiment_config_loads():
     assert cfg.seed == 42
 
 
+def test_a001d_experiment_config_loads():
+    """A-001-D 只取消 A-001 的正侧位加权（view_weighted → mean），其余逐字段一致。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    a001 = load_config(configs / "exp_A001.yaml").to_dict()
+    config = load_config(configs / "exp_A001d.yaml").to_dict()
+
+    # 唯一差异：聚合方式改为全图等权均值；`frontal_weight` 保留原值但不参与计算。
+    assert config["model"].pop("aggregation") == "mean"
+    assert a001["model"].pop("aggregation") == "view_weighted"
+    assert config == a001
+
+    text = (configs / "exp_A001d.yaml").read_text(encoding="utf-8")
+    assert any(line.strip() == "_base: exp_A001.yaml" for line in text.splitlines())
+
+    cfg = load_config(configs / "exp_A001d.yaml")
+    assert cfg.model.backbone == "convnext_tiny.fb_in1k"
+    assert cfg.model.pretrained is True
+    assert cfg.model.aggregation == "mean"
+    assert cfg.model.frontal_weight == pytest.approx(0.7)
+    assert cfg.image.size == 320
+    assert cfg.train.epochs == 8
+    assert cfg.train.early_stop_patience == 2
+    assert cfg.train.lr_scheduler == "cosine"
+    assert cfg.train.pos_weight is True
+    assert cfg.train.loss == "bce"
+    assert cfg.seed == 42
+
+
 def test_asl_loss_rejects_pos_weight_combination():
     """ASL 自带非对称重加权，再叠加 pos_weight 会破坏口径，配置阶段直接报错。"""
     with pytest.raises(ValueError, match="pos_weight"):

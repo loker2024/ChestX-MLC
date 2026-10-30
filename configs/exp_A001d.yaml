@@ -1,0 +1,17 @@
+# 实验 A-001-D：A-001 的视角聚合对照（正侧位 7:3 加权 → 全图等权均值）。
+#
+# 以 `configs/exp_A001.yaml` 为唯一变更基准（`_base` 继承），只动一处：
+#   `model.aggregation`: view_weighted → mean
+# 取消正侧位加权后，训练与推理都不再把 views 传给 `aggregate_logits`，
+# 一次检查内的所有图片直接取等权均值；`frontal_weight` 保留 A-001 的 0.7
+# 以维持配置字段一致，但在 mean 聚合下不参与任何计算（配置校验仍要求它在 (0, 1) 内）。
+# 其余口径逐字段沿用 A-001：convnext_tiny.fb_in1k、320×320 letterbox、
+# BCE + `pos_weight`、8 轮上限 + cosine 调度、早停 patience 2、seed 42。
+#
+# 用法（在仓库根目录执行）：
+#     HF_HUB_OFFLINE=1 python src/run_train.py --config configs/exp_A001d.yaml --seed 42 --tag A-001d_convnext_tiny_mean_s42
+
+_base: exp_A001.yaml
+
+model:
+  aggregation: mean
