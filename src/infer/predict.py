@@ -88,12 +88,26 @@ def _forward_probabilities(
     搬设备、按模型 dtype 转换输入、aggregate_logits 求 study 均值、sigmoid 后
     再转回 fp32 CPU 张量。predict_loader / predict_image / predict_study 都走它。
     """
+    return torch.sigmoid(
+        _forward_logits(model, images, offsets, device, views, frontal_weight)
+    )
+
+
+def _forward_logits(
+    model: nn.Module,
+    images: torch.Tensor,
+    offsets: torch.Tensor,
+    device: torch.device,
+    views: torch.Tensor | None = None,
+    frontal_weight: float = 0.7,
+) -> torch.Tensor:
+    """CPU 上的 images/offsets -> CPU 上的 `[B, 10]` fp32 study logits."""
     model_images = images.to(device=device, dtype=_model_dtype(model), non_blocking=True)
     model_offsets = offsets.to(device=device, non_blocking=True)
     study_logits = aggregate_logits(model(model_images), model_offsets,
                                     views.to(device) if views is not None else None, frontal_weight)
-    # 先转 float32 再搬 CPU：以后即使模型用半精度推理，概率也按 fp32 落表。
-    return torch.sigmoid(study_logits.float()).cpu()
+    # 先转 float32 再搬 CPU：以后即使模型用半精度推理，融合也使用稳定的 fp32 logits。
+    return study_logits.float().cpu()
 
 
 @torch.inference_mode()
@@ -129,6 +143,38 @@ def predict_loader(
         raise RuntimeError("推理集为空，无法生成预测")
     probabilities = torch.cat(probability_batches).numpy()
     frame = pd.DataFrame(probabilities, columns=[f"p{class_id}" for class_id in CLASS_IDS])
+    frame.insert(0, "Study_id", study_ids)
+    return frame
+
+
+@torch.inference_mode()
+def predict_loader_logits(
+    model: nn.Module,
+    loader: DataLoader,
+    device: torch.device,
+    config: Config | None = None,
+) -> pd.DataFrame:
+    """对 DataLoader 做 study-level 推理，返回 `Study_id, z1..z10` logits 宽表。"""
+    model.eval()
+    study_ids: list[str] = []
+    logit_batches: list[torch.Tensor] = []
+
+    for batch in loader:
+        logits = _forward_logits(
+            model,
+            batch["images"],
+            batch["offsets"],
+            device,
+            batch["views"] if config is not None and config.model.aggregation == "view_weighted" else None,
+            config.model.frontal_weight if config is not None else 0.7,
+        )
+        study_ids.extend(batch["study_ids"])
+        logit_batches.append(logits)
+
+    if not logit_batches:
+        raise RuntimeError("推理集为空，无法生成 logits")
+    logits = torch.cat(logit_batches).numpy()
+    frame = pd.DataFrame(logits, columns=[f"z{class_id}" for class_id in CLASS_IDS])
     frame.insert(0, "Study_id", study_ids)
     return frame
 

@@ -5,8 +5,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+import torch
+from torch import nn
 
 from infer.ensemble import fuse_prediction_frames, normalize_weights
+from infer.predict import predict_loader_logits
 
 
 def _probability_frame(study_ids: list[str], values: list[float]) -> pd.DataFrame:
@@ -78,3 +81,28 @@ def test_fusion_rejects_unknown_method_and_missing_columns() -> None:
         fuse_prediction_frames(
             [frame.drop(columns="p1")], weights=None, method="probability"
         )
+
+
+class _MeanImageModel(nn.Module):
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        values = images.mean(dim=(1, 2, 3), keepdim=False).unsqueeze(1)
+        return values.repeat(1, 10)
+
+
+def test_predict_loader_logits_aggregates_images_by_study() -> None:
+    batch = {
+        "images": torch.tensor(
+            [
+                [[[1.0, 1.0], [1.0, 1.0]]],
+                [[[3.0, 3.0], [3.0, 3.0]]],
+                [[[5.0, 5.0], [5.0, 5.0]]],
+            ]
+        ),
+        "offsets": torch.tensor([0, 2, 3]),
+        "study_ids": ["study_a", "study_b"],
+    }
+
+    logits = predict_loader_logits(_MeanImageModel(), [batch], torch.device("cpu"))
+
+    assert logits["Study_id"].tolist() == ["study_a", "study_b"]
+    np.testing.assert_allclose(logits["z1"], [2.0, 5.0])
