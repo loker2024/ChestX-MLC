@@ -117,6 +117,7 @@ train:
 | `configs/default.yaml` | P7 冻结的最终配置，正式训练与提交使用 | 无 | 25 epoch、`pos_weight: true` |
 | `configs/exp_short.yaml` | 短周期方向筛查 | `_base: default.yaml` | `epochs: 6`、关闭早停和 `pos_weight` |
 | `configs/exp_view_weighted.yaml` | 正侧位加权聚合对照，待训练 | `_base: default.yaml` | `aggregation: view_weighted`，正位权重 0.7 |
+| `configs/exp_freeze_head.yaml` | 冻结骨干、仅训练分类头的对照，待训练 | `_base: default.yaml` | `model.freeze_backbone: true` |
 | `configs/exp_cosine.yaml` | RUN-003-A 历史余弦调度对照 | `_base: default.yaml` | 固定 `cosine`、关闭 `pos_weight` |
 | `configs/exp_pos_weight.yaml` | 完整周期的 `pos_weight` 实验配置 | `_base: default.yaml` | 显式设置 `pos_weight: true`，与当前默认一致 |
 | `configs/exp_run003b.yaml` | RUN-003-B：当前默认口径的 ResNet-18 完整复跑（cosine + pos_weight，seed 42），已完成 | `_base: default.yaml` | 显式固定 `backbone: resnet18`、`pos_weight: true`、`lr_scheduler: cosine`、`lr_min`、`seed: 42`（取值与当前默认一致） |
@@ -141,6 +142,7 @@ default.yaml
 ├── exp_short.yaml
 │   └── exp_short_pos_weight.yaml
 ├── exp_view_weighted.yaml
+├── exp_freeze_head.yaml
 ├── exp_cosine.yaml
 ├── exp_pos_weight.yaml
 ├── exp_run003b.yaml
@@ -215,6 +217,7 @@ data:
 | --- | --- | --- | --- | --- |
 | `model.backbone` | 非空字符串 | `resnet18` | timm 支持的模型名 | 骨干网络。换骨干等于换模型，必须重新训练；推理配置要与训练一致。 |
 | `model.pretrained` | 布尔 | `true` | `true` / `false` | 是否加载 ImageNet 预训练权重。离线环境拿不到权重时会告警并回退随机初始化，训练日志与 checkpoint 的 `metadata.pretrained_loaded` 会记录真实情况。 |
+| `model.freeze_backbone` | 布尔 | `false` | `true` / `false` | 是否冻结骨干、仅训练 timm 识别的分类头。冻结实验应使用单独配置；默认关闭以保持全量微调。 |
 | `model.num_classes` | 整数 | `10` | 必须等于 `10` | 赛题固定 10 类，写其他值会直接报错。 |
 | `model.aggregation` | 字符串 | `mean` | `mean` / `view_weighted` | 图片等权均值或按正侧位均值加权。 |
 | `model.frontal_weight` | 数字 | `0.7` | `0 < 值 < 1` | 视角加权时正位权重；侧位权重为 `1 - frontal_weight`。 |
@@ -392,7 +395,7 @@ outputs/
 | `metrics` | 最优轮的验证指标 | 当前最优轮的验证指标 | 含 `loss` / `macro_auc` / `macro_f1`。 |
 | `config` | 完整配置 | 完整配置 | 续训省略 `--config` 时从这里恢复。 |
 | `seed` | 训练 seed | 训练 seed | 无命令行覆盖时等于配置值。 |
-| `metadata` | 有 | 有 | `pretrained_loaded`（是否真正加载预训练）与 `device`（训练设备）。 |
+| `metadata` | 有 | 有 | `pretrained_loaded`、`device`、`freeze_backbone`，以及 `total_params` / `trainable_params` 参数计数。 |
 | `extras` | `None` | 有 | 训练进度、最优权重快照、历史记录、早停计数；续训只认带 `extras` 的文件。 |
 
 因此：**推理用 `best.pt`，续训用 `last.pt`**。拿 `best.pt` 续训会因缺少 `extras` 被明确拒绝。

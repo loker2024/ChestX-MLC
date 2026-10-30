@@ -25,10 +25,11 @@
 - `16:42`（新增）`src/common/config.py`、`configs/exp_freeze_head.yaml`、`tests/test_config.py`：增加 `model.freeze_backbone` 配置开关，默认关闭；新增冻结骨干、仅训练分类头的实验配置与加载断言。
 - `16:43`（新增）`src/model/network.py`、`tests/test_model.py`：通过 timm `get_classifier()` 实现通用骨干冻结逻辑，仅解冻分类头，并在分类头不可识别或无参数时明确报错。
 - `16:47`（修复）`src/train/engine.py`、`tests/test_engine.py`：AdamW 与梯度裁剪仅接收 `requires_grad=True` 的参数；无可训练参数时明确报错，并验证冻结骨干在训练后保持不变。
-- `17:03`（新增）`src/run_train.py`、`tests/test_run_train.py`：在 `best.pt` / `last.pt` metadata 中记录冻结状态、总参数量和可训练参数量，并补默认与冻结配置的 CLI 产物测试。
 - `16:52`（新增）`src/model/losses.py`、`src/common/config.py`、`tests/test_model.py`、`tests/test_config.py`：新增 ASL 非对称损失（`train.asl_gamma_pos` / `asl_gamma_neg` / `asl_clip`，默认取论文值 0 / 4 / 0.05），`train.loss` 默认 `bce` 保持原口径；ASL 与 `pos_weight` 互斥并在配置阶段报错；补 ASL 与 BCE 的等价性、手算参考、方向性及极端 logits 梯度测试。本机 `python -m pytest -q` 204 passed / 3 skipped，另有 1 条失败来自工作区既有未提交改动（`test_run_train_cli_writes_artifacts` 的 `total_params` 断言），与本改动无关。
 - `16:52`（新增）`configs/exp_A001b.yaml`、`tests/test_config.py`：新增实验 A-001-B 配置——以 `_base: exp_A001.yaml` 只替换损失方案（ASL 替代 BCE + `pos_weight`），其余口径逐字段沿用 A-001（ConvNeXt-Tiny、320 letterbox、7:3 视角加权、8 轮 cosine、早停 2、seed 42）。
 - `16:52`（变更）`docs/architecture.md`、`docs/manual.md`：更新损失模块与训练数据流描述，补 `train.loss` 及 ASL 三个超参的配置说明。
+- `17:03`（新增）`src/run_train.py`、`tests/test_run_train.py`：在 `best.pt` / `last.pt` metadata 中记录冻结状态、总参数量和可训练参数量，并补默认与冻结配置的 CLI 产物测试。
+- `17:05`（新增）`docs/manual.md`、`docs/experiments.md`：登记 `exp_freeze_head.yaml` 与 RUN-010 待执行实验，补充 `model.freeze_backbone`、checkpoint 参数计数说明及远程训练命令；明确本机未执行真实 GPU 训练。
 
 ## 2026-10-29
 

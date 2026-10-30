@@ -41,6 +41,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | RUN008-C | `run008c_convnext_tiny_s2026` | `configs/exp_run008c.yaml` | 6 | 是 | ConvNeXt-Tiny 骨干对照（6 轮无早停，与 RUN008-D 并行），已完成 |
 | RUN008-D | `run008d_convnextv2_nano_s2026` | `configs/exp_run008d.yaml` | 6 | 是 | ConvNeXtV2-Nano 骨干对照（研究用，CC BY-NC 4.0 不能提交；训练异常），已完成 |
 | RUN-009-A | `run009a_effv2s_384_s2026` | `configs/exp_run009a.yaml` | 25 | 是 | EfficientNetV2-S（RW）@384×384 完整口径复核（实际 6/25 轮后按用户要求停止，非早停），已完成 |
+| RUN-010 | `freeze_head_s42` | `configs/exp_freeze_head.yaml` | 25 | 是 | 冻结 ImageNet 预训练 ResNet-18、仅训练分类头；待 GPU 环境执行 |
 | A-001 | `A-001_convnext_tiny_s42` | `configs/exp_A001.yaml` | 8（早停 2，实际 6） | 是 | RUN-008-C 重跑：ConvNeXt-Tiny @320×320，epoch=8 / patience=2 / seed=42，完整展开不继承 |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
@@ -52,6 +53,8 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 执行步骤和判读门见 [训练计划](train_plan01.md)，通用命令及续训注意事项见 [使用手册](manual.md)。实际运行的配置、环境、指标和耗时记录在 [training_log.md](training_log.md)，对照结果以该文件为准。
 
 截至 2026-10-30 的对照结论（数字均来自 `metrics.csv` 与 `outputs/compare/summary.md`）：
+
+RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、优化器参数集合和 checkpoint metadata 的合成数据测试；训练完成后再与同 seed 的全量微调基线比较 Macro-AUC、Macro-F1、逐类 AUC 和训练耗时。
 
 - **RUN-001R 回归门通过**：末轮 macro-AUC 0.7903，对比 RUN-001 的 0.7858 为 Δ+0.0045，落在判读门 [0.7808, 0.7908] 内，曲线形状也一致（6 轮单调上升、最优 epoch 6）→ 结果达到预设回归门，但不能证明训练结果完全等价，001R 的 `best.pt` 可作为耗时自检载体。
 - **`pos_weight` 未达原 AUC 增益门（RUN-002）**：最优 macro-AUC 0.7882（epoch 5），对比 001R 的 0.7903 为 Δ−0.0021，未达「+0.005 且逐类无大退化」的判读门；逐类 AUC 差呈稀有类升、多数丰富类降（class1 +0.0588，class2 −0.0328、class4 −0.0398、class8 −0.0172），正是判读门要排除的形态。当时 `train.pos_weight` 维持 `false`，RUN-004 走 004A。
@@ -140,7 +143,19 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | `pos_weight` | 已验证 | `train.pos_weight: true` | **RUN-002-A/B 未达原 AUC 增益门**：完整周期双 seed macro-AUC 0.7872 / 0.7871，vs RUN-003 0.7887 为 Δ−0.0015 / −0.0016，均未达 +0.005 门；F1@0.5 提升（0.4045 / 0.4198）伴随阈值曲线右移，已测峰值与基线接近，当前默认开启 |
 | 聚合方式消融 | 待评估 | 比较平均 logits、平均概率及最大聚合 | 当前使用平均 logits 后 sigmoid；其他方式尚未实现或实测 |
 | 更高分辨率 / TTA | 已验证（方向性） | `image.size`、`run_infer.py` 加翻转 TTA | **RUN-007-B 已做 384×384 + 6 轮短跑（macro-AUC 0.7959 / F1@0.5 0.4227）**：比 320 的 12 轮早停 0.7906 高 +0.0053，但轮数与 cosine 周期不同、不可单变量归因；需 25 轮完整对照再判定。**RUN-009-A（2026-10-30）**：EfficientNetV2-S RW @384×384 + 25 轮上限口径只跑 6/25 轮（用户要求停止），macro-AUC 0.7944，比同骨干 320×320 6 轮的 RUN-008-B（0.7954）低 −0.0010，未显示增量；25 轮完整对照仍待做。TTA 未做；448 显存未实测（3090 24G） |
+| 冻结骨干、仅训练分类头 | 待执行 | `configs/exp_freeze_head.yaml`、`model.freeze_backbone` | RUN-010：固定 ResNet-18、ImageNet 预训练、study 聚合和评估口径，只把可训练参数限制为分类头；执行命令见下方。 |
 
 ### 正侧位加权聚合配置
 
 `configs/exp_view_weighted.yaml` 在默认骨干上启用加权聚合；RUN-007 系列使用 DenseNet-121。正位（AP、PA）和侧位（LATERAL、LL）先分别求 logits 均值，再按 0.7 / 0.3 加权；单视角或含未知视角时回退全部图片等权均值。推理及耗时检查须使用相同配置；缺少完整测试索引时，多图加权一致性校验会报错。实测结果见上文及 [训练记录](training_log.md)。
+
+### RUN-010 执行命令
+
+```bash
+python src/run_train.py \
+  --config configs/exp_freeze_head.yaml \
+  --seed 42 \
+  --tag freeze_head_s42
+```
+
+启动前确认日志包含“预训练权重: 已加载”，并在 `best.pt` 的 `metadata` 中核对 `freeze_backbone: true`、`trainable_params` 小于 `total_params`；实际指标与耗时回填 [training_log.md](training_log.md) 后再做结论。
