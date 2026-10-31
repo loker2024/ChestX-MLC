@@ -1,6 +1,6 @@
 # 训练计划 19：A-001 优化超参联合放大对照（lr 1e-3 / wd 0.03 / 10 轮 / patience 4）
 
-**状态：配置已就绪（`configs/exp_A009.yaml`），GPU 训练与评估已执行，实测待回填。**
+**状态：已完成（2026-10-31），GPU 训练与评估已执行，结论：未过门、方向否定。**
 
 ## 目标与配置
 
@@ -66,4 +66,12 @@ A-001 / A-008 是同一份（`check_data --full` 结论沿用 A-008 的全通过
 - [x] 配置 `configs/exp_A009.yaml` 就绪（`_base: exp_A001.yaml`，四项覆盖，加载校验通过）。
 - [x] GPU 训练完成（2026-10-31 19:49:52 → 20:33:27，43m35s，10/10 轮跑满、无早停，best epoch 10）。
 - [x] `run_eval.py` 评估（阈值 0.2–0.7）与配对 bootstrap 完成。
-- [ ] 实测回填 `docs/training_log.md`、`docs/experiments.md` 并更新本文件结论。
+- [x] 实测回填 `docs/training_log.md`、`docs/experiments.md` 并更新本文件结论。
+
+## 执行结果
+
+- 产物：`outputs/20261031-194952_A-009_convnext_tiny_lr1e-3_wd0.03_s42/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-009_full.txt`、`outputs/A-009_valid_predictions.csv`、`outputs/compare_A009/bootstrap_A009.csv`。
+- 结果：10/10 轮跑满、无早停，best epoch 10，valid macro-AUC **0.7799** / F1@0.5 **0.4101**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0239、F1@0.5 −0.0154，距 0.8088 门差 −0.0289 → **未过门**。
+- 训练行为：AUC 从 ep1 0.7387 逐轮升到 ep10 0.7799，但 valid_loss 在 ep6 触底 0.9384 后反弹到 1.0955；A-001 则在 ep4 就见顶 0.8038。lr 放大到 1e-3 后收敛整体右移、末段过拟合。
+- 配对 bootstrap（859 studies × 2,000 次，按 study 有放回重采样，seed 2026）：ΔAUC（A-001 − A-009）95% CI [+0.0121, +0.0360] P=1.000、ΔF1@0.5 95% CI [+0.0027, +0.0285] P=0.991，差距不是 valid 内采样噪声。
+- 结论：优化超参联合放大方向否定（单 seed，四项同改不可单变量归因）；默认超参保持 A-001 口径，不补 seed 2026；若继续调参应改开 lr / wd 单变量实验。

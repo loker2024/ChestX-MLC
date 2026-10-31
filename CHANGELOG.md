@@ -116,6 +116,9 @@
 
 - `20:44`（新增）`configs/exp_A009.yaml`、`docs/train_plan19.md`：新增 A-009 优化超参联合放大对照（相对 A-001 只覆盖 `train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余逐字段继承），并记录该组的判读门（0.8088）、执行命令、实现口径与「四项同改不可拆单项」的限制；训练已启动，实测待回填。
 
+- `20:45`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan19.md`：回填 A-009 实测——2026-10-31 19:49:52 启动、10/10 轮跑满（best epoch 10，43m35s），valid macro-AUC **0.7799** / F1@0.5 **0.4101**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0239 / F1@0.5 −0.0154，距 0.8088 门差 −0.0289 → 未过门；valid_loss 在 ep6 触底 0.9384 后反弹到 ep10 1.0955，收敛整体右移；配对 bootstrap（859 studies × 2,000 次）ΔAUC（A-001 − A-009）95% CI [+0.0121, +0.0360] P=1.000、ΔF1@0.5 95% CI [+0.0027, +0.0285] P=0.991，差距不是 valid 内采样噪声；四项同改不可单变量归因，方向否定、默认超参不变，不补 seed 2026。
+- `20:45`（变更）远端训练环境（不涉及仓库文件）：A-009（A-001 的优化超参联合放大对照，lr 1e-3 / wd 0.03 / 10 轮 / patience 4）在 autodl V100-SXM2-32G 上完成训练与评估——产物 `outputs/20261031-194952_A-009_convnext_tiny_lr1e-3_wd0.03_s42/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-009_full.txt`、`outputs/A-009_valid_predictions.csv`、`outputs/compare_A009/bootstrap_A009.csv` 与 `outputs/plan19_bootstrap.py`。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
