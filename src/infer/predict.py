@@ -48,7 +48,7 @@ def load_checkpoint_model(
     if checkpoint.get("config") is not None:
         saved = config_from_dict(checkpoint["config"])
         fields = {"image": ("size", "letterbox", "normalize", "in_channels", "xrv_maxval"),
-                  "model": ("arch", "backbone", "num_classes", "dropout", "aggregation", "frontal_weight")}
+                  "model": ("arch", "backbone", "num_classes", "dropout", "head", "csra_residual_weight", "csra_temperature", "aggregation", "frontal_weight")}
         differences = [f"{section}.{field}" for section, names in fields.items()
                        for field in names if getattr(getattr(config, section), field) != getattr(getattr(saved, section), field)]
         if differences:

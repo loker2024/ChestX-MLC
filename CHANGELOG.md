@@ -56,6 +56,14 @@
 - `14:35`（变更）`docs/experiments.md`：实验矩阵新增 A-004-a / A-004-b 两行；「执行与结果」新增「dropout 与 weight decay 的单变量分解」段（两项单独均为负向、组合主要由 weight decay 决定、均未过门）；「后续待验证优化项」正则化行补 A-004-a / A-004-b 结论；冻结结论第 2 条补 A-004 系列未带来增益。
 - `14:35`（变更）`docs/train_plan14.md`：状态行由「配置与本机验证已准备；GPU 训练待执行」改为已完成，补「执行记录」小节（两组实测指标、归因、产物与结论）。
 
+- `14:40`（新增）`src/model/csra.py`、`configs/exp_csra.yaml`、`tests/test_csra.py`、`docs/train_plan_csra.md`：新增 ConvNeXt-Tiny 单头 CSRA 分类头、A-001 对照配置、合成数据与 checkpoint 测试及实验计划；GPU 实验待执行。
+- `14:40`（变更）`src/common/config.py`、`src/model/network.py`、`src/infer/predict.py`、`docs/manual.md`：接入并校验可选 CSRA 分类头、权重加载与推理配置一致性；旧配置沿用原分类头，说明 LayerNorm 位置和使用限制。
+- `14:41`（新增）`docs/train_plan15.md`：制定 A-001 与单头 CSRA 分类头对照计划，明确数据、代码和权重核验、训练评估命令、配对边界、判读门与后续 seed 复核；GPU 实验尚未执行。
+- `14:42`（变更）`.gitignore`：忽略本地 `.env` 与其变体，并允许 `.env.example`、`.env.sample` 示例模板纳入版本控制。
+
+- `15:37`（新增）`src/model/ml_decoder.py`、`configs/exp_ml_decoder.yaml`、`tests/test_ml_decoder.py`、`docs/ml_decoder_implementation.md`、`docs/train_plan16.md`：接入轻量类别查询交叉注意力分类头、实验配置、测试和实现与训练计划；GPU 实验未执行。
+- `15:37`（变更）`src/common/config.py`、`src/model/network.py`、`docs/manual.md`：增加分类头选择与使用限制，保留原模型默认路径。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

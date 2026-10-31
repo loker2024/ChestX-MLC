@@ -766,3 +766,11 @@ python -m pytest
 | [耗时自检](cost.md) | 计时口径与限制 |
 | [实现计划](plan0.md) | P1–P8 的阶段划分与验收方式 |
 | `CHANGELOG.md` | 全部代码与文档改动记录 |
+
+### 可选 CSRA 分类头
+
+`configs/exp_csra.yaml` 在 A-001 基础上选择 `model.head: csra`；旧配置及未指定时默认为 `standard`。CSRA 当前仅支持 `convnext_tiny.fb_in1k`、全量微调和 `model.dropout: 0`；`model.csra_residual_weight` 默认 0.4，`model.csra_temperature` 默认 1.0。模型对外仍输出逐图 10 类 logits，Study 聚合和损失口径不变。CSRA 预训练权重加载失败直接报错；推理时使用 checkpoint 权重，结构与保存配置必须一致。实现细节、训练和对照要求见 [CSRA 实验计划](train_plan_csra.md)。GPU 实验尚未执行。
+
+### 可选 ML-Decoder 思路分类头
+
+`configs/exp_ml_decoder.yaml` 在 A-001 基础上使用单层类别查询交叉注意力头；它是 ML-Decoder 的轻量变体，不是作者完整配置的复现。当前仅支持 ConvNeXt-Tiny `fb_in1k`、全量微调、dropout 为 0。结构与实验边界分别见 [实现说明](ml_decoder_implementation.md) 和 [训练计划 16](train_plan16.md)。

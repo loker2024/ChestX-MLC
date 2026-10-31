@@ -83,6 +83,8 @@ def build_model(cfg: Config) -> nn.Module:
         )
         model.pretrained_loaded = bool(cfg.model.pretrained)
     except (OSError, RuntimeError) as error:
+        if cfg.model.head in {"csra", "ml_decoder"}:
+            raise RuntimeError(f"{cfg.model.head} 实验的预训练骨干加载失败，已停止构建") from error
         warnings.warn(
             f"加载 {cfg.model.backbone} 的预训练权重失败（{error}），改为随机初始化；"
             "若这是配置错误，请检查 model.backbone 与网络连接。",
@@ -95,6 +97,17 @@ def build_model(cfg: Config) -> nn.Module:
             drop_rate=cfg.model.dropout,
         )
         model.pretrained_loaded = False
+    if cfg.model.head == "csra":
+        from model.csra import ConvNeXtCSRAHead
+
+        model.head = ConvNeXtCSRAHead(
+            model.head.norm, model.num_features, cfg.model.num_classes,
+            cfg.model.csra_residual_weight, cfg.model.csra_temperature,
+        )
+    elif cfg.model.head == "ml_decoder":
+        from model.ml_decoder import ConvNeXtMLDecoderHead
+
+        model.head = ConvNeXtMLDecoderHead(model.head.norm, model.num_features, cfg.model.num_classes)
     if cfg.model.freeze_backbone:
         _freeze_backbone(model, cfg.model.backbone)
     return model

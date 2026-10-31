@@ -1,0 +1,4 @@
+# A-001 分类头对照；首次实验固定单头、残差权重 0.4、温度 1.0。
+_base: exp_A001.yaml
+model:
+  head: csra

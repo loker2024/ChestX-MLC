@@ -13,6 +13,7 @@ YAML 是嵌套字典，读进来后转成一组 dataclass（每个配置节对�
 
 from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
+import math
 import types
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
@@ -81,6 +82,9 @@ class ModelConfig:
     pretrained: bool = True  # 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
     dropout: float = 0.0  # timm 分类头 dropout；旧配置默认关闭
+    head: str = "standard"  # standard=原 timm 分类头；csra=类别空间注意力
+    csra_residual_weight: float = 0.4
+    csra_temperature: float = 1.0
     freeze_backbone: bool = False  # 是否冻结骨干，仅训练分类头
     aggregation: str = "mean"
     frontal_weight: float = 0.7
@@ -90,6 +94,17 @@ class ModelConfig:
     xrv_sha256: str | None = None  # 期望的权重文件 SHA-256；None=不校验
 
     def __post_init__(self) -> None:
+        if self.head not in {"standard", "csra", "ml_decoder"}:
+            raise ValueError("model.head 只能是 standard、csra 或 ml_decoder")
+        if not math.isfinite(self.csra_residual_weight) or self.csra_residual_weight < 0:
+            raise ValueError("model.csra_residual_weight 必须是有限非负数")
+        if not math.isfinite(self.csra_temperature) or self.csra_temperature <= 0:
+            raise ValueError("model.csra_temperature 必须是有限正数")
+        if self.head in {"csra", "ml_decoder"}:
+            if self.arch != "timm" or self.backbone != "convnext_tiny.fb_in1k":
+                raise ValueError("注意力分类头目前只支持 timm convnext_tiny.fb_in1k")
+            if self.freeze_backbone or self.dropout != 0.0:
+                raise ValueError("注意力分类头目前仅支持全量微调且 dropout=0")
         if not 0.0 <= self.dropout < 1.0:
             raise ValueError("model.dropout 必须在 [0, 1) 内")
         if self.aggregation not in {"mean", "view_weighted"}:

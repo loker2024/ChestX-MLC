@@ -1,0 +1,4 @@
+# A-001 分类头对照：单层、10 类别查询的 ML-Decoder 轻量变体。
+_base: exp_A001.yaml
+model:
+  head: ml_decoder
