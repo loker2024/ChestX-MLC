@@ -28,7 +28,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from common.checkpoint import load_checkpoint
-from common.config import Config
+from common.config import Config, config_from_dict
 from common.constants import CLASS_IDS
 from data.dataset import load_image
 from data.transforms import build_eval_transform
@@ -44,13 +44,32 @@ def load_checkpoint_model(
     一遍 ImageNet 预训练权重（离线环境也下载不了）。模型结构仍由 config 决定，
     所以推理用的配置文件必须和训练时一致（backbone、类别数）。
     """
+    checkpoint = load_checkpoint(checkpoint_path, map_location="cpu")
+    if checkpoint.get("config") is not None:
+        saved = config_from_dict(checkpoint["config"])
+        fields = {"image": ("size", "letterbox", "normalize", "in_channels", "xrv_maxval"),
+                  "model": ("arch", "backbone", "num_classes", "dropout", "aggregation", "frontal_weight")}
+        differences = [f"{section}.{field}" for section, names in fields.items()
+                       for field in names if getattr(getattr(config, section), field) != getattr(getattr(saved, section), field)]
+        if differences:
+            raise ValueError("推理配置与 checkpoint 不一致：" + ", ".join(differences))
+    else:
+        import warnings
+        warnings.warn("旧 checkpoint 缺少存档配置，无法验证推理口径", RuntimeWarning)
     # 只替换 pretrained 字段，backbone 和 num_classes 保持配置里的值。
     model_config = replace(config.model, pretrained=False)
     model = build_model(replace(config, model=model_config))
 
-    checkpoint = load_checkpoint(checkpoint_path, map_location="cpu")
     model.load_state_dict(checkpoint["model"])
     return model.to(device).eval()
+
+
+def validate_submission_model(config: Config, checkpoint_path: str | Path) -> None:
+    """禁止将研究专用的 TxRV 模型用于提交。"""
+    checkpoint = load_checkpoint(checkpoint_path, map_location="cpu")
+    saved = config_from_dict(checkpoint["config"]) if checkpoint.get("config") else config
+    if config.model.arch == "xrv_densenet121" or saved.model.arch == "xrv_densenet121":
+        raise ValueError("TxRV 模型仅用于研究，不能生成赛题提交或参与提交融合")
 
 
 def build_eval_inference_transform(

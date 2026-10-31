@@ -16,7 +16,7 @@ from common.metrics import macro_auc, macro_f1, macro_f1_curve, parse_thresholds
 from common.utils import resolve_device
 from data.dataset import build_loader
 from infer.ensemble import fuse_prediction_frames, normalize_weights
-from infer.predict import load_checkpoint_model, predict_loader, predict_loader_logits
+from infer.predict import load_checkpoint_model, predict_loader, predict_loader_logits, validate_submission_model
 from infer.submission import build_submission_frame, validate_submission, write_submission
 
 
@@ -161,6 +161,9 @@ def main(argv: list[str] | None = None) -> None:
         _load_model_config(checkpoint_path, config_path)
         for checkpoint_path, config_path in zip(checkpoint_paths, config_paths)
     ]
+    if args.split == "test":
+        for config, checkpoint_path in zip(configs, checkpoint_paths):
+            validate_submission_model(config, checkpoint_path)
     weights = _parse_weights(args.weights, len(checkpoint_paths))
     device = resolve_device(configs[0].device)
 

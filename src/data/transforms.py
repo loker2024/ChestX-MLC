@@ -79,7 +79,8 @@ def build_eval_transform(
         if letterbox
         else [T.Resize((size, size), antialias=True)]
     )
-    return T.Compose([*geometry, *_normalize_steps(normalize, in_channels, xrv_maxval)])
+    transform = T.Compose([*geometry, *_normalize_steps(normalize, in_channels, xrv_maxval)])
+    return _XrvBitDepthTransform(transform, size, letterbox, xrv_maxval, False) if normalize == "xrv" else transform
 
 
 def build_train_transform(size: int, cfg: ImageConfig) -> Callable[[Image.Image], torch.Tensor]:
@@ -116,7 +117,45 @@ def build_train_transform(size: int, cfg: ImageConfig) -> Callable[[Image.Image]
     if cfg.hflip:
         steps.append(T.RandomHorizontalFlip(p=0.5))
     steps.extend(_normalize_steps(cfg.normalize, cfg.in_channels, cfg.xrv_maxval))
-    return T.Compose(steps)
+    transform = T.Compose(steps)
+    return _XrvBitDepthTransform(transform, size, cfg.letterbox, cfg.xrv_maxval, True, cfg.hflip) if cfg.normalize == "xrv" else transform
+
+
+class _XrvBitDepthTransform:
+    """保留 16 位输入，并在任何通道转换前检查原始像素范围。"""
+
+    def __init__(self, eight_bit: Callable, size: int, letterbox: bool, maxval: int,
+                 train: bool, hflip: bool = False) -> None:
+        self.eight_bit, self.size, self.letterbox, self.maxval = eight_bit, size, letterbox, maxval
+        self.train, self.hflip = train, hflip
+        self.augment = T.Compose([
+            T.RandomAffine(degrees=7, translate=(0.05, 0.05), scale=(0.9, 1.1),
+                           interpolation=InterpolationMode.BILINEAR, fill=0),
+            T.ColorJitter(brightness=0.15, contrast=0.15),
+            *([T.RandomHorizontalFlip(p=0.5)] if hflip else []),
+        ])
+
+    def __call__(self, image: Image.Image) -> torch.Tensor:
+        pixels = np.asarray(image)
+        if pixels.size == 0 or pixels.min() < 0 or pixels.max() > self.maxval:
+            raise ValueError(f"图像像素超出 xrv_maxval={self.maxval} 的范围")
+        if image.mode not in {"I", "I;16", "I;16B", "I;16L"}:
+            return self.eight_bit(image)
+        if pixels.ndim != 2 or pixels.max() > 65535:
+            raise ValueError("xrv 16 位输入必须是单通道灰度图")
+        tensor = torch.from_numpy(pixels.astype(np.float32)).unsqueeze(0) / self.maxval
+        height, width = tensor.shape[-2:]
+        if self.letterbox:
+            scale = self.size / max(width, height)
+            resized_width, resized_height = max(1, round(width * scale)), max(1, round(height * scale))
+            tensor = T.functional.resize(tensor, [resized_height, resized_width], antialias=True)
+            left, top = (self.size - resized_width) // 2, (self.size - resized_height) // 2
+            tensor = T.functional.pad(tensor, [left, top, self.size - resized_width - left, self.size - resized_height - top])
+        else:
+            tensor = T.functional.resize(tensor, [self.size, self.size], antialias=True)
+        if self.train:
+            tensor = self.augment(tensor)
+        return (tensor * 2 - 1) * 1024
 
 
 class _NormalizedTensor:

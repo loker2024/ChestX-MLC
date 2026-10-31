@@ -21,13 +21,16 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import random
 import sys
+import warnings
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TextIO
 
 import pandas as pd
+import numpy as np
 import torch
 import yaml
 
@@ -124,7 +127,8 @@ def _validate_resume_config(config: Config, saved: Config) -> None:
     for values in (current_values, saved_values):
         values.pop("device")
         values.pop("output")
-        values["train"].pop("epochs")
+        if saved.train.lr_scheduler != "cosine":
+            values["train"].pop("epochs")
         values["train"].pop("num_workers")
         values["eval"].pop("batch_studies")
     differences = []
@@ -151,6 +155,7 @@ def _checkpoint_metadata(
     config: Config,
     device: torch.device,
     pretrained_loaded: bool,
+    previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """生成可核对模型训练口径的 checkpoint 元数据。"""
     total_params = sum(parameter.numel() for parameter in model.parameters())
@@ -169,7 +174,35 @@ def _checkpoint_metadata(
     pretrained_info = getattr(model, "pretrained_info", None)
     if callable(pretrained_info):
         metadata.update(pretrained_info())
+        if previous is not None:
+            for key in ("arch", "weights_name", "weights_path", "weights_sha256", "pretrained_loaded"):
+                if key in previous:
+                    metadata[key] = previous[key]
     return metadata
+
+
+def _capture_rng_state(device: torch.device | None = None) -> dict[str, Any]:
+    return {"python": random.getstate(), "numpy": np.random.get_state(),
+            "torch": torch.get_rng_state(),
+            "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+            "mps": torch.mps.get_rng_state() if device is not None and device.type == "mps" else None}
+
+
+def _restore_rng_state(state: dict[str, Any]) -> None:
+    random.setstate(state["python"])
+    np.random.set_state(state["numpy"])
+    torch.set_rng_state(state["torch"].cpu())
+    cuda = state.get("cuda")
+    if cuda is not None:
+        if not torch.cuda.is_available() or len(cuda) != torch.cuda.device_count():
+            warnings.warn("CUDA 设备与断点不一致，无法精确恢复 CUDA 随机状态", RuntimeWarning)
+        else:
+            torch.cuda.set_rng_state_all(cuda)
+    if state.get("mps") is not None:
+        if torch.backends.mps.is_available():
+            torch.mps.set_rng_state(state["mps"].cpu())
+        else:
+            warnings.warn("MPS 设备不可用，无法恢复 MPS 随机状态", RuntimeWarning)
 
 
 def _save_last_checkpoint(
@@ -180,6 +213,7 @@ def _save_last_checkpoint(
     config: Config,
     device: torch.device,
     pretrained_loaded: bool,
+    previous_metadata: dict[str, Any] | None = None,
 ) -> None:
     """保存可续训的完整状态：权重 + 优化器/调度器/AMP + 进度与最优快照。"""
     save_checkpoint(
@@ -192,7 +226,7 @@ def _save_last_checkpoint(
         metrics=progress.best_metrics,
         config=config,
         seed=config.seed,
-        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded),
+        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded, previous_metadata),
         extras={
             "best_auc": progress.best_auc,
             "best_epoch": progress.best_epoch,
@@ -200,6 +234,7 @@ def _save_last_checkpoint(
             "best_state": progress.best_state,
             "history": progress.history,
             "stale_epochs": progress.stale_epochs,
+            "rng_state": _capture_rng_state(device),
         },
     )
 
@@ -233,15 +268,6 @@ def run_training(
     pretrained_loaded = bool(getattr(model, "pretrained_loaded", False))
     # B 组把权重来源 / SHA-256 打进训练日志，作为「权重确实加载成功」的留痕；
     # 默认 timm 骨干没有 pretrained_info，不受影响。
-    pretrained_info = getattr(model, "pretrained_info", None)
-    if callable(pretrained_info):
-        info = pretrained_info()
-        print(
-            f"预训练权重: arch={info['arch']} name={info['weights_name']} "
-            f"loaded={info['pretrained_loaded']} sha256={info['weights_sha256']}"
-        )
-        print(f"权重文件: {info['weights_path']}")
-
     progress: TrainProgress | None = None
     optimizer_state = scheduler_state = scaler_state = None
     if checkpoint is not None:
@@ -254,6 +280,20 @@ def run_training(
         stored = (checkpoint.get("metadata") or {}).get("pretrained_loaded")
         if stored is not None:
             pretrained_loaded = bool(stored)
+        rng_state = checkpoint["extras"].get("rng_state")
+        if rng_state is None:
+            warnings.warn("旧断点缺少随机状态，续训不能精确重现连续训练", RuntimeWarning)
+        else:
+            _restore_rng_state(rng_state)
+        saved_config = config_from_dict(checkpoint["config"])
+        old_device = (checkpoint.get("metadata") or {}).get("device")
+        if saved_config.train.num_workers != config.train.num_workers or (old_device and old_device != str(device)):
+            warnings.warn("续训设备或 num_workers 已改变，随机数恢复不保证训练轨迹一致", RuntimeWarning)
+    if callable(getattr(model, "pretrained_info", None)):
+        info = _checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None)
+        print(f"预训练权重: arch={info['arch']} name={info['weights_name']} "
+              f"loaded={info['pretrained_loaded']} sha256={info['weights_sha256']}")
+        print(f"权重文件: {info['weights_path']}")
     print(f"预训练权重: {'已加载' if pretrained_loaded else '未加载（随机初始化或配置关闭）'}")
     if progress is not None:
         print(
@@ -274,6 +314,7 @@ def run_training(
             config,
             device,
             pretrained_loaded,
+            checkpoint.get("metadata") if checkpoint is not None else None,
         )
 
     result = fit(
@@ -299,7 +340,7 @@ def run_training(
         metrics=result["best_metrics"],
         config=config,
         seed=config.seed,
-        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded),
+        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None),
     )
     print(f"最优权重已保存: {checkpoint_path}")
     return result

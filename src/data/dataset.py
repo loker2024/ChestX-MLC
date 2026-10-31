@@ -34,16 +34,18 @@ class StudyDataset(Dataset):
         self,
         records: list[StudyRecord],
         transform: Callable[[Image.Image], torch.Tensor],
+        preserve_mode: bool = False,
     ) -> None:
         self.records = records
         self.transform = transform
+        self.preserve_mode = preserve_mode
 
     def __len__(self) -> int:
         return len(self.records)
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         record = self.records[index]
-        images = [self.transform(load_image(path)) for path in record.image_paths]
+        images = [self.transform(load_image(path, convert_rgb=not self.preserve_mode)) for path in record.image_paths]
 
         item: dict[str, Any] = {
             "images": torch.stack(images),  # [n, 3, size, size]，n = 这次检查的图片数
@@ -134,7 +136,7 @@ def build_loader(
 
     records = read_split(split_cfg.csv, split_cfg.images, labeled=split != "test")
     return DataLoader(
-        StudyDataset(records, loader_transform),
+        StudyDataset(records, loader_transform, preserve_mode=cfg.image.normalize == "xrv"),
         batch_size=batch_size,
         shuffle=train,
         num_workers=cfg.train.num_workers,

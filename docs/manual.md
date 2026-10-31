@@ -221,7 +221,7 @@ data:
 | `image.normalize` | 字符串 | `imagenet` | `imagenet` / `none` / `xrv` | `imagenet`：减 ImageNet 均值、除标准差，配合预训练权重；`none`：只把像素缩到 0–1；`xrv`：按 TorchXRayVision 口径把像素映射到 `[-1024, 1024]`，仅 B 组使用。 |
 | `image.hflip` | 布尔 | `false` | `true` / `false` | 仅训练增强是否做水平翻转。胸片左右有方向含义，默认关闭。 |
 | `image.in_channels` | 整数 | `3` | `3` / `1` | 输入通道数。timm 链路固定 3 通道；B 组 TxRV 医学权重是单通道，必须设 `1`，且 `normalize: xrv` 要求 `in_channels: 1`、`normalize: imagenet` 要求 `in_channels: 3`。 |
-| `image.xrv_maxval` | 整数 | `255` | `> 0` | 仅 `normalize: xrv` 生效：归一化公式 `(2 * pixel / maxval - 1) * 1024` 的像素上限。当前数据为 8 位灰度 JPEG/PNG，用 255；像素超过该值会直接报错，避免把 16 位数据当 8 位处理。 |
+| `image.xrv_maxval` | 整数 | `255` | `> 0` | 仅 `normalize: xrv` 生效：归一化公式 `(2 * pixel / maxval - 1) * 1024` 的像素上限。当前 B 组配置按 8 位灰度 JPEG/PNG 使用 255；16 位灰度图可用 65535，原始像素超过该值会在预处理前报错。 |
 
 训练时的其他增强（±7° 旋转、0.9–1.1 缩放、5% 平移、亮度/对比度 ±15%）由代码固定，不受配置控制；验证和推理只做确定性的缩放与归一化。
 
@@ -246,7 +246,7 @@ data:
 
 | 字段 | 类型 | 默认 | 约束 | 说明 |
 | --- | --- | --- | --- | --- |
-| `train.epochs` | 整数 | `25` | `>= 1` | 总训练轮数。续训时可以在新配置里调大以延长训练。 |
+| `train.epochs` | 整数 | `25` | `>= 1` | 总训练轮数。warmup 调度续训时可调整；cosine 调度须与断点一致。 |
 | `train.batch_studies` | 整数 | `16` | `>= 1` | 每个 batch 的**检查数**，不是图片数；实际图片数是一次检查的 1–7 张之和。显存不足时优先调小。 |
 | `train.lr` | 浮点 | `0.0003` | `> 0` | AdamW 基础学习率。必须用小数写法，不要写 `3e-4`。 |
 | `train.weight_decay` | 浮点 | `0.01` | `>= 0` | AdamW 权重衰减。 |
@@ -556,18 +556,18 @@ python src/run_train.py --resume outputs/20261027-101500_full_baseline/last.pt
 
 - 复用原 run 目录，不新建目录；`train.log` **追加**写入，并插入 `===== 续训 ... =====` 分隔行。
 - 从 `last.pt` 恢复模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优权重、历史记录与早停计数，接着跑剩余 epoch。
-- 省略 `--config` 时，沿用 `last.pt` 里存档的配置；显式传 `--config` 时，只允许修改 `train.epochs`、`train.num_workers`、`eval.batch_studies`、`device` 和 `output`，其余差异会报错。续训配置另存为 `config_resume.yaml`，原 `config.yaml` 不动。
+- 省略 `--config` 时，沿用 `last.pt` 里存档的配置；显式传 `--config` 时，只允许修改 `train.num_workers`、`eval.batch_studies`、`device` 和 `output`；仅 warmup 调度允许修改 `train.epochs`，cosine 调度必须保持原总轮数。其余差异会报错。续训配置另存为 `config_resume.yaml`，原 `config.yaml` 不动。
 - 如果该 run 已跑满 `train.epochs`，不会重复训练，只重新导出 `best.pt`。
 - 训练被 Ctrl+C 中断时，最多丢失当前这一轮；用上面的 `--resume` 命令继续。
-- 续训保存的是模型、优化器、调度器、AMP 与训练进度，不含随机数生成器状态；恢复后数据打乱与增强会从 `seed` 重新开始，指标可能与“不中断一次跑完”有细微差异。正式对比仍应以完整 run 为准。
+- 新断点保存 Python、NumPy、PyTorch 和所用 CUDA / MPS 随机数状态；旧断点缺少状态时会警告。改变设备或 worker 数会影响随机序列；即使状态一致，GPU 算子仍可能存在数值差异。
 
-延长训练轮数的写法：
+仅使用 `train.lr_scheduler: warmup` 时，可按下列方式延长训练轮数：
 
 ```bash
 python src/run_train.py --resume outputs/<run> --config configs/exp_long.yaml
 ```
 
-`exp_long.yaml` 只需在原训练配置的基础上把 `train.epochs` 调大。学习率、权重衰减、数据与预处理等训练口径不可通过续训配置更改；需要改变这些参数时应新建 run。
+`exp_long.yaml` 只需在原 warmup 配置的基础上把 `train.epochs` 调大。cosine 调度的总轮数是学习率曲线的一部分，不支持续训时修改。学习率、权重衰减、数据与预处理等训练口径不可通过续训配置更改；需要改变这些参数时应新建 run。
 
 > 只有训练过程中生成的 `last.pt` 才能续训。`best.pt` 没有优化器、调度器和 `extras`，拿它续训会报错。
 
@@ -631,6 +631,8 @@ python src/run_infer.py \
 | `--checkpoint` | 必填 | 训练产出的 `best.pt`。 |
 | `--out` | `outputs/submission.csv` | 提交文件路径，父目录会自动创建。 |
 | `--threshold` | 无 | 只输出概率 ≥ 该值的类别，必须在 `[0, 1]`。省略时输出全部 10 类概率。 |
+
+推理加载 checkpoint 时会比较模型结构、图像预处理和 study 聚合配置；不一致会报错，旧 checkpoint 缺少配置时会警告。TxRV 研究模型禁止生成提交或参与 test 融合，但仍可在带标签数据上评估。
 
 推理流程：按配置构建 test loader → 加载权重 → 逐图前向并按配置聚合 study logits → sigmoid → 摊平成提交长表 → 按 `test.csv` 校验。终端会打印 checkpoint、设备、test study 数、提交文件路径、输出策略与行数。
 

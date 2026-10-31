@@ -18,7 +18,7 @@ import math
 from common.config import load_config
 from common.utils import resolve_device
 from data.dataset import build_loader
-from infer.predict import load_checkpoint_model, predict_loader
+from infer.predict import load_checkpoint_model, predict_loader, validate_submission_model
 from infer.submission import build_submission_frame, validate_submission, write_submission
 
 
@@ -53,6 +53,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     config = load_config(args.config)
+    validate_submission_model(config, args.checkpoint)
     device = resolve_device(config.device)
 
     loader = build_loader(config, "test", pin_memory=device.type == "cuda")
