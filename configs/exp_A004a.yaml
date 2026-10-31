@@ -1,0 +1,5 @@
+# A-004-a：只开分类头 dropout 0.2 的单变量对照（weight_decay 保持 A-001 的 0.01）。
+_base: exp_A001.yaml
+
+model:
+  dropout: 0.2

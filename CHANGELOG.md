@@ -44,6 +44,8 @@
 - `12:55`（变更）`docs/experiments.md`：实验矩阵新增 A-004 行；「执行与结果」新增正则化组合对照段（未过门、正则化未推迟过拟合、bootstrap CI 跨 0、不切换默认口径）；「后续待验证优化项」补「正则化（dropout / weight_decay）」行。
 - `12:55`（变更）`docs/train_plan13.md`：状态行由「配置与本机验证已准备；GPU 训练及评估待执行」改为已完成，补「执行记录」小节（实测指标、训练行为、统计判读、产物与结论）。
 
+- `13:12`（新增）`configs/exp_A004a.yaml`、`configs/exp_A004b.yaml`、`docs/train_plan14.md`、`tests/test_a004_decomp.py`：把 A-004 的 dropout 0.2 + weight_decay 0.05 组合拆成两个单变量对照——A-004-a 只开分类头 dropout 0.2（weight_decay 保持 0.01），A-004-b 只把 weight_decay 提到 0.05（dropout 保持 0）；两个配置各以 `_base: exp_A001.yaml` 只覆盖一个字段。计划文档记录配置差异、串行训练与评估命令、四组对比（A-001 / A-004 / A-004-a / A-004-b）与归因判读口径；测试核验两配置展开后只改预期字段。GPU 实验待执行。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
