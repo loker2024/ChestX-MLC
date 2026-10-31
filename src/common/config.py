@@ -80,6 +80,7 @@ class ModelConfig:
     backbone: str = "resnet18"  # timm 的模型名
     pretrained: bool = True  # 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
+    dropout: float = 0.0  # timm 分类头 dropout；旧配置默认关闭
     freeze_backbone: bool = False  # 是否冻结骨干，仅训练分类头
     aggregation: str = "mean"
     frontal_weight: float = 0.7
@@ -89,6 +90,8 @@ class ModelConfig:
     xrv_sha256: str | None = None  # 期望的权重文件 SHA-256；None=不校验
 
     def __post_init__(self) -> None:
+        if not 0.0 <= self.dropout < 1.0:
+            raise ValueError("model.dropout 必须在 [0, 1) 内")
         if self.aggregation not in {"mean", "view_weighted"}:
             raise ValueError("model.aggregation 只能是 mean 或 view_weighted")
         if not 0.0 < self.frontal_weight < 1.0:
@@ -100,6 +103,8 @@ class ModelConfig:
                 f"model.arch 只能是 'timm' 或 'xrv_densenet121'，当前为 {self.arch!r}"
             )
         if self.arch == "xrv_densenet121":
+            if self.dropout != 0.0:
+                raise ValueError("xrv_densenet121 不支持 model.dropout")
             if self.freeze_backbone:
                 raise ValueError(
                     "model.arch='xrv_densenet121' 要求全量微调，不能开启 freeze_backbone"

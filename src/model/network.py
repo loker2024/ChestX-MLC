@@ -79,6 +79,7 @@ def build_model(cfg: Config) -> nn.Module:
             cfg.model.backbone,
             pretrained=cfg.model.pretrained,
             num_classes=cfg.model.num_classes,
+            drop_rate=cfg.model.dropout,
         )
         model.pretrained_loaded = bool(cfg.model.pretrained)
     except (OSError, RuntimeError) as error:
@@ -91,6 +92,7 @@ def build_model(cfg: Config) -> nn.Module:
             cfg.model.backbone,
             pretrained=False,
             num_classes=cfg.model.num_classes,
+            drop_rate=cfg.model.dropout,
         )
         model.pretrained_loaded = False
     if cfg.model.freeze_backbone:

@@ -1,0 +1,8 @@
+# A-004：A-001 的分类头 dropout 与 weight decay 组合对照。
+_base: exp_A001.yaml
+
+model:
+  dropout: 0.2
+
+train:
+  weight_decay: 0.05
