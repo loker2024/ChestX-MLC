@@ -64,6 +64,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-004-b | `A-004b_weight_decay_only_s42` | `configs/exp_A004b.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的 weight decay 单变量对照：只把 `train.weight_decay` 0.01 → 0.05，`model.dropout` 保持 0，其余口径逐字段不变；已完成（0.7999 / 0.4238，未过 0.8088 门） |
 | A-005 | `A-005` | `configs/exp_csra.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 5） | 是 | A-001 的分类头替换对照：把 timm 标准分类头换成单头 CSRA 头（残差权重 0.4、温度 1.0、无 bias，27,827,808 参数），其余口径逐字段不变；已完成（0.7936 / 0.4050，未过 0.8072 门） |
 | A-006 | `A-006_ml_decoder_s42` | `configs/exp_ml_decoder.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的分类头替换对照：把 timm 标准分类头换成轻量 ML-Decoder 头（10 类查询 + 单层 4 头交叉注意力 + 逐类权重向量，28,549,226 参数），其余口径逐字段不变；已完成（0.7900 / 0.4118，未过 0.8072 门） |
+| A-007 | `A-007_convnext_small_in22k_ft_s42` | `configs/exp_A007.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 8） | 是 | A-001 的骨干与预训练权重对照：ConvNeXt-Tiny + `fb_in1k` → ConvNeXt-Small + `fb_in22k_ft_in1k`（49,462,378 参数），其余口径逐字段不变；已完成（0.7903 / 0.4204，未过 0.8088 门） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -353,6 +354,36 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   验证）；默认 `model.head: standard` 不切换，不补 seed 2026 配对，不进入候选提交。若继续注意力头，
   应先解决稀疏类的类别先验/初始化，而不是在单 seed 上改结构。
 
+**A-007：ConvNeXt-Small 骨干 + ImageNet-22k 预训练权重对照**（配置 `configs/exp_A007.yaml`，数字来自
+`run_eval.py`，产物 `outputs/20261031-172305_A-007_convnext_small_in22k_ft_s42`，2026-10-31，计划见
+[train_plan17.md](train_plan17.md)）：
+
+- 目的与口径：数据、预处理、`view_weighted` 0.7/0.3、BCE + `pos_weight`、cosine、batch 16 studies、
+  epoch 8 / patience 2、seed 42 全部与 A-001 一致，只把 `model.backbone` 由 `convnext_tiny.fb_in1k`
+  换成 `convnext_small.fb_in22k_ft_in1k`（ConvNeXt-Small 骨干 + ImageNet-22k 预训练后在 1k 微调的
+  权重；参数量 27,827,818 → 49,462,378，+77.7%）。训练代码与 A-001 相同（`ea555c0` 只新增配置与计划
+  文档），因此直接以 A-001（0.8038 / 0.4255，同数据、同设备、同预算、同 seed）为主对照，不再重训
+  配对基线；方向性筛选门 = 0.8038 + 0.005 = **0.8088**。
+- 结果：A-007 17:23:05–18:00:08（37m03s，含启动与首轮数据索引）、8/8 轮跑满后第 8 轮早停（best
+  epoch 6），macro-AUC **0.7903** / F1@0.5 **0.4204**（F1 峰在 0.6：0.4225；A-001 峰 0.4328）。
+- 相对 A-001：ΔAUC **−0.0135**、ΔF1@0.5 **−0.0051**，距门 −0.0185 → 未过门。
+- 配对 bootstrap（859 studies × 2,000 次、按 study 重采样、seed 2026）：ΔAUC（A-001 − A-007）=
+  **+0.0136**，95% CI **[+0.0006, +0.0260]**、P(Δ>0) = **0.983**；ΔF1@0.5 = +0.0051，
+  95% CI [−0.0065, +0.0172]、P = 0.807 → A-001 的 AUC 优势正区间占优，F1 差方向一致但跨零。
+- 逐类：3 升 7 降（class9 +0.0082、class8 +0.0032、class5 +0.0031；class2 −0.1079 断崖、class4
+  −0.0147、class6 −0.0114），class2（support 37）是 AUC 差的主要来源（10 类平均拉低约 0.0108）。
+- 训练行为：每轮 AUC 均低于 A-001 同轮（epoch 1 0.7452 vs 0.7738，epoch 6 0.7903 vs 0.8012），
+  峰值更晚更低（epoch 6 / 0.7903 vs epoch 4 / 0.8038）；valid_loss 第 5 轮见底 0.9267 后反弹到
+  1.3911 / 1.8042（A-001 为 0.8856 → 0.9333 / 1.0194），过拟合更陡；train_loss 到第 8 轮仍降到
+  0.4471 → 更大容量在固定 8 轮预算内没有学得更好。
+- 资源：参数 +21,634,560（+77.7%）、显存峰值 14,702 MiB（A-001 约 11.7 GB，+约 3.0 GB）、耗时
+  37m03s / 8 轮 vs 34m01s / 6 轮（+8.9%）；预训练权重 200,928,946 B 约为 A-001 `fb_in1k` 权重
+  114,374,272 B 的 1.76 倍。
+- 判读：骨干/预训练权重方向否定（单 seed）——本组同时变骨干结构与预训练数据，差值不能单变量归因；
+  ConvNeXt-Tiny（`fb_in1k`）保持 A 组默认候选，不补 seed 2026 配对，不进入候选提交。若继续更大骨干，
+  应先解决固定 8 轮预算下的过拟合（更早停止 / 更强正则）或改用更长预算，并另开单变量实验
+  （Small + `fb_in1k` 或 Tiny + `fb_in22k_ft_in1k`）把结构与权重拆开。
+
 
 ## 冻结结论
 
@@ -366,7 +397,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
    对照，尚不能判断骨干优势是否在第二个 seed 复现；RUN-008 的 ConvNeXt-Tiny 在 6 轮
    预算下 0.8008 超过 +0.005 门，但预算与 RUN-007-A 不同且单 seed，同口径复核前
    不切换；A-001（2026-10-30，seed 42、epoch 8、早停 2）复现 0.8038，
-   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）与 A-005 的 CSRA 分类头（0.7936 vs 同一配对基线 0.8022）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
+   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）与 A-005 的 CSRA 分类头（0.7936 vs 同一配对基线 0.8022）与 A-007 的 ConvNeXt-Small + `fb_in22k_ft_in1k` 骨干/权重（0.7903 vs A-001 0.8038）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
    实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
    在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果；`train.pos_weight` 的 AUC 未达原增益门，但 F1@0.5 显著提高，现按要求设为 `true`；`train.lr_scheduler` 经 RUN-003-A 复核无 AUC 增益，现按要求改为 `cosine`。
 3. **复现口径**：默认 seed 为 42，seed 复核另有 2026；指标统一由 `run_compare.py` 在同一份 valid 上重算，
@@ -381,7 +412,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 | 优化项 | 预期收益 | 改动点 | 备注 |
 | --- | --- | --- | --- |
-| 新骨干对照 | 已验证（未达切换门槛） | `configs/exp_densenet121.yaml` / `configs/exp_resnet50.yaml` / `configs/exp_run008{a,b,c,d}.yaml` | **RUN-003-B / RUN-005 / RUN-006 / RUN-006-A 已完成（同口径）**：ResNet-18 基线 0.7837、ResNet-50 0.7857、DenseNet-121 0.7880（seed 42）/ 0.7913（seed 2026）；新骨干 macro-AUC 高 0.0020 / 0.0043，seed 2026 尚缺 ResNet-18 配对结果，仍不足以判定骨干优劣，暂不切换默认骨干。**RUN-008 骨干对照（2026-10-29 晚，6 轮无早停）**：ConvNeXt-Tiny 0.8008（比 RUN-007-A 高 +0.0102）、EfficientNet-B2 0.7952（+0.0046）、EfficientNetV2-S 0.7954（+0.0048）、ConvNeXtV2-Nano 0.4977（训练异常）；ConvNeXt-Tiny 超过判读门但预算与 RUN-007-A（25 轮、12 轮早停）不同且单 seed，只作候选方向；ConvNeXtV2-Nano 权重为 CC BY-NC 4.0，赛题规则不接受。详见 [train_plan04.md](train_plan04.md)、[train_plan05.md](train_plan05.md)、[train_plan08.md](train_plan08.md) 与训练记录。T4 端到端耗时与权重许可 / SHA-256 核验仍待做（仅当选新骨干时）。A-001（2026-10-30）在 seed 42、epoch 8、早停 2 下复现 0.8038，与 RUN008-C 同量级、差异混杂；**A-003（2026-10-30/31）**：MobileNetV3-Small 1.0×（1,528,106 参数）@320、25 轮上限 + 早停 5 口径在第 17 轮早停（best epoch 12），macro-AUC 0.7808 / F1@0.5 0.3881，低于 A-001 的 0.8038 且距 0.7988 门差 −0.0180 → 轻量 CNN 在本预算下未过门，默认骨干不切换；A-002（0.5×）第 5 轮按用户要求中止、无 `best.pt`，两者配对比较不成立（详见 [train_plan11.md](train_plan11.md)） |
+| 新骨干对照 | 已验证（未达切换门槛） | `configs/exp_densenet121.yaml` / `configs/exp_resnet50.yaml` / `configs/exp_run008{a,b,c,d}.yaml` | **RUN-003-B / RUN-005 / RUN-006 / RUN-006-A 已完成（同口径）**：ResNet-18 基线 0.7837、ResNet-50 0.7857、DenseNet-121 0.7880（seed 42）/ 0.7913（seed 2026）；新骨干 macro-AUC 高 0.0020 / 0.0043，seed 2026 尚缺 ResNet-18 配对结果，仍不足以判定骨干优劣，暂不切换默认骨干。**RUN-008 骨干对照（2026-10-29 晚，6 轮无早停）**：ConvNeXt-Tiny 0.8008（比 RUN-007-A 高 +0.0102）、EfficientNet-B2 0.7952（+0.0046）、EfficientNetV2-S 0.7954（+0.0048）、ConvNeXtV2-Nano 0.4977（训练异常）；ConvNeXt-Tiny 超过判读门但预算与 RUN-007-A（25 轮、12 轮早停）不同且单 seed，只作候选方向；ConvNeXtV2-Nano 权重为 CC BY-NC 4.0，赛题规则不接受。详见 [train_plan04.md](train_plan04.md)、[train_plan05.md](train_plan05.md)、[train_plan08.md](train_plan08.md) 与训练记录。T4 端到端耗时与权重许可 / SHA-256 核验仍待做（仅当选新骨干时）。A-001（2026-10-30）在 seed 42、epoch 8、早停 2 下复现 0.8038，与 RUN008-C 同量级、差异混杂；**A-003（2026-10-30/31）**：MobileNetV3-Small 1.0×（1,528,106 参数）@320、25 轮上限 + 早停 5 口径在第 17 轮早停（best epoch 12），macro-AUC 0.7808 / F1@0.5 0.3881，低于 A-001 的 0.8038 且距 0.7988 门差 −0.0180 → 轻量 CNN 在本预算下未过门，默认骨干不切换；A-002（0.5×）第 5 轮按用户要求中止、无 `best.pt`，两者配对比较不成立（详见 [train_plan11.md](train_plan11.md)）；**A-007（2026-10-31）**：ConvNeXt-Small + `fb_in22k_ft_in1k`（49,462,378 参数）@320、8 轮 / patience 2 / seed 42 口径在第 8 轮跑满后早停（best epoch 6），macro-AUC 0.7903 / F1@0.5 0.4204，低于 A-001（0.8038 / 0.4255）ΔAUC −0.0135、距 0.8088 门 −0.0185，配对 bootstrap ΔAUC 95% CI [+0.0006, +0.0260] P=0.983 → 更大骨干 + 更强预训练在本预算下未过门，且同时变结构与权重不可单变量归因（详见 [train_plan17.md](train_plan17.md)） |
 | **视图元信息（ViewPosition）** | 已验证（无效） | 已实现 `StudyRecord` / `collate_studies` 传递视角及正侧位加权聚合 | **RUN-007 / RUN-007-A 已判无效**：seed 42 加权 macro-AUC 0.7892 vs 等权 0.7880（Δ+0.0012），seed 2026 加权 0.7906 vs 等权 0.7913（Δ−0.0007），两 seed 配对差方向相反且均低于 +0.005 门；F1 与逐类变化在两 seed 间也不一致。**A-001-D（2026-10-30）在 ConvNeXt-Tiny 上做等权 vs 加权**：等权 0.7931 / F1@0.5 0.4340 vs 加权 A-001 0.8038 / 0.4255，AUC **−0.0107**（超 ±0.005 门、约 3.2 倍 seed 波动）、F1 +0.0085（峰位 0.6→0.5 的校准差）→ 等权不优于加权；A-001 系列口径维持 `view_weighted`，`configs/default.yaml` 的默认聚合未改动。两套骨干结论方向一致：正侧位加权的收益未被证明，但取消加权同样不是改善方向。`Rows`/`Columns` 不建议用（易学设备偏差），`Subject_id` 严禁入特征 |
 | 阈值曲线选点 | 中 | 仅推理侧：`run_compare.py` 扫 0.2~0.7，必要时改 `eval.threshold` | RUN-003 正式模型已复核：F1 峰值仍在 0.2（0.4219，@0.5 为 0.2655），与 RUN-001R 形态一致；RUN-002-A/B 的 pos_weight 模型把峰右移到 0.5–0.6（0.4182 / 0.4212）、RUN-003-B（cosine + pos_weight）峰在 0.4（0.4059），上限均与基线 @0.2 持平，这些选点仅用于验证 F1；默认提交输出全部 10 类概率，不按阈值过滤 |
 | 训练轮数 | 已验证 | 在正式基线之后调整 `train.epochs` | **RUN-003 已判无效**：epoch 8 达峰（0.7887）后过拟合、第 13 轮早停，25 轮上限未带来 AUC 增益（Δ−0.0016 vs RUN-001R），该次实验未证明增加训练轮数有收益 |
