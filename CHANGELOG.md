@@ -39,6 +39,11 @@
 - `12:15`（变更）`docs/experiments.md`：实验矩阵新增 B-001 行（仅研究、不用于提交）；「执行与结果」新增 B 组独立研究对照段（结果、与 RUN-006 差值不可归因预训练、重叠风险未知）。
 - `12:15`（变更）`docs/train_plan12.md`：状态行改为已完成（训练与评估已执行）；「待执行」替换为 2026-10-31 GPU 训练与评估执行记录与结论。
 
+- `12:55`（变更）远端训练环境（不涉及仓库文件）：A-004（A-001 的分类头 dropout 0.2 + weight_decay 0.05 组合对照）在 autodl V100-SXM2-32G 上完成训练与评估——12:13:44 启动、第 7 轮早停（best epoch 5，上限 8 / patience 2），32m16s，valid macro-AUC **0.7988** / F1@0.5 **0.4233**（F1 峰值 0.6：0.4340）；产物 `outputs/20261031-121344_A-004_convnext_tiny_dropout_wd_s42/`（`best.pt` 111,385,131 B / `last.pt` 445,536,555 B，metadata `pretrained_loaded: true`）、`outputs/eval_reports/A-004_full.txt`、`outputs/A-004_valid_predictions.csv`、`outputs/compare_A001_A004/`；与 A-001（独立重算 0.8038 / 0.4255）差 AUC −0.0050 / F1@0.5 −0.0022，距方向性门 0.8088 差 −0.0100 → 未过门；配对 bootstrap（859 studies × 2,000 次）ΔAUC 95% CI [−0.0061, +0.0167] 跨 0。
+- `12:55`（变更）`docs/training_log.md`：新增「A-004：A-001 的分类头 dropout 与 weight decay 组合对照（320×320 / seed=42）」小节（配置差异、命令、代码版本、环境、预训练、7 轮逐轮表、阈值曲线、逐类 AUC、配对 bootstrap、判读、产物），汇总表新增 A-004 行并补口径注，环境表 GPU 说明补 A-004。
+- `12:55`（变更）`docs/experiments.md`：实验矩阵新增 A-004 行；「执行与结果」新增正则化组合对照段（未过门、正则化未推迟过拟合、bootstrap CI 跨 0、不切换默认口径）；「后续待验证优化项」补「正则化（dropout / weight_decay）」行。
+- `12:55`（变更）`docs/train_plan13.md`：状态行由「配置与本机验证已准备；GPU 训练及评估待执行」改为已完成，补「执行记录」小节（实测指标、训练行为、统计判读、产物与结论）。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

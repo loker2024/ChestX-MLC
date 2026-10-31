@@ -57,6 +57,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-002 | `A-002_mobilenetv3_small050_s42` | `configs/exp_A002.yaml`（`_base: exp_A001.yaml`） | 25（实际 5，按用户要求中止） | 是 | A-001 的轻量骨干对照：ConvNeXt-Tiny → MobileNetV3-Small 0.5×（578,474 参数），轮数 25 / 早停 5；第 5 轮中止、无 `best.pt`，不能作配对对照 |
 | A-003 | `A-003_mobilenetv3_small100_s42` | `configs/exp_A003.yaml`（`_base: exp_A002.yaml`） | 25（早停 5，实际 17） | 是 | A-002 的宽度对照：MobileNetV3-Small 0.5× → 1.0×（1,528,106 参数），其余口径逐字段不变；已完成（0.7808 / 0.3881，未过 0.7988 门） |
 | B-001 | `B-001_xrv_densenet121_s224` | `configs/exp_B001.yaml`（`_base: default.yaml`） | 25（早停 5，实际 11） | 是 | B 组：TorchXRayVision 医学预训练 DenseNet-121（单通道 224×224 / xrv 归一化 / 6,957,834 参数）；**仅研究，不用于赛题提交、融合或候选选择**（规则第 1 条）；已完成（0.7912 / 0.4120，与预训练集重叠风险未知） |
+| A-004 | `A-004_convnext_tiny_dropout_wd_s42` | `configs/exp_A004.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的正则化组合对照：`model.dropout` 0.0 → 0.2（分类头 Dropout）+ `train.weight_decay` 0.01 → 0.05，其余口径逐字段不变；已完成（0.7988 / 0.4233，未过 0.8088 门） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -252,6 +253,28 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：差值同时来自分辨率、通道、归一化与初始化来源，**不可归因医学预训练**；本地数据来源不可确证、
   疑似 MIMIC-CXR-JPG 衍生，与预训练集重叠风险未知（疑似高）→ 指标可能乐观，不声称无泄漏；不并入冻结结论。
 
+**A-004：分类头 dropout + weight decay 组合对照**（配置 `configs/exp_A004.yaml`，数字来自 `run_eval.py`，
+产物 `outputs/20261031-121344_A-004_convnext_tiny_dropout_wd_s42`，2026-10-31）：
+
+- 目的与口径：A-001 上只改两项——`model.dropout: 0.0 → 0.2`（分类头 Linear 前的 Dropout，训练启用 /
+  评估关闭）与 `train.weight_decay: 0.01 → 0.05`；其余（ConvNeXt-Tiny @320、epoch 8 / patience 2、
+  seed 42、`view_weighted` 0.7/0.3、BCE + `pos_weight`、cosine、batch 16 studies）逐字段一致；
+  autodl 独占 V100-SXM2-32G，`check_data.py --full` 与 A-001 同一份划分。
+- 结果：第 7 轮早停（best epoch 5），valid macro-AUC **0.7988** / F1@0.5 **0.4233**（F1 峰值在 0.6：
+  0.4340），32m16s、显存约 14.0 GB；与 A-001 本次独立重算（0.8038 / 0.4255）差 **AUC −0.0050、
+  F1@0.5 −0.0022**，距方向性门 0.8088 差 −0.0100 → 未过门。
+- 训练行为：A-004 各轮 train_loss 高于 A-001（同轮 +0.005~+0.026），valid_loss 前 4 轮略高
+  （+0.006~+0.013）、第 5–6 轮略低（−0.017 / −0.009），但走势未变，仍在第 4 轮见底后反弹
+  （0.8990→0.9166→1.0102→1.1973）→ 正则化只抬高了训练损失水平、没有推迟过拟合；
+  阈值曲线在 0.2–0.4 段高于 A-001、0.5–0.7 段更低，峰值仅 +0.0012（属校准形态变化）；逐类 4 升 6 降，
+  class2 −0.0348、class6 −0.0186 退化最大，class3 +0.0276 提升最大。
+- 统计判读：配对 bootstrap（859 studies 重采样 2,000 次）ΔAUC（A-001 − A-004）95% CI
+  [−0.0061, +0.0167]、P(Δ>0)=0.803，ΔF1@0.5 95% CI [−0.0084, +0.0133] → 方向为 A-001 略优，
+  单 seed、CI 跨 0，不能判定真实退化，但没有增益证据。
+- 判读：同时改 dropout 与 weight_decay 两项，只能评价组合、不能分开归因；−0.0050 约为 A 组 seed
+  波动 ±0.0033 的 1.5 倍 → **A-001 口径保持不变，默认配置不切换**；若继续，应把 dropout 与
+  weight_decay 拆成两个单变量组并补 seed 2026 配对。
+
 ## 冻结结论
 
 1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
@@ -290,6 +313,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 | 聚合方式消融 | 已验证（等权不优于加权） | 比较平均 logits、平均概率及最大聚合 | 当前使用平均 logits 后 sigmoid；**A-001-D（2026-10-30）**：ConvNeXt-Tiny 上把正侧位加权（`view_weighted`）换成等权 `mean`，macro-AUC 0.7931 vs A-001 的 0.8038（−0.0107，超 ±0.005 门），等权不优于加权；平均概率与最大聚合仍未实现或实测 |
 | 更高分辨率 / TTA | 已验证（方向性） | `image.size`、`run_infer.py` 加翻转 TTA | **RUN-007-B 已做 384×384 + 6 轮短跑（macro-AUC 0.7959 / F1@0.5 0.4227）**：比 320 的 12 轮早停 0.7906 高 +0.0053，但轮数与 cosine 周期不同、不可单变量归因；需 25 轮完整对照再判定。**RUN-009-A（2026-10-30）**：EfficientNetV2-S RW @384×384 + 25 轮上限口径只跑 6/25 轮（用户要求停止），macro-AUC 0.7944，比同骨干 320×320 6 轮的 RUN-008-B（0.7954）低 −0.0010，未显示增量；25 轮完整对照仍待做。TTA 未做；448 显存未实测（3090 24G） |
 | 冻结骨干、仅训练分类头 | 已验证（大幅退化） | `configs/exp_freeze_head.yaml` / `configs/exp_A001c.yaml`、`model.freeze_backbone` | **A-001-C 已做（2026-10-30）**：ConvNeXt-Tiny @320 冻结骨干、仅训分类头（7,690 / 27,827,818 可训练参数），8 轮跑满 best epoch 8 macro-AUC 0.7264 / F1@0.5 0.3602 vs A-001 0.8038 / 0.4255（ΔAUC −0.0774、ΔF1@0.5 −0.0653）；逐轮增量衰减到 +0.0002 说明瓶颈在固定特征 → 该口径不作提交候选。RUN-010（ResNet-18 冻结）仍待执行。 |
+| 正则化（dropout / weight_decay） | 已验证（未达增益门） | `model.dropout` / `train.weight_decay` | **A-004（2026-10-31）**：A-001 口径下分类头 dropout 0.2 + weight_decay 0.05 组合，valid macro-AUC 0.7988 vs A-001 0.8038（Δ−0.0050）、F1@0.5 0.4233 vs 0.4255（Δ−0.0022），距方向性门 0.8088 差 −0.0100 → 未过门；各轮 train_loss 高于 A-001、valid_loss 走势未变（第 4 轮后仍反弹）；单 seed、两项同改不可分开归因，若继续应拆成两个单变量组并补 seed 复核 |
 
 ### 正侧位加权聚合配置
 

@@ -2038,6 +2038,84 @@ B 组独立研究对照，计划与边界见 [train_plan12.md](train_plan12.md)�
 - 判读：本组仅回答「同划分、同聚合、同 seed 下医学预训练权重是否带来可复现差异」的前置研究问题；由于上述混杂与重叠风险，**不并入冻结结论、不参与骨干优劣判定、不进入提交候选**。若后续要推进，应先获得数据来源书面确认、再设计分辨率/归一化对齐的单变量实验。
 
 
+## A-004：A-001 的分类头 dropout 与 weight decay 组合对照（320×320 / seed=42）
+
+背景：A-001 在 ConvNeXt-Tiny @320 上以 8 轮上限 + 早停 2 跑出 valid macro-AUC 0.8038 / F1@0.5
+0.4255，但训练与验证损失从 epoch 4 起明显分离（train 0.8466 → 0.7613，valid 0.8856 → 0.9333），
+valid_loss 在 epoch 4 见底后反弹。本组验证「分类头 dropout + 更强 weight decay」这组正则化组合能否
+推迟过拟合、把 macro-AUC 推过方向性门（A-001 重算值 + 0.005 = 0.8088），计划见 [train_plan13.md](train_plan13.md)。
+
+| 项 | 值 |
+|---|---|
+| 相对 A-001 差异 | `model.dropout: 0.0 → 0.2`（分类头 Dropout 位于 `ResetClassifier` 的 Linear 之前，作用于 768 维特征，训练启用 / 评估关闭，不是随机深度）；`train.weight_decay: 0.01 → 0.05`（AdamW 全参数同一参数组） |
+| 运行命令 | `HF_HUB_OFFLINE=1 .venv/bin/python src/run_train.py --config configs/exp_A004.yaml --seed 42 --tag A-004_convnext_tiny_dropout_wd_s42` |
+| 代码版本 | `ad336f2`（`exp/A-004` 分支）：`src/common/config.py` 新增并校验 `model.dropout`，`src/model/network.py` 两处 `timm.create_model` 传入 `drop_rate=cfg.model.dropout`；默认 0，对历史配置逐字段无影响 |
+| 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08），训练期间无其他 GPU 占用；显存峰值约 14.0 GB（14,346 MiB） |
+| 数据 | `data/train.csv` 30,344 图 / 18,513 studies、`data/valid.csv` 1,422 图 / 859 studies；与 A-001 同一份划分，`check_data.py --full` 核验跨 split Subject/Study/Dicom_id 无重叠 |
+| 预训练 | `convnext_tiny.fb_in1k`（HF commit `b43a6303…`、114,374,272 B、SHA-256 `08b9dc9c…`、Apache-2.0），与 A-001 共用同一份本地缓存，`HF_HUB_OFFLINE=1` 离线加载；`train.log` 确认「预训练权重: 已加载」，`best.pt` metadata `pretrained_loaded: true` |
+| 产物 | `outputs/20261031-121344_A-004_convnext_tiny_dropout_wd_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`、`config.yaml` 确认 `dropout: 0.2` / `weight_decay: 0.05`）、`outputs/eval_reports/A-004_full.txt`、`outputs/A-004_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004/` |
+| 耗时 | 32m16s（12:13:44–12:46:00），第 7 轮后早停（上限 8）；单轮约 3 分钟，epoch 1 因首轮冷缓存读盘约 10.9 分钟 |
+
+| epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 0.9966 | 0.9469 | 0.7712 | 0.3835 |
+| 2 | 3.00e-04 | 0.9407 | 0.9432 | 0.7816 | 0.4033 |
+| 3 | 3.00e-04 | 0.8963 | 0.9171 | 0.7862 | 0.4092 |
+| 4 | 2.72e-04 | 0.8543 | 0.8990 | 0.7960 | 0.4079 |
+| 5 | 2.00e-04 | 0.7769 | 0.9166 | **0.7988** | 0.4232 |
+| 6 | 1.10e-04 | 0.6419 | 1.0102 | 0.7969 | 0.4300 |
+| 7 | 3.77e-05 | 0.4967 | 1.1973 | 0.7928 | 0.4324 |
+
+第 5 轮后连续 2 轮无提升 → 第 7 轮早停。
+
+**结论**：best epoch 5，valid macro-AUC **0.7988** / F1@0.5 **0.4233**（`run_eval.py` 在 valid 859
+studies 上重算，与 `metrics.csv` 的 epoch 5 0.7988 / 0.4232 一致，F1 差 0.0001）；相对 A-001
+（0.8038 / 0.4255）差 **AUC −0.0050、F1@0.5 −0.0022**，距方向性门 0.8088 差 **−0.0100 → 未过门**。
+
+阈值曲线（`outputs/compare_A001_A004/summary.md`；A-001 为本次独立重算）：
+
+| threshold | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 |
+|---|---|---|---|---|---|---|
+| A-001 | 0.3641 | 0.3835 | 0.4046 | 0.4255 | **0.4328** | 0.4205 |
+| A-004 | 0.3698 | 0.3967 | 0.4127 | 0.4233 | **0.4340** | 0.4178 |
+| Δ（A-004 − A-001） | +0.0057 | +0.0132 | +0.0081 | −0.0022 | +0.0012 | −0.0027 |
+
+A-004 在 0.2–0.4 段 F1 高于 A-001、0.5–0.7 段更低，F1 峰值同为 0.6（0.4340 vs 0.4328，+0.0012）→
+属阈值附近的校准形态变化，排序指标 macro-AUC 才是主判据。
+
+逐类 AUC（`outputs/compare_A001_A004/per_class.csv`；class_id 1–10 按赛题标签顺序）：
+
+| class_id | support | A-001 | A-004 | Δ |
+|---|---|---|---|---|
+| 1 | 24 | 0.7438 | 0.7479 | +0.0041 |
+| 2 | 37 | 0.8537 | 0.8189 | −0.0348 |
+| 3 | 46 | 0.7889 | 0.8165 | +0.0276 |
+| 4 | 68 | 0.7374 | 0.7295 | −0.0079 |
+| 5 | 115 | 0.8719 | 0.8652 | −0.0067 |
+| 6 | 177 | 0.7867 | 0.7681 | −0.0186 |
+| 7 | 193 | 0.7801 | 0.7750 | −0.0051 |
+| 8 | 214 | 0.7048 | 0.7053 | +0.0005 |
+| 9 | 260 | 0.8955 | 0.8918 | −0.0037 |
+| 10 | 306 | 0.8754 | 0.8696 | −0.0058 |
+
+逐类 4 升 6 降：class3 +0.0276 提升最大，class2 −0.0348、class6 −0.0186 退化最大；升幅集中在
+support 较小的 class1 / class3（24 / 46 例，单类 AUC 的 seed 噪声大），降幅集中在 support 更大的
+class2 / class6，与整体 −0.0050 的方向一致。
+
+**判读**：
+
+- 正则化组合没有推迟过拟合：A-004 各轮 train_loss 均高于 A-001（同轮 +0.005~+0.026），valid_loss
+  前 4 轮也高于 A-001（+0.006~+0.013）、第 5–6 轮转为略低（−0.017 / −0.009），但整体走势未变，仍在
+  epoch 4 见底后上行（0.8990 → 0.9166 → 1.0102 → 1.1973），且第 7 轮即触发早停（A-001 为第 6 轮后
+  早停、best epoch 4；A-004 best epoch 5）→ dropout 与 weight decay 只把训练损失水平抬高、没有
+  缩小 train/valid 差距。
+- 配对 bootstrap（valid 859 studies 按 study 重采样 2,000 次，基于两份逐 study 预测 CSV）：
+  ΔAUC（A-001 − A-004）= +0.0051，95% CI [−0.0061, +0.0167]、P(Δ>0) = 0.803；ΔF1@0.5 = +0.0023，
+  95% CI [−0.0084, +0.0133] → 差异方向为 A-001 略优，但 CI 跨 0，且 bootstrap 只覆盖 valid 内
+  重采样（不含训练随机性）→ 单 seed 下不能判定 A-004 真实退化，可确定的是**没有增益**。
+- 口径注意：本组同时改 dropout 与 weight decay 两项，只能评价组合、不能分开归因；单 seed；
+  −0.0050 约为 A 组 seed 波动 ±0.0033 的 1.5 倍 → A-001 口径保持不变。
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -2075,6 +2153,7 @@ B 组独立研究对照，计划与边界见 [train_plan12.md](train_plan12.md)�
 | A-002 | `exp_A002.yaml` | MobileNetV3-Small 0.5×（578,474 参数）；epoch=25 / patience=5 / seed=42 | 5（用户要求中止）/25 | — | — | — | 约 24m（V100） | 第 5 轮按用户要求停止（非早停），无 `best.pt`，不能与 A-003 配对；前 5 轮最佳 epoch 4（0.7634 / 0.3918）仅作历史参考 |
 | A-003 | `exp_A003.yaml` | MobileNetV3-Small 1.0×（1,528,106 参数）；epoch=25 / patience=5 / seed=42 | 17（早停）/25 | 12 | 0.7808 | 0.3881 | 1h17m19s（独占，V100） | 未过门：vs A-001（0.8038 / 0.4255）AUC -0.0230、F1@0.5 -0.0374，距方向性筛选门 0.7988 差 -0.0180；A-002 中止无 `best.pt` → 配对比较不成立 |
 | B-001 | `exp_B001.yaml` | B 组：TxRV `densenet121-res224-all` 医学预训练 + 单通道 224×224 + xrv 归一化（6,957,834 参数）；epoch=25 / patience=5 / seed=42，**仅研究** | 11（早停）/25 | 6 | 0.7912 | 0.4120 | 约 40m（独占，V100） | 与 RUN-006（0.7880 / 0.4070）差 AUC +0.0032、F1@0.5 +0.0050，但分辨率/归一化/通道/权重来源同时不同，差值不可归因医学预训练；本地数据与预训练集重叠风险未知 → 指标可能乐观；不用于提交/融合/候选选择 |
+| A-004 | `exp_A004.yaml` | A-001 的分类头 dropout 与 weight decay 组合对照：`model.dropout: 0.0 → 0.2` + `train.weight_decay: 0.01 → 0.05` | 7（早停）/8 | 5 | 0.7988 | 0.4233 | 32m16s（独占，V100） | 与 A-001（0.8038 / 0.4255）差 AUC −0.0050、F1@0.5 −0.0022，距方向性门 0.8088 差 −0.0100 → 未过门；正则化只抬高训练损失水平、未推迟过拟合（valid loss 第 4 轮后仍反弹），配对 bootstrap ΔAUC 95% CI [−0.0061, +0.0167] 跨 0 → 无增益证据，A-001 口径不变 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -2102,13 +2181,15 @@ B 组独立研究对照，计划与边界见 [train_plan12.md](train_plan12.md)�
 
 注：B-001 为独立研究对照（B 组），权重为 TorchXRayVision `densenet121-res224-all`（Apache-2.0，SHA-256 56524913…8899），预训练数据含 NIH ChestX-ray14、PadChest、CheXpert、MIMIC-CXR、OpenI；本地数据来源不可确证、疑似 MIMIC-CXR-JPG 衍生子集，与预训练集重叠风险未知（疑似高），因此 valid 指标可能乐观，不能据此声称无泄漏；与 RUN-006（ImageNet DenseNet-121 @320、3 通道、imagenet 归一化）的差值同时来自分辨率、通道、归一化与初始化来源，不可单变量归因医学预训练；按赛题规则第 1 条，本组仅作研究，不接入提交、模型融合或候选选择。单 seed。
 
+注：A-004 的 macro-AUC 与 F1@0.5 由 `run_eval.py` 在 valid 上重算（0.7988 / 0.4233；`metrics.csv` 的 best epoch 5 为 0.7988 / 0.4232，F1 差 0.0001）；`configs/exp_A004.yaml` 以 `_base: exp_A001.yaml` 只覆盖两个字段（`model.dropout` 0.2、`train.weight_decay` 0.05），与 A-001 属单 seed 同数据、同划分、同为 V100-SXM2-32G 独占；因同时改两项，只能评价组合、不能分开归因 dropout 与 weight decay 各自的作用；配对 bootstrap（859 studies × 2,000 次）ΔAUC（A-001 − A-004）95% CI [−0.0061, +0.0167]，只覆盖 valid 内重采样、不含训练随机性，不作为显著性结论。
+
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 
 ## 环境
 
 | 项 | 值 |
 |---|---|
-| GPU | RTX 3090 24G（驱动 535.247.01，CUDA 12.2）；RUN-009 / A-001~A-001-G / A-002 / A-003 系列为 V100-SXM2-32G（驱动 580.105.08），两种硬件的耗时不可横向对照 |
+| GPU | RTX 3090 24G（驱动 535.247.01，CUDA 12.2）；RUN-009 / A-001~A-001-G / A-002 / A-003 / A-004 系列为 V100-SXM2-32G（驱动 580.105.08），两种硬件的耗时不可横向对照 |
 | Python / 框架 | Python 3.12、torch 2.10.0+cu128、timm 1.0.30、torchvision 0.25.0+cu128 |
 | B 组独立环境 | `/root/venv-b001`：Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7、timm 1.0.30（仅 B-001） |
 | 数据根目录 | `/root/sj-tmp`（`data/` 下以软链接挂入，数据本身不入库） |
