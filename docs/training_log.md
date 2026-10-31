@@ -2811,6 +2811,21 @@ A-001（seed 42 / 8 轮 / patience 2 / wd 0.01）；若要拆归因，应另开 
 
 注：A-009 的 macro-AUC 与 F1@0.5 由 `run_eval.py` 在 valid 上重算（0.7799 / 0.4101；`metrics.csv` 的 best epoch 10 为 0.7799 / 0.4102，F1 差 0.0001）；`configs/exp_A009.yaml` 以 `_base: exp_A001.yaml` 只覆盖四项（`train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4），训练代码与 A-001 相同（代码 `8a449c7` 只新增配置与计划文档），属同数据、同划分、同设备（V100-SXM2-32G 独占）、同 seed 42 的组合对照；四项同改，差值不能单变量归因；配对 bootstrap（859 studies × 2,000 次，按 study 有放回重采样、seed 2026、退化类跳过，2,000 次均 10 类有效）ΔAUC（A-001 − A-009）95% CI [+0.0121, +0.0360] P=1.000、ΔF1@0.5 95% CI [+0.0027, +0.0285] P=0.991，只覆盖 valid 内重采样、不含训练随机性。
 
+## A-FUSE-1：valid 多模型概率融合选型与 test 提交通道（推理融合，无新训练）
+
+- 启动与命令（2026-10-31 23:10–23:14，autodl V100-SXM2-32G 独占，`/root/venv-b001/bin/python`）：
+  - 逐模型 valid 概率缓存：`RUN_DIR=outputs/ensemble/valid/single_<tag>`，对每个候选执行
+    `python src/run_ensemble.py --checkpoint outputs/<run>/best.pt --split valid --out outputs/ensemble/valid/single_<tag>`
+    （单模型约 50 秒；缓存 `predictions.csv` 含 Study_id + p1…p10）。
+  - 融合评测脚本 `/root/fusion_eval.py`（读上方 predictions.csv，概率空间加权平均，输出 `/root/fusion_eval_result.json`）。
+  - test 提交：`python src/run_ensemble.py --checkpoint outputs/20261030-150749_A-001_convnext_tiny_s42/best.pt outputs/20261031-134732_A-004b_weight_decay_only_s42/best.pt outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/best.pt --split test --out outputs/ensemble/test_fuse4`（112 秒）。
+- 候选与单模型 valid macro-AUC（本轮重算）：A-001 0.8038、A-005_baseline 0.8022、A-004-b 0.7999、A-008 0.7974、A-001-B(ASL, s42) 0.7970、A-001(s216) 0.7947、RUN-009-A 0.7945、A-001-D(mean) 0.7931；B-001（研究用）与 RUN-008-D（CC BY-NC）按规则排除，A-001-C 冻结骨干 0.7264 不作候选。
+- 手动融合（概率空间加权平均，valid macro-AUC / F1@0.5）：A-001+RUN-009-A+A-001-D w111 0.8100 / 0.4409、w211 0.8104 / 0.4389；A-001+A-005_baseline+RUN-009-A+A-001-D w1111 0.8106 / 0.4401；含 A-001(s216) 的五模型 w11111 0.8108 / 0.4446；**A-001+A-004-b+RUN-009-A+A-001-D w1111 0.8116 / 0.4416（采用）**；A-001+A-008+RUN-009-A+A-001-D 0.8112 / 0.4455；六模型等权 0.8113 / 0.4406。
+- 权重网格：6 模型、权重 0/1/2、至少 2 模型，249 组；top1 0.8124（A-001:2 / A-005_baseline:1 / RUN-009-A:2 / A-004-b:2 / A-008:1），仅比等权四模型高 0.0008（< 单 seed 波动 ±0.0033）→ 不采用，避免 valid 过拟合。
+- 结果：最终四模型等权概率融合 valid macro-AUC **0.8116** / F1@0.5 **0.4416**，相对 A-001 0.8038 / 0.4255 为 ΔAUC +0.0078、ΔF1@0.5 +0.0161，过 0.8088 门（+0.0028）；相对历史最佳 fuse3 w211（0.8104 / 0.4389）ΔAUC +0.0012。
+- 产物：`outputs/ensemble/valid/single_<tag>/`（11 个单模型概率缓存）、`outputs/ensemble/test_fuse4/submission.csv`（14,140 行 = 1414 studies × 10 类，概率 0.0019–0.9955，UTF-8，656 KB），本地本机副本校验通过（行数、study 数、10 类齐全、概率范围合法）。
+- 注：融合在 valid 上的增益未做配对 bootstrap 显著性检验；四模型/权重选型都在同一份 valid 上完成，网格 top1 不是无偏估计；test 无标签，融合相对单模型的 test 增益无法直接验证；融合推理成本随模型数线性增长（四模型 test 约 112 秒）。按规则不接入 B-001 与 RUN-008-D 权重。
+
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 
 ## 环境

@@ -126,6 +126,9 @@
 - `22:22`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 A-001(s216) 实测——2026-10-31 21:34:05 → 22:17:50（43m45s）、第 10 轮后连续 4 轮无提升早停（best epoch 6），valid macro-AUC **0.7947** / F1@0.5 **0.4235**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0091、F1@0.5 −0.0020，距 0.8088 门差 −0.0141 → 未过门；ep6 达峰后 train_loss 0.7075 → 0.2446、valid_loss 0.9631 → 2.0729，12 轮预算无后段增益、wd 0.02 未推迟过拟合；四项同改（seed 216 / 12 轮 / patience 4 / wd 0.02）不可单变量归因，方向否定、默认口径不变。training_log 新增 A-001(s216) 小节与汇总表行，experiments 矩阵新增一行、执行与结果新增结论、环境表补 seed 216。
 - `22:22`（变更）远端训练环境（不涉及仓库文件）：A-001(s216)（A-001 口径 + seed 216 + 12 轮 / patience 4 / wd 0.02）在 autodl V100-SXM2-32G 上完成训练与评估——产物 `outputs/20261031-213405_A-001_convnext_tiny_s216/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-001-s216_full.txt`、`outputs/A-001-s216_valid_predictions.csv`；训练分支 `exp/A-001-s216`（提交 `f2a06db`）。
 
+- `23:15`（新增）`docs/experiments.md`、`docs/training_log.md`：回填 A-FUSE-1（valid 多模型概率融合选型与 test 提交通道，纯推理融合、无新训练）——8 个候选单模型 valid 基准（A-001 0.8038、A-005_baseline 0.8022、A-004-b 0.7999、A-008 0.7974 等）、9 组手动概率空间加权融合、6 模型 249 组权重网格（top1 0.8124），最终采用 A-001 + A-004-b + RUN-009-A + A-001-D 四模型等权融合，valid macro-AUC **0.8116** / F1@0.5 **0.4416**（相对 A-001 +0.0078，过 0.8088 门；相对历史最佳 fuse3 w211 +0.0012）；按规则排除 B-001（研究用）与 RUN-008-D（CC BY-NC），并记录未做配对 bootstrap、权重在 valid 上搜索非无偏等限制。experiments 矩阵新增 A-FUSE-1 行。
+- `23:15`（新增）远端训练环境（不涉及仓库文件）：A-FUSE-1 融合产物——`outputs/ensemble/valid/single_<tag>/predictions.csv` 共 11 个单模型概率缓存（新增 A005b / A001(s216) / A004b / A008 四个，单模型约 50 秒）、融合评测脚本 `/root/fusion_eval.py` 与结果 `/root/fusion_eval_result.json`、test 提交文件 `outputs/ensemble/test_fuse4/submission.csv`（14,140 行 = 1414 studies × 10 类，概率 0.0019–0.9955，656 KB，UTF-8，四模型 test 推理 112 秒）。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

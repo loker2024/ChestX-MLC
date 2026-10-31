@@ -69,6 +69,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-009 | `A-009_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`） | 10（跑满上限） | 是 | A-001 的优化超参联合放大对照：`train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余口径逐字段不变；已完成（0.7799 / 0.4101，未过 0.8088 门） |
 | A-009-r2 | `A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`）+ `src/run_train.py --init-from` 首轮 `best.pt` | 10（早停 4，实际 5） | 是 | A-009 的二轮 warm start 对照：以首轮 A-009 `best.pt`（epoch 10 权重）为初始权重、按 A-009 同配置重训 10 轮；已完成（0.7764 / 0.4117，未过 0.8088 门，低于首轮 0.7799 / 0.4101） |
 | A-001(s216) | `A-001_convnext_tiny_s216` | `configs/exp_A001_seed216.yaml`（`_base: exp_A001.yaml`） | 12（早停 4，实际 10） | 是 | A-001 的 seed 216 复核 + 预算/正则三项覆盖：`seed` 42 → 216、`train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，其余口径逐字段不变；已完成（0.7947 / 0.4235，未过 0.8088 门） |
+| A-FUSE-1 | `test_fuse4_prob_w1111`（推理融合，无新训练） | `src/run_ensemble.py --fusion probability`，四模型等权 1:1:1:1（A-001 / A-004-b / RUN-009-A / A-001-D） | — | — | 既有 A 组 `best.pt` 的 valid 概率融合选型与提交通道：手动 9 组 + 6 模型权重网格 249 组，最终四模型等权融合 valid 0.8116 / F1@0.5 0.4416（+0.0078 vs A-001，过 0.8088 门），产出 test 提交文件；排除 B-001 / RUN-008-D |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -429,6 +430,16 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 阈值曲线（0.2–0.7）：0.3768 / 0.3992 / 0.4127 / 0.4235 / 0.4245 / 0.3960，F1 峰在 0.6；低阈值段高于 A-001、0.4 以上低于 A-001，属校准形态变化。
 - 逐类：4 升（class4 +0.0264 最大）6 降（class1 −0.0494 最大，support 24），没有单类崩掉。
 - 判读：AUC 相对 A-001 差 **−0.0091**、F1@0.5 差 **−0.0020**，距 0.8088 门差 −0.0141 → **未过门**；ep6 达峰后 valid_loss 由 0.9631 反弹到 2.0729，12 轮预算未带来后段增益、wd 0.02 未推迟过拟合；四项同改不可单变量归因，方向否定、默认口径不变（seed 42 / 8 轮 / patience 2 / wd 0.01）。
+
+**A-FUSE-1：valid 多模型概率融合选型与提交（推理融合，不新增训练）**（脚本 `src/run_ensemble.py`，valid 产物 `outputs/ensemble/valid/`，test 产物 `outputs/ensemble/test_fuse4/submission.csv`，2026-10-31）：
+- 目的：不再新增训练，直接用既有 A 组 `best.pt` 做融合，检验多模型融合能否跨过 0.8088 判读门并产出提交文件；按赛题规则排除 B-001（TorchXRayVision 医学预训练，仅研究用、不接入融合）与 RUN-008-D（ConvNeXtV2-Nano，权重 CC BY-NC 4.0）。
+- 候选与单模型 valid 基准（本轮统一在 valid 859 studies 上重算、宏观 AUC）：A-001 0.8038、A-005_baseline 0.8022、A-004-b 0.7999、A-008 0.7974、A-001-B(ASL, s42) 0.7970、A-001(s216) 0.7947、RUN-009-A 0.7945、A-001-D(mean 聚合) 0.7931；其余 A 组模型本轮未做融合（无逐 study 概率缓存），A-001-C 冻结骨干 0.7264 不作候选。
+- 概率缓存：`outputs/ensemble/valid/single_<tag>/predictions.csv` 共 11 个，含 Study_id + p1…p10；单模型 valid 推理约 50 秒。
+- 手动组合（概率空间加权平均，权重按模型顺序给出，valid macro-AUC / F1@0.5）：A-001+RUN-009-A+A-001-D w111 0.8100 / 0.4409；同组 w211 0.8104 / 0.4389；A-001+A-005_baseline+RUN-009-A+A-001-D w1111 0.8106 / 0.4401；A-001+A-005_baseline+RUN-009-A+A-001-D+A-001(s216) w11111 0.8108 / 0.4446；A-001+A-004-b+RUN-009-A+A-001-D w1111 **0.8116 / 0.4416**（最终采用）；A-001+A-008+RUN-009-A+A-001-D w1111 0.8112 / 0.4455；A-001+A-005_baseline+A-004-b+RUN-009-A+A-001-D w11111 0.8115 / 0.4411；六模型等权 0.8113 / 0.4406；A-001+A-001-B(ASL)+RUN-009-A+A-001-D 0.8107 / 0.4447。
+- 权重网格：6 模型（A-001 / A-005_baseline / RUN-009-A / A-001-D / A-004-b / A-008）、权重 0/1/2、至少 2 个模型参与，共 249 组合法组合；top1 0.8124（A-001:2、A-005_baseline:1、RUN-009-A:2、A-004-b:2、A-008:1）/ F1@0.5 0.4402，相对等权四模型 0.8116 只高 **0.0008**，在 valid 噪声内（单 seed 波动约 ±0.0033）→ **不采用网格最优权重**，避免在 valid 上过拟合权重。
+- 判读：四模型等权融合 valid macro-AUC **0.8116** / F1@0.5 **0.4416**，相对 A-001（0.8038 / 0.4255）ΔAUC **+0.0078**（过 0.8088 门 +0.0028）、ΔF1@0.5 +0.0161；相对历史最佳融合 fuse3（A001+run009a+A001d w211，0.8104 / 0.4389）ΔAUC +0.0012；四模型覆盖两种骨干（ConvNeXt-Tiny @320、EfficientNetV2-S @384）与两种正则/聚合差异（wd 0.05、mean 聚合），等权比权重搜索更稳健 → 融合作为**提交通道**可用，单模型仍是口径基线。
+- 限制：融合增益未做配对 bootstrap 显著性检验；权重网格与选型都在同一份 valid 上做，top1 数字不是无偏估计；test 侧只有提交文件、无标签，融合在 test 上的增益无法验证；四模型融合推理成本（test 1414 studies 约 112 秒）随模型数线性增加。
+- 产物：`outputs/ensemble/test_fuse4/submission.csv`（14,140 行 = 1414 studies × 10 类，概率区间 0.0019–0.9955，UTF-8），`outputs/eval_reports/` 下不另存。
 
 ## 冻结结论
 
