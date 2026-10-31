@@ -1,0 +1,23 @@
+# A-009：A-001 的超参组合对照（学习率 + 权重衰减 + 训练轮数 + 早停耐心）。
+#
+# 以 `configs/exp_A001.yaml` 为基准，按本次要求改四处：
+#   train.weight_decay         0.01 → 0.03
+#   train.epochs               8    → 10
+#   train.early_stop_patience  2    → 4
+#   train.lr                   0.0003 → 0.001
+# 其余口径（ConvNeXt-Tiny @320、view_weighted 聚合 0.7/0.3、pos_weight、
+# warmup 2 轮 + cosine、seed 42）逐字段继承 A-001，不重复展开。
+#
+# 与 A-001 是四项超参同改的对照，差值不能拆到单项，只能作为组合档位判读；
+# 若方向为正面，后续应拆成单变量组再补 seed 复核。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_A009.yaml --seed 42 --tag A-009_convnext_tiny_lr1e-3_wd0.03_s42
+
+_base: exp_A001.yaml
+
+train:
+  weight_decay: 0.03
+  epochs: 10
+  early_stop_patience: 4
+  lr: 0.001

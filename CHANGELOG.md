@@ -114,6 +114,8 @@
 - `19:03`（变更）`tests/test_model.py`、`tests/test_config.py`、`tests/test_engine.py`：新增 7 个用例——概率空间加权等于 `0.7·σ(正位)+0.3·σ(侧位)`（0.6928 vs G0 的 0.8320）、极端 logits（±80）不产生 inf/nan、概率空间可反传、`predict_loader` 端到端复现 G1 且与 G0 有可测差异、A-008 与 A-001 除聚合空间外逐字段一致、非法 `aggregation` 取值被拒、`fit` 在 G1 口径下 loss 有限且参数更新。全量 `python -m pytest -q` 301 passed / 3 skipped。
 - `19:03`（变更）`docs/manual.md`、`docs/architecture.md`：手册配置表补 `exp_A008.yaml` 行，`model.aggregation` / `model.frontal_weight` 字段说明改为三值口径；架构文档更新聚合口径描述与 `aggregate_logits` 签名。
 
+- `20:44`（新增）`configs/exp_A009.yaml`、`docs/train_plan19.md`：新增 A-009 优化超参联合放大对照（相对 A-001 只覆盖 `train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余逐字段继承），并记录该组的判读门（0.8088）、执行命令、实现口径与「四项同改不可拆单项」的限制；训练已启动，实测待回填。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
