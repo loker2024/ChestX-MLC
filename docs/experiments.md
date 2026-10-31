@@ -67,6 +67,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-007 | `A-007_convnext_small_in22k_ft_s42` | `configs/exp_A007.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 8） | 是 | A-001 的骨干与预训练权重对照：ConvNeXt-Tiny + `fb_in1k` → ConvNeXt-Small + `fb_in22k_ft_in1k`（49,462,378 参数），其余口径逐字段不变；已完成（0.7903 / 0.4204，未过 0.8088 门） |
 | A-008 | `A-008_convnext_tiny_g1_s42` | `configs/exp_A008.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的聚合空间对照：`model.aggregation: view_weighted → view_weighted_probability`（先逐图 sigmoid 再在概率空间按正侧位 7:3 加权），其余口径逐字段不变；已完成（0.7974 / 0.4197，未过 0.8088 门） |
 | A-009 | `A-009_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`） | 10（跑满上限） | 是 | A-001 的优化超参联合放大对照：`train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余口径逐字段不变；已完成（0.7799 / 0.4101，未过 0.8088 门） |
+| A-009-r2 | `A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`）+ `src/run_train.py --init-from` 首轮 `best.pt` | 10（早停 4，实际 5） | 是 | A-009 的二轮 warm start 对照：以首轮 A-009 `best.pt`（epoch 10 权重）为初始权重、按 A-009 同配置重训 10 轮；已完成（0.7764 / 0.4117，未过 0.8088 门，低于首轮 0.7799 / 0.4101） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -408,6 +409,17 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 逐类：A-001 在 10 类中 9 类 AUC 高于 A-009，只有 class7 低 0.0027；降幅最大为 class2（−0.0867，support 37）、class4（−0.0414）、class3（−0.0391）。
 - 配对 bootstrap（859 studies × 2,000 次，按 study 有放回重采样，seed 2026）：ΔAUC（A-001 − A-009）95% CI [+0.0121, +0.0360] P=1.000、ΔF1@0.5 95% CI [+0.0027, +0.0285] P=0.991，差距不是 valid 内采样噪声。
 - 判读：与「更大 lr + 更强 wd + 更长预算」的组合假设相反（单 seed）；A-004-b 显示 wd 0.01 → 0.05 单独只差 AUC −0.0039（seed 波动内），本组 −0.0239 更可能主要来自 lr 放大后的收敛推迟与过拟合加剧，但四项同改不能单变量归因；默认超参保持 A-001 口径，不补 seed 2026，若继续调参应改开 lr / wd 单变量实验。
+
+**A-009-r2：A-009 的二轮 warm start（以首轮 best.pt 为初始权重、同配置重训 10 轮）**（配置 `configs/exp_A009.yaml` + `src/run_train.py --init-from`，产物
+`outputs/20261031-204914_A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
+[train_plan20.md](train_plan20.md)）
+
+- 配置：与首轮 A-009 逐字段相同（lr 1e-3 / wd 0.03 / 10 轮 / patience 4），唯一区别是初始化——不加载 ImageNet 预训练权重，改为加载首轮 `best.pt`（epoch 10，SHA-256 `6988006910b824a83c277764695d0db4a3bdeb3ab0b1b029d22dc9e3ee0f1b15`）；训练从第 1 轮重新开始，不恢复优化器 / 调度器 / 进度。
+- 结果：20:49:14–21:13:48（24m34s，V100 与另一容器共享）、第 5 轮早停（连续 4 轮无提升，best epoch 1），macro-AUC **0.7764** / F1@0.5 **0.4117**；逐轮 AUC 0.7764 / 0.7739 / 0.7587 / 0.7692 / 0.7664。
+- 对比首轮 A-009（0.7799 / 0.4101）：ΔAUC **−0.0035**、ΔF1@0.5 +0.0016；对比 A-001（0.8038 / 0.4255）：ΔAUC **−0.0274**、ΔF1@0.5 −0.0138，距 +0.005 方向性门差 −0.0324，**未过门**。
+- 阈值曲线（0.2–0.7）：A-009-r2 0.3684 / 0.3833 / 0.3966 / 0.4117 / 0.4137 / 0.4022，首轮 A-009 0.3825 / 0.3991 / 0.4053 / 0.4101 / 0.4083 / 0.3925；低阈值段（0.2–0.3）二轮更低、0.5–0.7 段略高，属校准形态变化。
+- 逐类：class5 0.8579 / class9 0.8942 / class10 0.8678 相对稳定，class1 0.6993 / class4 0.6764 / class8 0.6973 偏低；未做与首轮 A-009 逐类差异的显著性检验。
+- 判读：以首轮 ep10 权重初始化后，lr 重新从 5e-4 warmup 到 1e-3 破坏了已收敛的权重——train_loss 由首轮的 0.6562 反弹到 0.7556，valid AUC 由源权重 0.7799 掉到 0.7764 后连续 4 轮未回升，5 轮即早停；**warm start 二轮无增益**，A-009 首轮的否定结论不变。本轮耗时受 GPU 共享影响（每轮约 6–7 分钟 vs 首轮 4.4 分钟/轮），不可横向比较。
 
 ## 冻结结论
 

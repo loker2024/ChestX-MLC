@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import random
 import sys
 import warnings
@@ -59,6 +60,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--resume",
         default=None,
         help=f"断点续训：run 目录或其中的 {LAST_CHECKPOINT_NAME}，省略则从头训练",
+    )
+    parser.add_argument(
+        "--init-from",
+        default=None,
+        help="warm start：用某个 checkpoint（如 best.pt）的模型权重初始化后重新训练，与 --resume 互斥",
     )
     return parser.parse_args(argv)
 
@@ -104,6 +110,27 @@ def _resolve_resume(path: str | Path) -> tuple[Path, dict[str, Any]]:
     if checkpoint.get("config") is None:
         raise ValueError(f"{checkpoint_path} 里没有存档配置，无法重建训练环境")
     return run_dir, checkpoint
+
+
+def _resolve_init_from(path: str | Path) -> tuple[Path, dict[str, Any], str]:
+    """把 --init-from 解析成 (checkpoint 路径, checkpoint 内容, 权重 SHA-256)。
+
+    与 --resume 不同，这里只取模型权重做初始化：训练从第 1 轮重新开始，
+    优化器、调度器和 epoch 进度都不复用。
+    """
+    checkpoint_path = Path(path)
+    if checkpoint_path.is_dir():
+        checkpoint_path = checkpoint_path / "best.pt"
+    if not checkpoint_path.is_file():
+        raise FileNotFoundError(f"找不到 {checkpoint_path}；--init-from 需要现有 checkpoint 文件")
+    checkpoint = load_checkpoint(checkpoint_path)
+    if "model" not in checkpoint:
+        raise ValueError(f"{checkpoint_path} 里没有模型权重，无法用于 warm start")
+    digest = hashlib.sha256()
+    with checkpoint_path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return checkpoint_path, checkpoint, digest.hexdigest()
 
 
 def _progress_from_checkpoint(checkpoint: dict[str, Any]) -> TrainProgress:
@@ -181,6 +208,13 @@ def _checkpoint_metadata(
     return metadata
 
 
+def _merge_metadata(metadata: dict[str, Any], extra: dict[str, Any] | None) -> dict[str, Any]:
+    """把 warm start 来源等额外字段并进 checkpoint 元数据。"""
+    if extra:
+        metadata.update(extra)
+    return metadata
+
+
 def _capture_rng_state(device: torch.device | None = None) -> dict[str, Any]:
     return {"python": random.getstate(), "numpy": np.random.get_state(),
             "torch": torch.get_rng_state(),
@@ -214,8 +248,12 @@ def _save_last_checkpoint(
     device: torch.device,
     pretrained_loaded: bool,
     previous_metadata: dict[str, Any] | None = None,
+    extra_metadata: dict[str, Any] | None = None,
 ) -> None:
     """保存可续训的完整状态：权重 + 优化器/调度器/AMP + 进度与最优快照。"""
+    metadata = _checkpoint_metadata(model, config, device, pretrained_loaded, previous_metadata)
+    if extra_metadata is not None:
+        metadata.update(extra_metadata)
     save_checkpoint(
         path,
         model,
@@ -226,7 +264,7 @@ def _save_last_checkpoint(
         metrics=progress.best_metrics,
         config=config,
         seed=config.seed,
-        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded, previous_metadata),
+        metadata=metadata,
         extras={
             "best_auc": progress.best_auc,
             "best_epoch": progress.best_epoch,
@@ -245,11 +283,14 @@ def run_training(
     run_dir: Path,
     *,
     checkpoint: dict[str, Any] | None = None,
+    init_from: tuple[Path, dict[str, Any], str] | None = None,
 ) -> dict[str, Any]:
     """真正的编排：建 loader、建模型、训练、写 metrics.csv、保存最优权重。
 
     `checkpoint` 是 `--resume` 读到的 last.pt；给了就从里面恢复权重、优化器
     状态和训练进度，接着跑剩下的 epoch。
+    `init_from` 是 `--init-from` 读到的 (路径, checkpoint, SHA-256)；只把模型
+    权重装进新模型，训练从第 1 轮重新开始（warm start）。
     """
     if checkpoint is not None:
         _validate_resume_config(config, config_from_dict(checkpoint["config"]))
@@ -258,14 +299,28 @@ def run_training(
     val_loader = build_loader(config, "valid", pin_memory=pin_memory)
     print(f"训练 study 数: {len(train_loader.dataset)} | 验证 study 数: {len(val_loader.dataset)}")
 
-    # 续训时权重马上会被 last.pt 覆盖，构建模型不必再加载（或联网下载）预训练权重。
+    # 续训或 warm start 时权重马上会被覆盖，构建模型不必再加载（或联网下载）预训练权重。
     build_config = (
         config
-        if checkpoint is None
+        if checkpoint is None and init_from is None
         else replace(config, model=replace(config.model, pretrained=False))
     )
     model = build_model(build_config).to(device)
     pretrained_loaded = bool(getattr(model, "pretrained_loaded", False))
+    warm_metadata: dict[str, Any] | None = None
+    if init_from is not None:
+        init_path, init_checkpoint, init_sha256 = init_from
+        model.load_state_dict(init_checkpoint["model"])
+        warm_metadata = {
+            "warm_start_from": str(init_path),
+            "warm_start_sha256": init_sha256,
+            "warm_start_epoch": init_checkpoint.get("epoch"),
+            "warm_start_metrics": init_checkpoint.get("metrics") or {},
+        }
+        print(
+            f"warm start: 从 {init_path} 加载模型权重 "
+            f"(source epoch {init_checkpoint.get('epoch')}, sha256 {init_sha256[:12]}…)"
+        )
     # B 组把权重来源 / SHA-256 打进训练日志，作为「权重确实加载成功」的留痕；
     # 默认 timm 骨干没有 pretrained_info，不受影响。
     progress: TrainProgress | None = None
@@ -315,6 +370,7 @@ def run_training(
             device,
             pretrained_loaded,
             checkpoint.get("metadata") if checkpoint is not None else None,
+            extra_metadata=warm_metadata,
         )
 
     result = fit(
@@ -340,7 +396,10 @@ def run_training(
         metrics=result["best_metrics"],
         config=config,
         seed=config.seed,
-        metadata=_checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None),
+        metadata=_merge_metadata(
+            _checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None),
+            warm_metadata,
+        ),
     )
     print(f"最优权重已保存: {checkpoint_path}")
     return result
@@ -353,6 +412,11 @@ def main(argv: list[str] | None = None) -> None:
     checkpoint: dict[str, Any] | None = None
     if args.resume:
         resume_dir, checkpoint = _resolve_resume(args.resume)
+    init_from: tuple[Path, dict[str, Any], str] | None = None
+    if args.init_from:
+        if checkpoint is not None:
+            raise ValueError("--init-from 和 --resume 不能同时使用")
+        init_from = _resolve_init_from(args.init_from)
 
     # 续训时优先用 last.pt 里存档的配置：它记录的就是这次训练真正的超参。
     if checkpoint is not None and args.config is None:
@@ -398,8 +462,10 @@ def main(argv: list[str] | None = None) -> None:
             print(f"配置文件: {config_source}")
             print(f"运行目录: {run_dir}")
             print(f"设备: {device} | 随机种子: {config.seed}")
+            if init_from is not None:
+                print(f"warm start 来源: {init_from[0]} (sha256 {init_from[2]})")
             try:
-                result = run_training(config, device, run_dir, checkpoint=checkpoint)
+                result = run_training(config, device, run_dir, checkpoint=checkpoint, init_from=init_from)
             except KeyboardInterrupt:
                 print(
                     f"训练被中断：每个 epoch 结束都会保存 {run_dir / LAST_CHECKPOINT_NAME}，"

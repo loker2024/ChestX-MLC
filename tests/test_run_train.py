@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 import run_train
 from common.checkpoint import load_checkpoint
@@ -83,3 +84,72 @@ def test_run_train_freeze_head_records_parameter_counts(tmp_path, labeled_split)
     metadata = checkpoint["metadata"]
     assert metadata["freeze_backbone"] is True
     assert metadata["total_params"] > metadata["trainable_params"] > 0
+
+
+def test_run_train_init_from_warm_start_records_metadata(tmp_path, labeled_split):
+    run_root = tmp_path / "outputs"
+    config_path = _write_config(tmp_path, labeled_split, run_root)
+
+    run_train.main(["--config", str(config_path), "--tag", "source"])
+    source_run = next(run_root.iterdir())
+    source_best = source_run / "best.pt"
+
+    run_train.main(
+        [
+            "--config",
+            str(config_path),
+            "--init-from",
+            str(source_best),
+            "--tag",
+            "warm",
+        ]
+    )
+    warm_dirs = [p for p in run_root.iterdir() if p.name.endswith("_warm")]
+    assert len(warm_dirs) == 1
+    warm_dir = warm_dirs[0]
+
+    log = (warm_dir / "train.log").read_text(encoding="utf-8")
+    assert "warm start:" in log
+
+    checkpoint = load_checkpoint(warm_dir / "best.pt")
+    metadata = checkpoint["metadata"]
+    assert "best.pt" in metadata["warm_start_from"]
+    assert len(metadata["warm_start_sha256"]) == 64
+    assert metadata["warm_start_epoch"] == 1
+    assert isinstance(metadata["warm_start_metrics"], dict)
+    assert metadata["pretrained_loaded"] is False
+
+
+def test_run_train_init_from_and_resume_are_mutually_exclusive(tmp_path, labeled_split):
+    run_root = tmp_path / "outputs"
+    config_path = _write_config(tmp_path, labeled_split, run_root)
+
+    run_train.main(["--config", str(config_path), "--tag", "source"])
+    run_dir = next(run_root.iterdir())
+
+    with pytest.raises(ValueError, match="不能同时使用"):
+        run_train.main(
+            [
+                "--config",
+                str(config_path),
+                "--resume",
+                str(run_dir),
+                "--init-from",
+                str(run_dir / "best.pt"),
+            ]
+        )
+
+
+def test_run_train_init_from_missing_checkpoint_is_rejected(tmp_path, labeled_split):
+    run_root = tmp_path / "outputs"
+    config_path = _write_config(tmp_path, labeled_split, run_root)
+
+    with pytest.raises(FileNotFoundError):
+        run_train.main(
+            [
+                "--config",
+                str(config_path),
+                "--init-from",
+                str(tmp_path / "missing.pt"),
+            ]
+        )
