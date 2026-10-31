@@ -56,6 +56,11 @@ torch==2.10.0
 torchvision==0.25.0
 timm==1.0.30
 
+# ---- B 组隔离研究（可选，不进入赛题环境）----
+# B-001 医学预训练对照需要 torchxrayvision==1.5.7（Apache-2.0）；仅作研究，
+# 不用于赛题提交、融合或候选模型选择，默认链路不会导入它，因此不锁定在赛题依赖中：
+#   python -m pip install "torchxrayvision==1.5.7"
+
 # ---- 数据处理与评估 ----
 numpy==2.5.4
 pillow==12.3.0

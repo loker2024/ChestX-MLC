@@ -54,15 +54,26 @@ def set_frozen_backbone_eval(model: nn.Module) -> None:
 
 
 def build_model(cfg: Config) -> nn.Module:
-    """按配置构建 timm 图像分类模型，输出每张图的 10 类 logits。
+    """按配置构建图像分类模型，输出每张图的 10 类 logits。
+
+    默认（`cfg.model.arch="timm"`）构建 timm 骨干；`arch="xrv_densenet121"` 时改走
+    `model.xrv` 的 TorchXRayVision DenseNet-121（B 组隔离研究，惰性导入，默认链路
+    完全不依赖 torchxrayvision）。两条路径都输出原始 logits。
 
     `cfg.model.pretrained=True` 时会尝试加载所选模型的预训练权重（必要时下载）。
     赛题服务器可能没有外网，加载失败时部分异常会被捕获并回退到随机初始化，
     并留下一条警告——事后看到指标偏低时，这条警告能提醒你「没加载预训练权重」。
+    B 组例外：TxRV 权重加载失败在 `model.xrv` 里直接报错，不回退。
 
     随机初始化的重试会把真正的配置错误（例如 backbone 名字拼错）原样抛出来，
     所以这里不是在掩盖错误，只是给「离线拿不到权重」留一条退路。
     """
+    if cfg.model.arch == "xrv_densenet121":
+        # 惰性导入：只有 B 组实验才需要 torchxrayvision，默认链路不受影响。
+        from model.xrv import build_xrv_densenet121
+
+        return build_xrv_densenet121(cfg)
+
     try:
         model = timm.create_model(
             cfg.model.backbone,

@@ -13,7 +13,8 @@ YAML 是嵌套字典，读进来后转成一组 dataclass（每个配置节对�
 
 from dataclasses import MISSING, asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Any, get_type_hints
+import types
+from typing import Any, Union, get_args, get_origin, get_type_hints
 
 import yaml
 
@@ -43,15 +44,32 @@ class ImageConfig:
 
     size: int = DEFAULT_IMAGE_SIZE  # letterbox 之后的方形边长
     letterbox: bool = True  # True=等比缩放后补边；False=直接拉伸到 size×size
-    normalize: str = "imagenet"  # "imagenet"=减均值除方差；"none"=只把像素缩到 0~1
+    normalize: str = "imagenet"  # "imagenet"=减均值除方差；"none"=只把像素缩到 0~1；"xrv"=TxRV 的 [-1024,1024]
     hflip: bool = False  # 训练是否水平翻转；胸片左右有方向含义，默认关闭
+    in_channels: int = 3  # 模型输入的通道数；B 组 TxRV DenseNet 使用单通道 1
+    xrv_maxval: int = 255  # normalize="xrv" 时的像素上限；8 位图 255、16 位图 65535
 
     def __post_init__(self) -> None:
         if self.size <= 0:
             raise ValueError(f"image.size 必须是正整数，当前为 {self.size}")
-        if self.normalize not in {"imagenet", "none"}:
+        if self.in_channels not in {1, 3}:
+            raise ValueError(f"image.in_channels 只能是 1 或 3，当前为 {self.in_channels}")
+        if self.normalize not in {"imagenet", "none", "xrv"}:
             raise ValueError(
-                f"image.normalize 只能是 'imagenet' 或 'none'，当前为 {self.normalize!r}"
+                f"image.normalize 只能是 'imagenet'、'none' 或 'xrv'，"
+                f"当前为 {self.normalize!r}"
+            )
+        if self.xrv_maxval <= 0:
+            raise ValueError(f"image.xrv_maxval 必须是正整数，当前为 {self.xrv_maxval}")
+        if self.normalize == "xrv" and self.in_channels != 1:
+            raise ValueError(
+                f"image.normalize='xrv' 要求 image.in_channels=1（TxRV 单通道输入），"
+                f"当前为 {self.in_channels}"
+            )
+        if self.normalize == "imagenet" and self.in_channels != 3:
+            raise ValueError(
+                f"image.normalize='imagenet' 要求 image.in_channels=3，"
+                f"当前为 {self.in_channels}"
             )
 
 
@@ -60,11 +78,15 @@ class ModelConfig:
     """模型结构与权重来源。"""
 
     backbone: str = "resnet18"  # timm 的模型名
-    pretrained: bool = True  # 是否加载 ImageNet 预训练权重
+    pretrained: bool = True  # 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
     freeze_backbone: bool = False  # 是否冻结骨干，仅训练分类头
     aggregation: str = "mean"
     frontal_weight: float = 0.7
+    arch: str = "timm"  # "timm"=timm 骨干；"xrv_densenet121"=TorchXRayVision DenseNet-121（B 组隔离研究）
+    xrv_weights: str = "densenet121-res224-all"  # TxRV 预训练权重名
+    xrv_cache_dir: Path | None = None  # 权重缓存目录；None=TxRV 默认 ~/.torchxrayvision/models_data
+    xrv_sha256: str | None = None  # 期望的权重文件 SHA-256；None=不校验
 
     def __post_init__(self) -> None:
         if self.aggregation not in {"mean", "view_weighted"}:
@@ -73,6 +95,22 @@ class ModelConfig:
             raise ValueError("model.frontal_weight 必须在 (0, 1) 内")
         if not self.backbone:
             raise ValueError("model.backbone 不能为空")
+        if self.arch not in {"timm", "xrv_densenet121"}:
+            raise ValueError(
+                f"model.arch 只能是 'timm' 或 'xrv_densenet121'，当前为 {self.arch!r}"
+            )
+        if self.arch == "xrv_densenet121":
+            if self.freeze_backbone:
+                raise ValueError(
+                    "model.arch='xrv_densenet121' 要求全量微调，不能开启 freeze_backbone"
+                )
+            if not self.xrv_weights:
+                raise ValueError("model.xrv_weights 不能为空")
+            if self.xrv_sha256 and (
+                len(self.xrv_sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in self.xrv_sha256.lower())
+            ):
+                raise ValueError("model.xrv_sha256 必须是 64 位十六进制字符串")
         if self.num_classes != NUM_CLASSES:
             raise ValueError(
                 f"model.num_classes 必须等于 {NUM_CLASSES}（赛题固定 10 类），"
@@ -304,6 +342,16 @@ def _build_dataclass(cls: type, raw: Any, where: str) -> Any:
 
 def _convert(value: Any, hint: Any, where: str) -> Any:
     """把 YAML 值转换成字段声明的类型；类型不对时给出带字段路径的报错。"""
+    # 先处理 Optional[...]：B 组的 xrv_cache_dir / xrv_sha256 允许不写（None），
+    # 其余字段仍然走下面的严格类型校验。
+    origin = get_origin(hint)
+    if origin is Union or origin is types.UnionType:
+        options = [arg for arg in get_args(hint) if arg is not type(None)]
+        if value is None:
+            return None
+        if len(options) == 1:
+            return _convert(value, options[0], where)
+        raise TypeError(f"{where} 不支持的联合类型 {hint}")
     if is_dataclass(hint):
         return _build_dataclass(hint, value, where)
     if hint is Path:

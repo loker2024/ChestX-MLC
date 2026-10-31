@@ -1,0 +1,47 @@
+# B-001：TorchXRayVision DenseNet-121（densenet121-res224-all 医学预训练）研究对照。
+# 仅研究，不用于赛题提交 / 融合 / 候选选择：该权重在外部医学影像数据集上预训练，
+# 违反赛题规则第 1 条，B 组结论不进入提交方案。
+# 其余口径对齐 default.yaml：seed 42、25 轮上限、早停 patience 5、batch 16 studies、
+# lr 3e-4、weight decay 0.01、warmup 2、cosine 衰减到 1e-5、pos_weight、关闭 hflip。
+_base: default.yaml
+
+image:
+  size: 224            # TxRV 权重的原生输入分辨率
+  letterbox: true      # 等比缩放后补边，避免长宽比变形
+  normalize: xrv       # TxRV 口径：像素映射到 [-1024, 1024]
+  in_channels: 1       # DenseNet-121 医学权重是单通道输入
+  xrv_maxval: 255      # 数据为 8 位 PNG，像素上限 255
+  hflip: false         # 胸片左右有方向含义，保持关闭
+
+model:
+  arch: xrv_densenet121
+  pretrained: true
+  num_classes: 10
+  aggregation: view_weighted   # 正位 0.7 / 侧位 0.3，与 A 组口径一致
+  frontal_weight: 0.7
+  xrv_weights: densenet121-res224-all
+  # GitHub release 文件（28,382,008 字节）的 SHA-256；不匹配会立即报错。
+  xrv_sha256: 56524913dd16a906422e8d8b66a7a5c46be1d82eb7ac012d8103776f1aa68899
+  # xrv_cache_dir 留空即用 TxRV 默认缓存 ~/.torchxrayvision/models_data
+
+train:
+  epochs: 25
+  batch_studies: 16
+  lr: 0.0003
+  weight_decay: 0.01
+  pos_weight: true
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 0.00001
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  early_stop_patience: 5
+  loss: bce
+
+eval:
+  batch_studies: 32
+  threshold: 0.5
+
+seed: 42
+device: auto

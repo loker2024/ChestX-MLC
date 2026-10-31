@@ -62,7 +62,11 @@ def build_eval_inference_transform(
     但预处理必须和训练/提交时一致，所以这里复用同一个 build_eval_transform。
     """
     return build_eval_transform(
-        config.image.size, config.image.letterbox, config.image.normalize
+        config.image.size,
+        config.image.letterbox,
+        config.image.normalize,
+        config.image.in_channels,
+        config.image.xrv_maxval,
     )
 
 

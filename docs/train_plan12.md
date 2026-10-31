@@ -1,6 +1,6 @@
 # 训练计划 12：B 组医学预训练 DenseNet-121 研究对照
 
-**状态：仅制定计划；尚未安装依赖、下载权重、修改训练代码或执行训练。**
+**状态：适配代码与本机测试已完成；数据、权重及 SHA-256 已核验；GPU 训练待执行（2026-10-31）。**
 
 ## 目标与边界
 
@@ -38,3 +38,19 @@ B 组使用 TorchXRayVision 的 **DenseNet-121 + `densenet121-res224-all` 胸片
 现有 RUN-006 为 ImageNet DenseNet-121、320×320，seed 42，记录的 valid Macro-AUC **0.7880**（见 [训练记录](training_log.md)）。B 组使用医学权重、单通道与不同归一化，且实际分辨率为 224；即使数据划分相同，与 RUN-006 也只是**历史参考**，差值不能归因于医学预训练，也不是严格配对。若划分或数据版本未核实一致，则不计算直接差值。
 
 单 seed 的指标、曲线及逐类表现只描述此次研究；不预设医学预训练一定更好。若无法排除预训练集与 valid 重叠，应醒目标注评估可能乐观。研究结束后在隔离实验记录中登记来源、方法、结果及限制，并按仓库要求同步更新 `CHANGELOG.md`；任何未执行的检查和训练保持未完成状态。
+
+## 执行记录
+
+### 2026-10-31 实现与核验（本机）
+
+- 代码：新增 `src/model/xrv.py`（TxRV DenseNet-121 构建、权重 SHA-256 校验、加载失败即报错不回退）、`configs/exp_B001.yaml`、`tests/test_xrv.py`；`src/common/config.py` 增加 `image.in_channels`、`image.xrv_maxval`、`normalize: xrv` 与 `model.arch` / `model.xrv_weights` / `model.xrv_cache_dir` / `model.xrv_sha256`；`src/data/transforms.py` 增加单通道 letterbox 与 TxRV `[-1024, 1024]` 归一化；`src/data/dataset.py`、`src/infer/predict.py` 传递通道与归一化参数；`src/run_eval.py` 增加 `--pred-out` 逐 study 概率导出；`src/run_train.py` 记录预训练权重元数据。
+- 权重：`densenet121-res224-all`（GitHub release `mlmed/torchxrayvision` v1，Apache-2.0），文件 28,382,008 B，SHA-256 `56524913dd16a906422e8d8b66a7a5c46be1d82eb7ac012d8103776f1aa68899`；本机与 autodl 缓存目录一致、哈希一致。
+- 数据核验（autodl）：train 30,344 图 / 18,513 studies，valid 1,422 图 / 859 studies；Study_id 与 Subject_id 交集均为 0（患者无泄漏）；CSV `Dicom_id` 全部命中图片文件；抽样 8 张均为 8 位灰度（mode L、uint8、0–255），`xrv_maxval: 255` 适用；每 study 图数 1–7 张；ViewPosition 以 AP / PA / LATERAL / LL 为主。
+- 测试：`python -m pytest` 240 passed / 3 skipped；`tests/test_xrv.py` 13 个用例覆盖配置锁定、单通道值域与形状、失败即报错不回退、10 类原始 logits、聚合反传、checkpoint 重载一致、`build_loader` 单通道。
+- 冒烟：CPU 合成数据 2 epoch（真实医学权重、224 单通道）训练 / 续训 / 评测 / 逐 study 概率导出全链路通过；`best.pt` metadata 含 `arch` / `weights_name` / `weights_sha256` / `pretrained_loaded`。
+
+### 待执行
+
+- autodl V100-SXM2-32G 上按 `configs/exp_B001.yaml` 跑满 25 轮（早停 patience 5），记录 `train.log` / `metrics.csv` / `best.pt` / `last.pt`。
+- 用 `run_eval.py --pred-out` 导出 valid 逐 study 概率，整理评估汇总与逐类报告。
+- 回填 `docs/experiments.md`、`docs/training_log.md` 的 B-001 记录，并在训练环境提交。

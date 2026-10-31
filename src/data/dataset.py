@@ -124,7 +124,11 @@ def build_loader(
         batch_size = cfg.train.batch_studies
     else:
         loader_transform = build_eval_transform(
-            cfg.image.size, cfg.image.letterbox, cfg.image.normalize
+            cfg.image.size,
+            cfg.image.letterbox,
+            cfg.image.normalize,
+            cfg.image.in_channels,
+            cfg.image.xrv_maxval,
         )
         batch_size = cfg.eval.batch_studies
 

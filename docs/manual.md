@@ -137,6 +137,7 @@ train:
 | `configs/exp_A001c.yaml` | A-001-C：A-001 的冻结骨干对照（`freeze_backbone: true`，只训练分类头），已完成 | `_base: exp_A001.yaml` | 只覆盖 `model.freeze_backbone: true` |
 | `configs/exp_A002.yaml` | A-002：A-001 的轻量骨干对照（ConvNeXt-Tiny → MobileNetV3-Small 0.5×、578,474 参数；轮数 8→25、早停 2→5），第 5 轮按用户要求中止 | `_base: exp_A001.yaml` | 只覆盖 `model.backbone`、`train.epochs: 25`、`train.early_stop_patience: 5` |
 | `configs/exp_A003.yaml` | A-003：A-002 的宽度对照（MobileNetV3-Small 0.5× → 1.0×、1,528,106 参数），已完成（0.7808 / 0.3881，未过门） | `_base: exp_A002.yaml` | 只覆盖 `model.backbone: mobilenetv3_small_100.lamb_in1k` |
+| `configs/exp_B001.yaml` | B-001：B 组医学预训练 DenseNet-121 研究对照（TxRV `densenet121-res224-all`，224×224 单通道），仅研究、不用于赛题提交 | `_base: default.yaml` | `image.size: 224`、`normalize: xrv`、`in_channels: 1`、`model.arch: xrv_densenet121`、`xrv_sha256` 固定 |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
 
@@ -161,7 +162,8 @@ default.yaml
 │           ├── exp_run008c.yaml
 │           └── exp_run008d.yaml
 ├── exp_resnet50.yaml
-└── exp_example.yaml
+├── exp_example.yaml
+└── exp_B001.yaml
 ```
 
 > `configs/exp_A001.yaml` 为 A-001 的完整展开配置，不使用 `_base` 继承，故未画入上面的继承树。
@@ -169,6 +171,7 @@ default.yaml
 > `configs/exp_A001a.yaml` 为 A-001-a 的完整展开配置、不使用 `_base` 继承，故未画入上面的继承树。
 > `configs/exp_A001c.yaml` 以 `_base: exp_A001.yaml` 继承 A-001，只覆盖 `model.freeze_backbone: true`，未单独画入继承树。
 > `configs/exp_A002.yaml` 以 `_base: exp_A001.yaml`、`configs/exp_A003.yaml` 以 `_base: exp_A002.yaml` 继承，未单独画入继承树。
+> `configs/exp_B001.yaml` 以 `_base: default.yaml` 继承，未单独画入继承树；B 组仅作研究，不用于赛题提交、融合或候选模型选择。
 >
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
 
@@ -179,8 +182,8 @@ default.yaml
 | 节 | 作用 | 是否必填 |
 | --- | --- | --- |
 | `data` | 三个 split 的标注 CSV 与图片根目录 | 必填，三个 split 都要写 |
-| `image` | 输入尺寸、letterbox、归一化、训练水平翻转 | 有默认值 |
-| `model` | 骨干网络、是否加载预训练、类别数 | 有默认值 |
+| `image` | 输入尺寸、letterbox、归一化与通道数、训练水平翻转 | 有默认值 |
+| `model` | 骨干网络、架构分支（timm / B 组 TxRV）、是否加载预训练、类别数 | 有默认值 |
 | `train` | 训练轮数、batch、学习率、AMP、早停等 | 有默认值 |
 | `eval` | 验证/推理 batch 与 F1 判定阈值 | 有默认值 |
 | `output` | 训练产物根目录 | 有默认值 |
@@ -215,8 +218,10 @@ data:
 | --- | --- | --- | --- | --- |
 | `image.size` | 整数 | `320` | `> 0` | letterbox 之后的方形边长。建议取 32 的倍数以对齐 ResNet 下采样；改动后必须重新训练，推理也要用同一尺寸。 |
 | `image.letterbox` | 布尔 | `true` | `true` / `false` | `true`：等比缩放到最长边等于 `size`，再居中补黑边，保持胸片比例；`false`：直接拉伸成 `size × size`，可能使器官轮廓变形。 |
-| `image.normalize` | 字符串 | `imagenet` | `imagenet` / `none` | `imagenet`：减 ImageNet 均值、除标准差，配合预训练权重；`none`：只把像素缩到 0–1。 |
+| `image.normalize` | 字符串 | `imagenet` | `imagenet` / `none` / `xrv` | `imagenet`：减 ImageNet 均值、除标准差，配合预训练权重；`none`：只把像素缩到 0–1；`xrv`：按 TorchXRayVision 口径把像素映射到 `[-1024, 1024]`，仅 B 组使用。 |
 | `image.hflip` | 布尔 | `false` | `true` / `false` | 仅训练增强是否做水平翻转。胸片左右有方向含义，默认关闭。 |
+| `image.in_channels` | 整数 | `3` | `3` / `1` | 输入通道数。timm 链路固定 3 通道；B 组 TxRV 医学权重是单通道，必须设 `1`，且 `normalize: xrv` 要求 `in_channels: 1`、`normalize: imagenet` 要求 `in_channels: 3`。 |
+| `image.xrv_maxval` | 整数 | `255` | `> 0` | 仅 `normalize: xrv` 生效：归一化公式 `(2 * pixel / maxval - 1) * 1024` 的像素上限。当前数据为 8 位灰度 JPEG/PNG，用 255；像素超过该值会直接报错，避免把 16 位数据当 8 位处理。 |
 
 训练时的其他增强（±7° 旋转、0.9–1.1 缩放、5% 平移、亮度/对比度 ±15%）由代码固定，不受配置控制；验证和推理只做确定性的缩放与归一化。
 
@@ -225,11 +230,15 @@ data:
 | 字段 | 类型 | 默认 | 约束 | 说明 |
 | --- | --- | --- | --- | --- |
 | `model.backbone` | 非空字符串 | `resnet18` | timm 支持的模型名 | 骨干网络。换骨干等于换模型，必须重新训练；推理配置要与训练一致。 |
-| `model.pretrained` | 布尔 | `true` | `true` / `false` | 是否加载 ImageNet 预训练权重。离线环境拿不到权重时会告警并回退随机初始化，训练日志与 checkpoint 的 `metadata.pretrained_loaded` 会记录真实情况。 |
+| `model.pretrained` | 布尔 | `true` | `true` / `false` | 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）。timm 链路离线拿不到权重时会告警并回退随机初始化；B 组加载失败一律直接报错、不回退，训练日志与 checkpoint 的 `metadata.pretrained_loaded` 会记录真实情况。 |
 | `model.freeze_backbone` | 布尔 | `false` | `true` / `false` | 是否冻结骨干、仅训练 timm 识别的分类头。冻结实验应使用单独配置；默认关闭以保持全量微调。 |
 | `model.num_classes` | 整数 | `10` | 必须等于 `10` | 赛题固定 10 类，写其他值会直接报错。 |
 | `model.aggregation` | 字符串 | `mean` | `mean` / `view_weighted` | 图片等权均值或按正侧位均值加权。 |
 | `model.frontal_weight` | 数字 | `0.7` | `0 < 值 < 1` | 视角加权时正位权重；侧位权重为 `1 - frontal_weight`。 |
+| `model.arch` | 字符串 | `timm` | `timm` / `xrv_densenet121` | 模型实现分支。默认走 timm；`xrv_densenet121` 为 B 组隔离研究（TorchXRayVision DenseNet-121 医学预训练），仅研究，不用于赛题提交、融合或候选选择；该分支禁止 `freeze_backbone`。 |
+| `model.xrv_weights` | 字符串 | `densenet121-res224-all` | 非空 | 仅 `arch: xrv_densenet121` 生效：TxRV 预训练权重名。 |
+| `model.xrv_cache_dir` | 路径 / 空 | 空 | 可省略 | 仅 B 组生效：权重缓存目录；省略时用 TxRV 默认 `~/.torchxrayvision/models_data`。 |
+| `model.xrv_sha256` | 字符串 / 空 | 空 | 64 位十六进制 | 仅 B 组生效：期望的权重文件 SHA-256；给出时实际文件哈希不匹配立即报错。B-001 写死 `56524913dd16a906422e8d8b66a7a5c46be1d82eb7ac012d8103776f1aa68899`。 |
 
 默认结构为 ResNet-18 骨干 + 单层 `Linear(512, 10)` 分类头，参数量约 11.2M。
 
@@ -581,6 +590,12 @@ python src/run_eval.py \
     --config outputs/<run>/config.yaml \
     --checkpoint outputs/<run>/best.pt \
     --split train
+
+# 额外导出逐 study 的 ID / 真实标签 / 10 类概率（B 组留档用）
+python src/run_eval.py \
+    --config outputs/<run>/config.yaml \
+    --checkpoint outputs/<run>/best.pt \
+    --pred-out outputs/<run>/valid_predictions.csv
 ```
 
 | 参数 | 默认 | 说明 |
@@ -589,8 +604,9 @@ python src/run_eval.py \
 | `--checkpoint` | 必填 | 训练产出的 `best.pt`。 |
 | `--split` | `valid` | 只能是 `train` 或 `valid`；test 没有标签，不能用于评估。 |
 | `--thresholds` | 无 | 逗号分隔的阈值网格，例如 `0.3,0.4,0.5`；每个阈值须在 `[0, 1]`。给了就额外打印每个阈值下的 macro-F1。 |
+| `--pred-out` | 无 | 逐 study 预测 CSV 的写出路径；列固定为 `Study_id`、`label_1`…`label_10`（整数 multi-hot）、`p1`…`p10`（概率），UTF-8、保留 ID 前导零。 |
 
-输出包括：macro-AUC、按 `eval.threshold` 计算的 macro-F1、可选的多阈值 F1 表、逐类明细（`class_id`、`support`、`pos_rate`、`auc`、`precision`、`recall`、`f1`）。AUC 不受阈值影响；退化类别的 AUC 为 NaN，不参与 macro 平均。
+输出包括：macro-AUC、按 `eval.threshold` 计算的 macro-F1、可选的多阈值 F1 表、逐类明细（`class_id`、`support`、`pos_rate`、`auc`、`precision`、`recall`、`f1`）。AUC 不受阈值影响；退化类别的 AUC 为 NaN，不参与 macro 平均。给 `--pred-out` 时额外写出逐 study 概率 CSV。
 
 ### 4.4 推理：`run_infer.py`
 
@@ -694,7 +710,7 @@ python -m pytest
 | --- | --- | --- | --- |
 | `src/check_data.py` | 无 | `--config`、`--full` | 终端检查报告，失败退出码 1 |
 | `src/run_train.py` | 无 | `--config`、`--seed`、`--tag`、`--resume` | run 目录：`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`last.pt` |
-| `src/run_eval.py` | `--checkpoint` | `--config`、`--split`、`--thresholds` | 终端指标与逐类明细 |
+| `src/run_eval.py` | `--checkpoint` | `--config`、`--split`、`--thresholds`、`--pred-out` | 终端指标与逐类明细；`--pred-out` 另写逐 study 概率 CSV |
 | `src/run_infer.py` | `--checkpoint` | `--config`、`--out`、`--threshold` | `submission.csv` |
 | `src/run_ensemble.py` | `--checkpoint` | `--config`、`--weights`、`--fusion`、`--split`、`--thresholds`、`--out` | 指标产物或融合 `submission.csv` |
 | `src/run_compare.py` | `--runs` | `--thresholds`、`--out`、`--device` | `summary.csv`、`per_class.csv`、`summary.md` |

@@ -24,6 +24,13 @@
 - `10:24`（修复）`CHANGELOG.md`：2026-10-30、2026-10-29 两段条目按同日时间正序重排（条目内容不变）。
 - `10:58`（修复）把 AutoDL 训练环境未提交的 A-002 / A-003 实测回填合并到 `8acd94b` 并推送：`docs/experiments.md` 解决三方合并冲突（实验矩阵 A-002 / A-003 两行取实测版，A-002 / A-003 结论小节并入「执行与结果」，删除重复的旧「冻结结论」块）；`CHANGELOG.md` 冲突段重排为 `00:03`、`00:30`（5 条）、`10:24`（4 条）后接 `## 2026-10-30`；`docs/train_plan10.md` 状态行取回填版、`docs/train_plan11.md` 取已执行版；`docs/training_log.md`、`docs/manual.md`、`tests/test_config.py` 干净应用；`configs/exp_A003.yaml` 与已提交版一致。
 
+- `11:18`（新增）`src/model/xrv.py`、`configs/exp_B001.yaml`、`tests/test_xrv.py`：B 组隔离研究（TorchXRayVision DenseNet-121 医学预训练）的构建入口、实验配置与 13 个用例测试；`xrv.py` 用空占位 `torchxrayvision.baseline_models` 绕过该包与仓库 `model` 包的同名导入冲突，加载 `densenet121-res224-all` 后替换 10 类头、清空 `op_threshs` 输出原始 logits，权重 SHA-256 与 `model.xrv_sha256` 校验不符或加载失败时直接报错、不回退随机初始化。
+- `11:18`（变更）`src/common/config.py`：`ImageConfig` 新增 `in_channels`（3/1）与 `xrv_maxval`（默认 255），`normalize` 支持 `xrv`，并校验 `xrv` 仅配单通道、`imagenet` 仅配三通道；`ModelConfig` 新增 `arch`（`timm` / `xrv_densenet121`）、`xrv_weights`、`xrv_cache_dir`、`xrv_sha256`（64 位十六进制校验）且 B 组禁止冻结骨干；`_convert` 支持 `Optional`/`Path | None`，修复 checkpoint 配置中空字符串被当作非空路径的回归。
+- `11:18`（变更）`src/data/transforms.py`、`src/data/dataset.py`、`src/infer/predict.py`：`Letterbox` 增加 `channels` 参数（1/3），新增 TxRV 归一化 `(2*pixel/maxval-1)*1024` 输出单通道 `[1,H,W]`，像素超过 `xrv_maxval` 直接报错；`build_eval_transform` / `build_train_transform` 与 `build_loader` 传递通道数、像素上限。
+- `11:18`（变更）`src/model/network.py`、`src/run_train.py`、`src/run_eval.py`：`build_model` 按 `model.arch` 惰性分派 B 组分支；训练启动打印预训练权重名 / 路径 / SHA-256 / 加载状态并写入 checkpoint metadata；`run_eval.py` 新增 `--pred-out` 导出逐 study 的 `Study_id`（保前导零）、`label_1`…`label_10`、`p1`…`p10`。
+- `11:18`（变更）`docs/manual.md`、`docs/train_plan12.md`、`requirements.txt`：手册补 `exp_B001` 配置行、继承树、`image.in_channels` / `image.xrv_maxval` / `normalize: xrv`、`model.arch` / `model.xrv_*`、`run_eval --pred-out`；计划 12 状态行改为「适配代码与本机测试已完成、数据与权重已核验、GPU 训练待执行」并补执行记录；依赖清单注明 B 组可选的 `torchxrayvision==1.5.7` 不进入赛题环境。
+- `11:18`（变更）远端训练环境（不涉及仓库文件）：`densenet121-res224-all` 权重上传至 autodl `/root/.torchxrayvision/models_data/`，`sha256sum` 校验一致；核验数据划分 train 30,344 图 / 18,513 studies、valid 1,422 图 / 859 studies，Study_id 与 Subject_id 交集均为 0、图片均为 8 位灰度、`Dicom_id` 全部命中图片文件；本机 `pytest` 240 passed / 3 skipped。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

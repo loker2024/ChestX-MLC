@@ -157,13 +157,19 @@ def _checkpoint_metadata(
     trainable_params = sum(
         parameter.numel() for parameter in model.parameters() if parameter.requires_grad
     )
-    return {
+    metadata: dict[str, Any] = {
         "pretrained_loaded": pretrained_loaded,
         "device": str(device),
         "freeze_backbone": config.model.freeze_backbone,
         "total_params": total_params,
         "trainable_params": trainable_params,
     }
+    # B 组（TxRV 骨干）额外记录权重来源、路径与 SHA-256：checkpoint 能自证
+    # 「用的确实是 densenet121-res224-all 的医学预训练权重」。
+    pretrained_info = getattr(model, "pretrained_info", None)
+    if callable(pretrained_info):
+        metadata.update(pretrained_info())
+    return metadata
 
 
 def _save_last_checkpoint(
@@ -225,6 +231,16 @@ def run_training(
     )
     model = build_model(build_config).to(device)
     pretrained_loaded = bool(getattr(model, "pretrained_loaded", False))
+    # B 组把权重来源 / SHA-256 打进训练日志，作为「权重确实加载成功」的留痕；
+    # 默认 timm 骨干没有 pretrained_info，不受影响。
+    pretrained_info = getattr(model, "pretrained_info", None)
+    if callable(pretrained_info):
+        info = pretrained_info()
+        print(
+            f"预训练权重: arch={info['arch']} name={info['weights_name']} "
+            f"loaded={info['pretrained_loaded']} sha256={info['weights_sha256']}"
+        )
+        print(f"权重文件: {info['weights_path']}")
 
     progress: TrainProgress | None = None
     optimizer_state = scheduler_state = scaler_state = None

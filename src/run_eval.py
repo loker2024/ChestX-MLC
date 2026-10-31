@@ -16,8 +16,10 @@ P7 挑判定阈值时，可以在同一条命令上多给一个阈值网格，�
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from common.config import load_config
 from common.constants import CLASS_IDS
@@ -25,6 +27,24 @@ from common.metrics import macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
 from data.dataset import build_loader
 from infer.predict import load_checkpoint_model, predict_loader
+
+
+def save_predictions(path: str | Path, predictions: pd.DataFrame, y_true: np.ndarray) -> Path:
+    """把逐 study 的真实标签与 10 类概率写成 UTF-8 CSV。
+
+    B 组评估要求保留「逐 Study ID / 真实标签 / 10 类概率」，供事后复算指标与
+    对比分析；Study_id 按字符串写出，保留前导零。这里只写宽表，不生成赛题
+    submission.csv（B 组不用于提交）。
+    """
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame({"Study_id": predictions["Study_id"].astype(str)})
+    for index, class_id in enumerate(CLASS_IDS):
+        frame[f"label_{class_id}"] = y_true[:, index].astype(int)
+    for class_id in CLASS_IDS:
+        frame[f"p{class_id}"] = predictions[f"p{class_id}"].to_numpy(dtype=np.float64)
+    frame.to_csv(output_path, index=False, encoding="utf-8")
+    return output_path
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -42,6 +62,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--thresholds",
         default=None,
         help="逗号分隔的阈值网格，例如 0.3,0.4,0.5；给了就额外打印各阈值下的 macro-F1",
+    )
+    parser.add_argument(
+        "--pred-out",
+        default=None,
+        help="逐 study 预测 CSV 的输出路径，包含 Study_id、真实标签与 10 类概率",
     )
     return parser.parse_args(argv)
 
@@ -74,6 +99,11 @@ def main(argv: list[str] | None = None) -> None:
 
     print("逐类明细:")
     print(report.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+
+    # 逐 study 宽表放最后写：即使前面只关心汇总，也不影响原有输出格式。
+    if args.pred_out:
+        output_path = save_predictions(args.pred_out, predictions, y_true)
+        print(f"逐 study 预测已写入: {output_path}")
 
 
 if __name__ == "__main__":
