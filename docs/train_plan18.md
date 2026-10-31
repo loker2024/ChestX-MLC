@@ -1,6 +1,6 @@
 # 训练计划 18：A-001 的聚合空间对照（logits 空间 G0 → 概率空间 G1）
 
-**状态：配置与代码已就绪（2026-10-31），GPU 训练待执行。**
+**状态：已完成（2026-10-31），GPU 训练与评估已执行，结论：未过门、方向否定。**
 
 ## 目标与配置
 
@@ -83,5 +83,11 @@ python src/run_eval.py --config configs/exp_A008.yaml \
 
 - [x] 代码支持概率空间聚合（`view_weighted_probability`），本机 `pytest` 全绿。
 - [x] 配置 `configs/exp_A008.yaml` 就绪，与 A-001 仅聚合空间不同。
-- [ ] GPU 训练与评估。
-- [ ] 结果回填并形成结论。
+- [x] GPU 训练与评估（19:06:29–19:38:48，32m19s，第 7 轮早停，best epoch 5）。
+- [x] 结果回填并形成结论。
+
+## 执行结果
+
+- 产物：`outputs/20261031-190629_A-008_convnext_tiny_g1_s42/`（`best.pt` 111,385,259 B / `last.pt` / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv`。
+- 结果：best epoch 5，valid macro-AUC **0.7974** / F1@0.5 **0.4197**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0064、F1@0.5 −0.0058，距 0.8088 门差 −0.0114 → **未过门**。
+- 结论：概率空间聚合训练方向否定，默认聚合保持 `view_weighted`，不做 seed 2026 复核、不进入候选提交。

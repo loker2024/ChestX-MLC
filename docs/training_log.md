@@ -2533,6 +2533,37 @@ class2 是 A-007 掉出判读门的主要来源（10 类平均上拉低约 0.010
 - 口径注意：本组同时变骨干结构与预训练数据，差值不能单变量归因；单 seed；A-001 与 A-007 各自
   用同一 valid 选型（best epoch 按 valid AUC 选择，可能高估收益）；history 原始值见 `metrics.csv`。
 
+## A-008：A-001 的聚合空间对照（logits G0 → 概率空间 G1，320×320 / seed=42）
+
+背景与判读门见 [train_plan18.md](train_plan18.md)；配置 `configs/exp_A008.yaml`（`_base: exp_A001.yaml`，
+只覆盖 `model.aggregation: view_weighted → view_weighted_probability`，`frontal_weight: 0.7` 不变）。
+
+| 项 | 值 |
+|---|---|
+| 运行命令 | `HF_HUB_OFFLINE=1 .venv/bin/python src/run_train.py --config configs/exp_A008.yaml --seed 42 --tag A-008_convnext_tiny_g1_s42` |
+| 代码版本 | `c57ddf0`（分支 `exp/A-008`） |
+| 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08），训练中显存约 14.3 GB |
+| 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies；`check_data.py --full` 全通过 |
+| 预训练 | `convnext_tiny.fb_in1k`，`HF_HUB_OFFLINE=1` 离线加载 |
+| 产物 | `outputs/20261031-190629_A-008_convnext_tiny_g1_s42/`（`best.pt` 111,385,259 B / `last.pt` / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv` |
+| 耗时 | 2026-10-31 19:06:29 → 19:38:48 CST，共 32m19s（含启动与首轮数据索引），第 7 轮后早停（best epoch 5） |
+
+| epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 0.9924 | 0.9489 | 0.7722 | 0.3870 |
+| 2 | 3.00e-04 | 0.9366 | 0.9397 | 0.7776 | 0.4010 |
+| 3 | 3.00e-04 | 0.8916 | 0.9329 | 0.7794 | 0.4098 |
+| 4 | 2.72e-04 | 0.8468 | 0.9181 | 0.7909 | 0.4218 |
+| 5 | 2.00e-04 | 0.7660 | 0.9328 | **0.7974** | 0.4197 |
+| 6 | 1.10e-04 | 0.6242 | 1.0375 | 0.7942 | 0.4352 |
+| 7 | 3.77e-05 | 0.4841 | 1.2658 | 0.7867 | 0.4338 |
+
+**结论**：best epoch 5，valid macro-AUC **0.7974** / F1@0.5 **0.4197**；相对 A-001（0.8038 / 0.4255）
+差 **AUC −0.0064、F1@0.5 −0.0058**，距方向性门 0.8088 差 **−0.0114 → 未过门**。A-008 的 AUC 在
+ep5 见顶（A-001 为 ep4），ep6–7 过拟合更陡（valid_loss 1.0375 / 1.2658）；F1@0.5 逐轮升至 ep6
+0.4352（高于 A-001 全程峰值 0.4308），属概率空间平均带来的校准形态差异。单 seed、差值超过
+±0.0033 波动带，结论：概率空间聚合训练方向否定，默认聚合保持 `view_weighted`。
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
