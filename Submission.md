@@ -24,7 +24,7 @@ DenseNet121、ImageNet 预训练（权重版本待核实）；320×320 输入、
 
 - 官方提交得分：**74.41**（根据用户提供的信息记录）。
 - 原文件名：`submission(2).csv`。
-- 归档文件：[submission_B1-320-study_74.41.csv](outputs/submission_B1-320-study_74.41.csv)。
+- 归档文件：[submission_B1-320-study_74.41.csv](outputs/predictions/submissions/submission_B1-320-study_74.41.csv)。
 - 文件内容：1,414 个 study、14,140 条预测，包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列。
 - SHA-256：`2bbe6cf13e26bca48c0bba16742ba842aba0b0b415cdaee1de4025a74ac115d3`。
 - 归档文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
@@ -46,7 +46,7 @@ DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`�
 - 官方提交得分：**74.09**；状态：已正确评分（根据用户提供的截图记录）。
 - 提交 ID：`24767`；提交时间：2026-10-29 19:45:34。
 - 上传文件名：`submission_RUN-006-A.csv`。
-- 项目中的对应文件：[submission_densenet121_s2026.csv](outputs/submission_densenet121_s2026.csv)。
+- 项目中的对应文件：[submission_densenet121_s2026.csv](outputs/predictions/submissions/submission_densenet121_s2026.csv)。
 - 文件内容：1,414 个 study、14,140 条预测，包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列。
 - SHA-256：`b6957a111ac5844890a7d18955c1519977ee864fbe8ae02c6d30af14c82fb479`。
 - 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
@@ -68,7 +68,7 @@ DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`�
 - 官方提交得分：**74.82**；状态：已正确评分（根据用户提供的截图记录）。
 - 提交 ID：`24785`；提交时间：2026-10-29 19:57:22。
 - 上传文件名：`submission_RUN-007-A.csv`。
-- 项目中的对应文件：[submission_viewweighted_s2026.csv](outputs/submission_viewweighted_s2026.csv)。
+- 项目中的对应文件：[submission_viewweighted_s2026.csv](outputs/predictions/submissions/submission_viewweighted_s2026.csv)。
 - 文件内容：1,414 个 study、14,140 条预测，包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列。
 - SHA-256：`c99f3ab85468cc8cc818ee8c21bf674b2266bce6eb7c392217ed2fc4a85e3ab4`。
 - 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
@@ -94,7 +94,7 @@ DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`�
 - fusion：`probability`，即先对每个模型的 study logits 取 sigmoid，再按归一化权重加权平均。
 - 选择依据：valid 上共比较 13 组融合（2 模型等权、权重 1:3 / 3:1、probability / logit，及 3 模型对照）；本方案 Macro-AUC 最高、逐类 AUC 全胜单模型，Macro-F1 高于 2 模型最佳（0.4286）。完整对比数据在训练环境 `outputs/ensemble/valid/` 各目录的 `metrics.json`、`per_class.csv`、`f1_curve.csv`。
 
-融合与提交生成命令（在训练环境 `/root/ChestX-MLC` 执行，`--out outputs/ensemble/test` 生成的 `submission.csv` 已下载并直接改名为 `outputs/submission_ensemble_3m_prob_211_rank1.csv` 保存）：
+融合与提交生成命令（在训练环境 `/root/ChestX-MLC` 执行，`--out outputs/ensemble/test` 生成的 `submission.csv` 已下载并直接改名为 `outputs/predictions/submissions/submission_ensemble_3m_prob_211_rank1.csv` 保存）：
 
 ```bash
 HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
@@ -107,7 +107,7 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 ### 提交记录
 
 - 状态：尚未提交官方平台（候选提交，等待正式提交）。
-- 提交文件：[submission_ensemble_3m_prob_211_rank1.csv](outputs/submission_ensemble_3m_prob_211_rank1.csv)（`rank1` 标注 valid 排名第一，`211` 标注权重 2:1:1；原远程输出为 `outputs/ensemble/test/submission.csv`，下载后直接改名，无重复副本）。
+- 提交文件：[submission_ensemble_3m_prob_211_rank1.csv](outputs/predictions/submissions/submission_ensemble_3m_prob_211_rank1.csv)（`rank1` 标注 valid 排名第一，`211` 标注权重 2:1:1；原远程输出为 `outputs/ensemble/test/submission.csv`，下载后直接改名，无重复副本）。
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列；概率范围 0.002269–0.996524；训练环境内已通过 `validate_submission` 校验。
 - SHA-256：`52a47fc31892386221fa63c371d49e958dd375a1e03957fc5d85b7ab5c8d98d3`。
 - 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地；训练环境 `/root/ChestX-MLC/outputs/ensemble/test/` 保留原始文件名 `submission.csv`，本机改名后的文件与其 md5 一致（`c388fb5ba76f61285d1b7286f808eb5a`）。
@@ -144,7 +144,7 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 ### 提交记录
 
 - 状态：备选提交（valid 第二名），尚未提交官方平台。
-- 提交文件：[submission_ensemble_3m_prob_111_rank2.csv](outputs/submission_ensemble_3m_prob_111_rank2.csv)（`rank2` 标注 valid 排名第二，`111` 标注等权；原远程输出为 `outputs/ensemble/test_w111/submission.csv`，下载后直接改名，无重复副本）。
+- 提交文件：[submission_ensemble_3m_prob_111_rank2.csv](outputs/predictions/submissions/submission_ensemble_3m_prob_111_rank2.csv)（`rank2` 标注 valid 排名第二，`111` 标注等权；原远程输出为 `outputs/ensemble/test_w111/submission.csv`，下载后直接改名，无重复副本）。
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列；概率范围 0.001919–0.996157；训练环境内已通过 `validate_submission` 校验。
 - SHA-256：`dcd6e4b5eb2097e418be565a99027b89545941a254e96786146093e7f3bdf6ab`。
 - 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地；训练环境 `/root/ChestX-MLC/outputs/ensemble/test_w111/` 保留原始文件名 `submission.csv`，本机改名后的文件与其 md5 一致（`5ebf49b66fef87dca0e1eef8462c58ed`），与 ENSEMBLE-3M 的 test 文件内容不同。
