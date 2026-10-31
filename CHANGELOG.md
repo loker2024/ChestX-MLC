@@ -46,6 +46,11 @@
 
 - `13:12`（新增）`configs/exp_A004a.yaml`、`configs/exp_A004b.yaml`、`docs/train_plan14.md`、`tests/test_a004_decomp.py`：把 A-004 的 dropout 0.2 + weight_decay 0.05 组合拆成两个单变量对照——A-004-a 只开分类头 dropout 0.2（weight_decay 保持 0.01），A-004-b 只把 weight_decay 提到 0.05（dropout 保持 0）；两个配置各以 `_base: exp_A001.yaml` 只覆盖一个字段。计划文档记录配置差异、串行训练与评估命令、四组对比（A-001 / A-004 / A-004-a / A-004-b）与归因判读口径；测试核验两配置展开后只改预期字段。GPU 实验待执行。
 
+- `14:35`（变更）远端训练环境（不涉及仓库代码）：A-004 单变量分解 A-004-a（`configs/exp_A004a.yaml`，只开分类头 dropout 0.2）与 A-004-b（`configs/exp_A004b.yaml`，只把 `train.weight_decay` 0.01→0.05）在 autodl V100-SXM2-32G 上串行完成训练与评估——A-004-a 13:09:23 启动、跑满 8 轮（best epoch 6）、37m16s，valid macro-AUC **0.7944** / F1@0.5 **0.4360**（F1 峰在 0.4：0.4400）；A-004-b 13:47:32 启动、第 7 轮早停（best epoch 5）、31m59s，valid macro-AUC **0.7999** / F1@0.5 **0.4238**（F1 峰在 0.6：0.4364）。相对 A-001（0.8038 / 0.4255）：A-004-a 差 AUC −0.0094 / F1@0.5 +0.0105，A-004-b 差 AUC −0.0039 / F1@0.5 −0.0017，距方向性门 0.8088 分别差 −0.0144 / −0.0089 → 均未过门；配对 bootstrap（859 studies × 2,000 次）ΔAUC（A-001 − A-004-a）95% CI [−0.0027, +0.0215]、ΔAUC（A-001 − A-004-b）95% CI [−0.0056, +0.0138]、ΔAUC（A-004 − A-004-b）95% CI [−0.0092, +0.0068]；产物 `outputs/20261031-130923_A-004a_dropout_only_s42/`、`outputs/20261031-134732_A-004b_weight_decay_only_s42/`、`outputs/eval_reports/A-004{a,b}_full.txt`、`outputs/A-004{a,b}_valid_predictions.csv`、`outputs/compare_A001_A004_decomp/`。
+- `14:35`（变更）`docs/training_log.md`：新增「A-004-a：仅分类头 dropout 0.2 单变量对照」与「A-004-b：仅 weight decay 0.05 单变量对照」两小节（配置差异、命令、代码版本、逐轮表、阈值曲线、逐类 AUC、配对 bootstrap、归因判读），汇总表新增 A-004-a / A-004-b 两行并补口径注，环境表 GPU 说明补 A-004-a / A-004-b。
+- `14:35`（变更）`docs/experiments.md`：实验矩阵新增 A-004-a / A-004-b 两行；「执行与结果」新增「dropout 与 weight decay 的单变量分解」段（两项单独均为负向、组合主要由 weight decay 决定、均未过门）；「后续待验证优化项」正则化行补 A-004-a / A-004-b 结论；冻结结论第 2 条补 A-004 系列未带来增益。
+- `14:35`（变更）`docs/train_plan14.md`：状态行由「配置与本机验证已准备；GPU 训练待执行」改为已完成，补「执行记录」小节（两组实测指标、归因、产物与结论）。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

@@ -1,6 +1,6 @@
 # 训练计划 14：A-004 单变量分解（dropout / weight decay 分别对照）
 
-**状态：配置与本机验证已准备；GPU 训练待执行。**
+**状态：已完成（2026-10-31）。A-004-a 0.7944 / F1@0.5 0.4360、A-004-b 0.7999 / 0.4238，均未过方向性门 0.8088；dropout 单独 −0.0094 为主要负向项，weight decay 单独 −0.0039 接近噪声，组合 −0.0050 主要由 weight decay 决定。**
 
 ## 目标与配置
 
@@ -45,3 +45,21 @@ A-004 同时改动了分类头 dropout（0.0 → 0.2）与 `train.weight_decay`�
 - 归因：若 A-004-a 的负差接近 A-004 的 −0.0050、A-004-b 接近 0，则退化主要来自 dropout；反之来自 weight decay；两项都明显为负时需考虑共同作用与单 seed 噪声。用逐 study 预测做配对 bootstrap 给出区间，保留「重复使用同一 valid 选型」的偏差说明。
 - 对比每轮训练 loss、valid loss、AUC 与最佳轮次及停止原因；dropout 组的 train/valid loss 差距是否缩小，是「是否推迟过拟合」的直接证据。
 - 训练完成后按真实结果回填 `docs/experiments.md`、`docs/training_log.md` 和 `CHANGELOG.md`。本计划不声称训练已执行，不预设收益。
+## 执行记录
+
+- 2026-10-31 13:09:23–13:46:39：A-004-a（`configs/exp_A004a.yaml`，只开分类头 dropout 0.2）在 autodl 独占
+  V100-SXM2-32G 跑满 8 轮（best epoch 6），37m16s；`run_eval.py` 在 valid 859 studies 上重算 valid
+  macro-AUC **0.7944** / F1@0.5 **0.4360**（F1 峰在 0.4：0.4400）→ 相对 A-001（0.8038 / 0.4255）AUC
+  −0.0094、F1@0.5 +0.0105，距门 0.8088 差 −0.0144 → 未过门。
+- 2026-10-31 13:47:32–14:19:31：A-004-b（`configs/exp_A004b.yaml`，只把 `train.weight_decay` 改 0.05）第 7 轮
+  早停（best epoch 5），31m59s；valid macro-AUC **0.7999** / F1@0.5 **0.4238**（F1 峰在 0.6：0.4364）→
+  相对 A-001 AUC −0.0039、F1@0.5 −0.0017，距门差 −0.0089 → 未过门。
+- 四组对比：`outputs/compare_A001_A004_decomp/`（A-001 / A-004 / A-004-a / A-004-b，同一 valid、同一指标
+  函数重算）；配对 bootstrap（859 studies × 2,000 次）ΔAUC（A-001 − A-004-a）= +0.0094，95% CI
+  [−0.0027, +0.0215]、P=0.934；ΔAUC（A-001 − A-004-b）= +0.0039，95% CI [−0.0056, +0.0138]、P=0.785；
+  ΔAUC（A-004 − A-004-a）= +0.0043、ΔAUC（A-004 − A-004-b）= −0.0012 → 组合的 AUC 水平主要由 weight
+  decay 决定，dropout 是主要负向项；两项都没有推迟过拟合（valid_loss 均在第 4 轮见底后反弹）。
+- 结论：两组均未过门，A-001 口径与默认训练超参不切换；若继续正则化方向，应先补 seed 2026 配对复核，
+  再考虑与其他增强的组合。产物见 `outputs/20261031-130923_A-004a_dropout_only_s42/`、
+  `outputs/20261031-134732_A-004b_weight_decay_only_s42/`、`outputs/eval_reports/A-004{a,b}_full.txt`、
+  `outputs/A-004{a,b}_valid_predictions.csv`、`outputs/compare_A001_A004_decomp/`。
