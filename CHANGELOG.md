@@ -122,6 +122,8 @@
 - `21:20`（新增）`src/run_train.py`、`tests/test_run_train.py`：`run_train.py` 新增 `--init-from <checkpoint>` warm start 入口——只加载 checkpoint 的模型权重（构建模型时 `pretrained=False`，不重新加载 ImageNet 权重），训练从第 1 轮重新开始，不恢复优化器 / 调度器 / 进度；`best.pt` 与 `last.pt` 的 metadata 记录 `warm_start_from`、`warm_start_sha256`、`warm_start_epoch` 与 `warm_start_metrics`；与 `--resume` 互斥。`tests/test_run_train.py` 补 3 个用例（warm start 后日志与 metadata 记录来源、与 `--resume` 同时使用被拒、指向不存在的 checkpoint 被拒）。
 - `21:20`（变更）`docs/experiments.md`、`docs/training_log.md`、`docs/train_plan20.md`：回填 A-009-r2（A-009 二轮 warm start：以首轮 `best.pt` 为初始权重、按 A-009 同配置重训 10 轮）实测——20:49:14–21:13:48（24m34s，GPU 与另一容器共享）、第 5 轮早停（best epoch 1），valid macro-AUC **0.7764** / F1@0.5 **0.4117**；相对首轮 A-009（0.7799 / 0.4101）差 AUC −0.0035 / F1@0.5 +0.0016，相对 A-001（0.8038 / 0.4255）差 AUC −0.0274 / F1@0.5 −0.0138，距 0.8088 门差 −0.0324 → 未过门；lr 重新 warmup 破坏首轮已收敛权重（train_loss 0.6562 → 0.7556，ep1 后 4 轮无提升），warm start 二轮无增益，A-009 首轮否定结论不变。experiments 矩阵新增 A-009-r2 行，train_plan20 状态改为已完成。
 
+- `21:35`（新增）`configs/exp_A001_seed216.yaml`：新增 A-001(s216) 实验配置，以 `_base: exp_A001.yaml` 继承 A-001，只覆盖 `train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，并把 `seed` 设为 216；用于 A-001 口径下的 seed 复核与训练预算/正则组合验证。训练已启动（2026-10-31 21:34:05），实测待回填。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
