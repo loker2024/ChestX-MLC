@@ -62,6 +62,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-004 | `A-004_convnext_tiny_dropout_wd_s42` | `configs/exp_A004.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的正则化组合对照：`model.dropout` 0.0 → 0.2（分类头 Dropout）+ `train.weight_decay` 0.01 → 0.05，其余口径逐字段不变；已完成（0.7988 / 0.4233，未过 0.8088 门） |
 | A-004-a | `A-004a_dropout_only_s42` | `configs/exp_A004a.yaml`（`_base: exp_A001.yaml`） | 8（跑满上限） | 是 | A-001 的分类头 dropout 单变量对照：只把 `model.dropout` 0.0 → 0.2，`train.weight_decay` 保持 0.01，其余口径逐字段不变；已完成（0.7944 / 0.4360，未过 0.8088 门） |
 | A-004-b | `A-004b_weight_decay_only_s42` | `configs/exp_A004b.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的 weight decay 单变量对照：只把 `train.weight_decay` 0.01 → 0.05，`model.dropout` 保持 0，其余口径逐字段不变；已完成（0.7999 / 0.4238，未过 0.8088 门） |
+| A-005 | `A-005` | `configs/exp_csra.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 5） | 是 | A-001 的分类头替换对照：把 timm 标准分类头换成单头 CSRA 头（残差权重 0.4、温度 1.0、无 bias，27,827,808 参数），其余口径逐字段不变；已完成（0.7936 / 0.4050，未过 0.8072 门） |
 | A-006 | `A-006_ml_decoder_s42` | `configs/exp_ml_decoder.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的分类头替换对照：把 timm 标准分类头换成轻量 ML-Decoder 头（10 类查询 + 单层 4 头交叉注意力 + 逐类权重向量，28,549,226 参数），其余口径逐字段不变；已完成（0.7900 / 0.4118，未过 0.8072 门） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
@@ -305,6 +306,29 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   不改排序；weight decay 单独的差值接近噪声；两组均未过门 → **A-001 口径与默认训练超参不切换，
   不在单 seed 上继续扫正则化参数**。若继续，应先补 seed 2026 配对复核，再考虑与其他增强的组合。
 
+**A-005：CSRA 分类头对照**（配置 `configs/exp_csra.yaml`，数字来自 `run_eval.py`，产物
+`outputs/20261031-164123_A-005/`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
+2026-10-31，计划见 [训练计划 15](train_plan15.md)）：
+
+- 目的与口径：在 A-001 训练预算内只把标准分类头换成单头 CSRA（残差权重 0.4、温度 1.0、
+  无 bias，27,827,808 参数），其余口径逐字段不变；与 A-006 共用同一配对基线（同版本重训
+  标准头 0.8022 / 0.4210），同数据（train 30,344 图 / 18,513 studies、valid 1,422 / 859）、
+  同设备（V100-SXM2-32G 独占）、同预算（8 轮 / patience 2 / seed 42）、同 320×320 /
+  `view_weighted` / BCE + `pos_weight`。
+- 结果：第 5 轮早停（best epoch 3）、24m28s，macro-AUC **0.7936** / F1@0.5 **0.4050**（F1 峰
+  在 0.6：0.4191）；`run_eval.py` 重算与 `metrics.csv` 一致。
+- 相对配对基线：ΔAUC **−0.0086**、ΔF1@0.5 **−0.0161**，距方向性门 0.8072 差 **−0.0136**
+  → 未过门；对历史 A-001（0.8038 / 0.4255）差 AUC −0.0103、F1@0.5 −0.0205。
+- 配对 bootstrap（859 studies × 2,000 次，按 study 有放回重采样、seed 2026、退化类跳过）：
+  ΔAUC（基线 − A-005）95% CI [−0.0030, +0.0210]、P=0.928；ΔF1@0.5 95% CI [+0.0061, +0.0266]、
+  P=0.998 → 排序能力无可靠提升，F1@0.5 的下降有统计支持。
+- 训练行为：峰值更早（epoch 3 vs 基线 4）且更低，valid_loss 第 3 轮见底 0.9035 后反弹到
+  0.9403（基线为第 4 轮见底 0.9084 后反弹），train_loss 0.9887 → 0.7726；逐类 1 升 9 降，
+  仅 class9 +0.0077，低支持类退化最大（class3 −0.0310、class2 −0.0194、class1 −0.0105）。
+- 判读：CSRA 头未过门 → `model.head: standard` 保持默认，不切换、不补 seed 2026 复核、不
+  进入候选提交；与 A-006（ML-Decoder 0.7900）合并看，两种分类头结构均低于同版本标准头
+  配对基线 0.8022，分类头结构方向否定。
+
 **A-006：ML-Decoder 分类头对照**（配置 `configs/exp_ml_decoder.yaml`，数字来自 `run_eval.py`，产物
 `outputs/20261031-155701_A-006_ml_decoder_s42`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
 2026-10-31，计划见 [train_plan16.md](train_plan16.md)）：
@@ -342,7 +366,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
    对照，尚不能判断骨干优势是否在第二个 seed 复现；RUN-008 的 ConvNeXt-Tiny 在 6 轮
    预算下 0.8008 超过 +0.005 门，但预算与 RUN-007-A 不同且单 seed，同口径复核前
    不切换；A-001（2026-10-30，seed 42、epoch 8、早停 2）复现 0.8038，
-   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
+   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）与 A-005 的 CSRA 分类头（0.7936 vs 同一配对基线 0.8022）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
    实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
    在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果；`train.pos_weight` 的 AUC 未达原增益门，但 F1@0.5 显著提高，现按要求设为 `true`；`train.lr_scheduler` 经 RUN-003-A 复核无 AUC 增益，现按要求改为 `cosine`。
 3. **复现口径**：默认 seed 为 42，seed 复核另有 2026；指标统一由 `run_compare.py` 在同一份 valid 上重算，
@@ -370,7 +394,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 | 冻结骨干、仅训练分类头 | 已验证（大幅退化） | `configs/exp_freeze_head.yaml` / `configs/exp_A001c.yaml`、`model.freeze_backbone` | **A-001-C 已做（2026-10-30）**：ConvNeXt-Tiny @320 冻结骨干、仅训分类头（7,690 / 27,827,818 可训练参数），8 轮跑满 best epoch 8 macro-AUC 0.7264 / F1@0.5 0.3602 vs A-001 0.8038 / 0.4255（ΔAUC −0.0774、ΔF1@0.5 −0.0653）；逐轮增量衰减到 +0.0002 说明瓶颈在固定特征 → 该口径不作提交候选。RUN-010（ResNet-18 冻结）仍待执行。 |
 | 正则化（dropout / weight_decay） | 已验证（未达增益门） | `model.dropout` / `train.weight_decay` | **A-004（2026-10-31）**：A-001 口径下分类头 dropout 0.2 + weight_decay 0.05 组合，valid macro-AUC 0.7988 vs A-001 0.8038（Δ−0.0050）、F1@0.5 0.4233 vs 0.4255（Δ−0.0022），距方向性门 0.8088 差 −0.0100 → 未过门；各轮 train_loss 高于 A-001、valid_loss 走势未变（第 4 轮后仍反弹）；单 seed、两项同改不可分开归因，若继续应拆成两个单变量组并补 seed 复核；**A-004-a / A-004-b（2026-10-31）**：把组合拆成两个单变量组——A-004-a 只开 dropout （0.7944 / 0.4360，ΔAUC −0.0094、F1@0.5 +0.0105，F1 峰左移到 0.4 的 0.4400）、A-004-b 只提 weight_decay（0.7999 / 0.4238，ΔAUC −0.0039、F1@0.5 −0.0017）；两项单独均为负向，组合 −0.0050 主要由 weight decay 决定（组合 vs 单 wd 差 −0.0012），dropout 是主要负向项 → 正则化方向无增益，默认训练超参不变，后续应补 seed 2026 配对后再换档位 |
 
-| 分类头结构（ML-Decoder / CSRA） | 已验证（ML-Decoder 未达增益门） | `model.head` / `configs/exp_ml_decoder.yaml` / `configs/exp_csra.yaml` | **A-006（2026-10-31）**：A-001 口径下把标准头换成轻量 ML-Decoder（10 类查询 + 单层 4 头交叉注意力，28,549,226 参数），valid macro-AUC **0.7900** / F1@0.5 **0.4118** vs 同版本重训标准头 0.8022 / 0.4210（ΔAUC **−0.0122**、ΔF1@0.5 −0.0092），距方向性门 0.8072 差 −0.0172；配对 bootstrap ΔAUC（基线 − A-006）95% CI [+0.0001, +0.0245]、P=0.976、ΔF1@0.5 CI [−0.0018, +0.0205]；逐类 2 升 8 降、低支持类退化最大；收敛更慢（峰值 epoch 5 vs 4）、未推迟过拟合 → 分类头方向否定，`model.head: standard` 保持默认，不补 seed 2026 配对；CSRA 头（计划 15）本机测试已完成但 GPU 训练未执行，同一配对基线（`outputs/20261031-151114_A-005_baseline_s42`，0.8022 / 0.4210）可直接复用 |
+| 分类头结构（ML-Decoder / CSRA） | 已验证（两种注意力头均未达增益门） | `model.head` / `configs/exp_ml_decoder.yaml` / `configs/exp_csra.yaml` | **A-006（2026-10-31）**：A-001 口径下把标准头换成轻量 ML-Decoder（10 类查询 + 单层 4 头交叉注意力，28,549,226 参数），valid macro-AUC **0.7900** / F1@0.5 **0.4118** vs 同版本重训标准头 0.8022 / 0.4210（ΔAUC **−0.0122**、ΔF1@0.5 −0.0092），距方向性门 0.8072 差 −0.0172；配对 bootstrap ΔAUC（基线 − A-006）95% CI [+0.0001, +0.0245]、P=0.976、ΔF1@0.5 CI [−0.0018, +0.0205]；逐类 2 升 8 降、低支持类退化最大；收敛更慢（峰值 epoch 5 vs 4）、未推迟过拟合。**A-005（2026-10-31）**：同一配对基线下把标准头换成单头 CSRA（残差权重 0.4 / 温度 1.0 / 无 bias，27,827,808 参数），valid macro-AUC **0.7936** / F1@0.5 **0.4050**（ΔAUC **−0.0086**、ΔF1@0.5 **−0.0161**），距方向性门 0.8072 差 **−0.0136**；配对 bootstrap ΔAUC 95% CI [−0.0030, +0.0210]、P=0.928，ΔF1@0.5 CI [+0.0061, +0.0266]、P=0.998；逐类仅 class9 +0.0077、9 类降，低支持类退化最大；收敛更早（峰值 epoch 3 vs 4）且更低 → 两种分类头结构均无增益，`model.head: standard` 保持默认，不补 seed 2026 配对 |
 
 ### 正侧位加权聚合配置
 
