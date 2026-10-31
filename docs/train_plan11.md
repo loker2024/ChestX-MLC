@@ -1,6 +1,6 @@
 # 训练计划 11：A-003 MobileNetV3-Small 1.0× 对照
 
-**状态：配置已创建，尚未执行 GPU 训练。**
+**状态：已执行（2026-10-30 23:07:25 → 2026-10-31 00:24:44 CST，第 17 轮早停、best epoch 12）。`best.pt` 为 epoch 12，valid macro-AUC **0.7808** / F1@0.5 **0.3881**，未过 0.7988 方向性筛选门（差 -0.0180）；A-002 于第 5 轮按用户要求中止、无 `best.pt`，因此 A-002 / A-003 配对比较不成立。实测回填见 [training_log.md](training_log.md) 与 [experiments.md](experiments.md)。**
 
 ## 目的与基线
 

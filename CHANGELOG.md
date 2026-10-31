@@ -11,10 +11,18 @@
 ## 2026-10-31
 
 - `00:03`（新增）`docs/train_plan12.md`：制定 B 组 TorchXRayVision 医学预训练 DenseNet-121 独立研究计划，记录输入适配、权重和数据核验、赛题边界及评估要求；尚未实施或训练。
+
+- `00:30`（变更）`docs/training_log.md`：回填 A-002 / A-003 轻量骨干实测——A-002（MobileNetV3-Small 0.5×，578,474 参数）2026-10-30 22:39:11 启动、23:03:03 第 5 轮写盘后按用户要求中止（非早停），只有 `last.pt` 与 5 轮 metrics、无 `best.pt`，不能作配对对照；A-003（1.0×，1,528,106 参数，相对 A-002 只换骨干）23:07:25 启动、00:24:44 第 17 轮早停（best epoch 12），共 1h17m19s，valid macro-AUC **0.7808** / F1@0.5 **0.3881**，`best.pt` 6,249,691 B，metadata 确认 `pretrained_loaded: true` / 1,528,106 可训练参数；与 A-001 记录值（0.8038 / 0.4255）差 AUC -0.0230、F1@0.5 -0.0374，距方向性筛选门 0.7988 差 -0.0180 → 未过门。新增「A-002 / A-003」小节（配置差异、命令、环境、权重许可与 SHA-256、17 轮逐轮表、阈值曲线、逐类 AUC 对照、判读）、汇总表两行与备注，环境表补 V100 系列说明。
+- `00:30`（变更）`docs/experiments.md`：实验矩阵新增 A-002（第 5 轮中止）/ A-003（早停第 17 轮）两行；「执行与结果」新增轻量骨干对照结论（未达门、A-002 无 `best.pt` 配对不成立、不补 25+5 ConvNeXt 基线与 seed 2026）；「新骨干对照」待验证项补 A-003 结果与 A-002 中止说明。
+- `00:30`（变更）`docs/train_plan10.md`、`docs/train_plan11.md`：状态行由「计划 / 尚未执行」改为实际执行记录（A-002 第 5 轮按用户要求中止、无 `best.pt`；A-003 第 17 轮早停、best epoch 12、0.7808 / 0.3881、未过 0.7988 门、配对比较不成立）。
+- `00:30`（变更）`docs/manual.md`：§2.2 配置表补 `configs/exp_A002.yaml`、`configs/exp_A003.yaml` 两行及继承说明。
+- `00:30`（变更）远端训练环境（不涉及仓库文件）：A-003 于 autodl V100-SXM2-32G 上跑完并评测——产物 `outputs/20261030-230725_A-003_mobilenetv3_small100_s42/`（`best.pt` 6,249,691 B / `last.pt` 24,833,035 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-003_full.txt`（阈值 0.2–0.7 与逐类 AUC）、`outputs/A-003_valid_predictions.csv`（859 个 valid study 的 ID / 标签 / 10 类概率）、权重证据 `outputs/A-003_weight_evidence/`；A-002 中止产物保留 `outputs/20261030-223911_A-002_mobilenetv3_small050_s42/`（`last.pt` 9,592,203 B，无 `best.pt`）。
+
 - `10:24`（变更）`docs/experiments.md`：修正 A-001-D 与 A-001-G1…G5 实测记录错位（原位于「冻结结论」章节内，现移回「执行与结果」）；实验矩阵补登记 A-002（轻量 CNN 骨干对照，578,474 参数）与 A-003（宽度对照，1,528,106 参数）两行；实验环境表补 V100-SXM2-32G 说明与全部 seed 2026 run（RUN-007-B、RUN-009-A、A-001-B(seed 2026)），并注明两种硬件耗时不可横向对照。
 - `10:24`（变更）`docs/training_log.md`：A-001-C 耗时口径由 37 分 54 秒（17:32:49 → 18:10:43）更正为 38 分 01 秒（17:32:49 → 18:10:50），与汇总表、`docs/experiments.md`、已提交 CHANGELOG 条目一致。
 - `10:24`（变更）`docs/train_plan10.md`：状态行由「计划，尚未创建实验配置或执行训练」更正为「配置已创建（`configs/exp_A002.yaml`），尚未执行 GPU 训练」。
 - `10:24`（修复）`CHANGELOG.md`：2026-10-30、2026-10-29 两段条目按同日时间正序重排（条目内容不变）。
+- `10:58`（修复）把 AutoDL 训练环境未提交的 A-002 / A-003 实测回填合并到 `8acd94b` 并推送：`docs/experiments.md` 解决三方合并冲突（实验矩阵 A-002 / A-003 两行取实测版，A-002 / A-003 结论小节并入「执行与结果」，删除重复的旧「冻结结论」块）；`CHANGELOG.md` 冲突段重排为 `00:03`、`00:30`（5 条）、`10:24`（4 条）后接 `## 2026-10-30`；`docs/train_plan10.md` 状态行取回填版、`docs/train_plan11.md` 取已执行版；`docs/training_log.md`、`docs/manual.md`、`tests/test_config.py` 干净应用；`configs/exp_A003.yaml` 与已提交版一致。
 
 ## 2026-10-30
 
@@ -58,6 +66,8 @@
 - `22:45`（变更）`docs/training_log.md`：回填 A-001-G1…G5 五组 ASL 超参扫描实测——G1 gamma_neg 2（0.7949 / 0.3956）、G2 gamma_neg 6（0.7999 / 0.3391）、G3 clip 0.00（0.7971 / 0.4320）、G4 clip 0.10（0.7855 / 0.3695，best epoch 1、3 轮早停）、G5 gamma_pos 1（0.8002 / 0.4202）；新增「A-001-G 组」小节（组设计表、5 个 run 的配置/命令/环境/产物/耗时/逐轮表/结论、组间阈值曲线与逐类 AUC 对照、判读），汇总表新增 5 行并加注口径说明。
 - `22:45`（变更）`docs/experiments.md`：实验矩阵新增 A-001-G1…G5 五行；「执行与结果」新增 G 组扫描结论（gamma_neg 2→4→6 时 AUC 单调升但 F1@0.5 在 6 处崩、clip 0 只改校准且 F1@0.5 组内最高、clip 0.10 训练早期退化、gamma_pos 1 的 AUC 0.8002 组内最高仍低于 A-001 0.8038 → 默认损失不切换）；「损失函数设计（ASL / focal）」待验证项补本轮结果。
 - `22:45`（变更）远端训练环境（不涉及仓库文件）：在 autodl V100-SXM2-32G 上以链式脚本串行跑完 A-001-G1…G5（2026-10-30 20:11:24–22:36:29，共 2h25m05s，代码 `78ce901`、seed 42）；每组产物 `outputs/20261030-*_A-001-G<g>_convnext_tiny_asl_s42/`（best.pt 111,384,939 B），评测明细含 0.2–0.7 阈值重算，保存在 `outputs/eval_reports/A-001-G<g>_full.txt`。
+- `23:02`（新增）`docs/train_plan11.md`、`configs/exp_A003.yaml`、`tests/test_config.py`：新增 A-003 的 MobileNetV3-Small 1.0× 训练计划和配置，继承 A-002 并仅替换骨干，增加逐字段配置对照测试；尚未开展 GPU 训练。
+
 - `23:02`（新增）`docs/train_plan11.md`、`configs/exp_A003.yaml`、`tests/test_config.py`：新增 A-003 的 MobileNetV3-Small 1.0× 训练计划和配置，继承 A-002 并仅替换骨干，增加逐字段配置对照测试；尚未开展 GPU 训练。
 
 ## 2026-10-29

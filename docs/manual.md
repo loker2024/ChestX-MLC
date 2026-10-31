@@ -135,6 +135,8 @@ train:
 | `configs/exp_A001b.yaml` | A-001-B：A-001 的 ASL 损失对照（ASL 替代 BCE + `pos_weight`，其余口径不变），已完成 | `_base: exp_A001.yaml` | 只覆盖 `train.loss: asl`、`train.pos_weight: false`、`train.asl_gamma_pos: 0.0`、`train.asl_gamma_neg: 4.0`、`train.asl_clip: 0.05` 五项 |
 | `configs/exp_A001a.yaml` | A-001-a：A-001 的训练随机水平翻转对照（只把 `image.hflip` 改 true），已完成 | 无（完整展开，不继承 `default.yaml`） | 与 `exp_A001.yaml` 展开结果仅差 `image.hflip: true` |
 | `configs/exp_A001c.yaml` | A-001-C：A-001 的冻结骨干对照（`freeze_backbone: true`，只训练分类头），已完成 | `_base: exp_A001.yaml` | 只覆盖 `model.freeze_backbone: true` |
+| `configs/exp_A002.yaml` | A-002：A-001 的轻量骨干对照（ConvNeXt-Tiny → MobileNetV3-Small 0.5×、578,474 参数；轮数 8→25、早停 2→5），第 5 轮按用户要求中止 | `_base: exp_A001.yaml` | 只覆盖 `model.backbone`、`train.epochs: 25`、`train.early_stop_patience: 5` |
+| `configs/exp_A003.yaml` | A-003：A-002 的宽度对照（MobileNetV3-Small 0.5× → 1.0×、1,528,106 参数），已完成（0.7808 / 0.3881，未过门） | `_base: exp_A002.yaml` | 只覆盖 `model.backbone: mobilenetv3_small_100.lamb_in1k` |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
 
@@ -166,6 +168,7 @@ default.yaml
 > `configs/exp_A001b.yaml` 以 `_base: exp_A001.yaml` 继承 A-001，只覆盖损失相关五项，未单独画入继承树。
 > `configs/exp_A001a.yaml` 为 A-001-a 的完整展开配置、不使用 `_base` 继承，故未画入上面的继承树。
 > `configs/exp_A001c.yaml` 以 `_base: exp_A001.yaml` 继承 A-001，只覆盖 `model.freeze_backbone: true`，未单独画入继承树。
+> `configs/exp_A002.yaml` 以 `_base: exp_A001.yaml`、`configs/exp_A003.yaml` 以 `_base: exp_A002.yaml` 继承，未单独画入继承树。
 >
 > 做实验不要直接改 `default.yaml`。默认配置是最终提交口径，实验差异写进 `_base` 派生的新文件，结论和命令记录到 `docs/experiments.md`。
 

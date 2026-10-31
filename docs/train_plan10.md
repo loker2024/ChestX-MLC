@@ -1,6 +1,6 @@
 # 训练计划 10：A-002 轻量 CNN 骨干对照
 
-**状态：配置已创建（`configs/exp_A002.yaml`），尚未执行 GPU 训练。**
+**状态：配置已创建（`configs/exp_A002.yaml`）并已启动训练；2026-10-30 22:39:11 启动，23:03:03 第 5 轮写盘后按用户要求中止（非早停、未收敛），只有 `last.pt` 与 5 轮 metrics、无 `best.pt`，未完成、不能作配对对照。同骨干 1.0× 宽度的完整对照见 [train_plan11.md](train_plan11.md)，实测回填见 [training_log.md](training_log.md)。**
 
 ## 目标与对照
 
