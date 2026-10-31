@@ -12,6 +12,12 @@ __pycache__/
 venv/
 env/
 
+# ---- 本地环境变量；示例模板可入库 ----
+.env
+.env.*
+!.env.example
+!.env.sample
+
 # ---- macOS / 编辑器 ----
 .DS_Store
 ._*
