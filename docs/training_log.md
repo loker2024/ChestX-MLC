@@ -2003,6 +2003,41 @@ A-003 的 F1 峰值在 0.6（0.3965），整条曲线在 0.2–0.7 全段低于 
 10 类**全部低于 A-001**：退化最大的是低频 class2（−0.0924）与 class3 / class4（−0.0301 / −0.0264），
 class8 基本持平（−0.0008），高频 class9 / class10 低 −0.0064 / −0.0111。
 
+## B-001：B 组医学预训练 DenseNet-121 对照（224×224 / 单通道 / seed=42，仅研究）
+
+B 组独立研究对照，计划与边界见 [train_plan12.md](train_plan12.md)。仅作研究记录，**不用于赛题提交、模型融合或候选选择**（外部医学影像预训练，违反赛题规则第 1 条）。
+
+- 配置：`configs/exp_B001.yaml`（`_base: default.yaml`），完整展开见 run 目录 `config.yaml`；数据划分、聚合与 seed 与 A 组一致（同 train/valid CSV、`view_weighted` 正位 0.7 / 侧位 0.3、seed 42）。
+- 骨干：TorchXRayVision `densenet121-res224-all`（DenseNet-121，6,957,834 参数；18 类分类头替换为 10 类、置空 `op_threshs`，输出原始 logits，先聚合再算 loss），单通道 224×224、letterbox、归一化到 [-1024, 1024]（`image.normalize: xrv`、`image.in_channels: 1`、`image.xrv_maxval: 255`）；全量微调、BCE + `pos_weight`、关闭 `image.hflip`。
+- 权重：`https://github.com/mlmed/torchxrayvision/releases/download/v1/nih-pc-chex-mimic_ch-google-openi-kaggle-densenet121-d121-tw-lr001-rot45-tr15-sc15-seed0-best.pt`，28,382,008 B，SHA-256 `56524913dd16a906422e8d8b66a7a5c46be1d82eb7ac012d8103776f1aa68899`，许可证 Apache-2.0（仅覆盖 TxRV 产物，上游数据集另有条款）；预训练数据 5 源（NIH ChestX-ray14 / PadChest / CheXpert / MIMIC-CXR / OpenI）。
+- 环境：独立 venv `/root/venv-b001`（Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7、timm 1.0.30），V100-SXM2-32G，`num_workers: 16`。
+- 命令：`/root/venv-b001/bin/python src/run_train.py --config configs/exp_B001.yaml --seed 42 --tag B-001_xrv_densenet121_s224`，2026-10-31 11:21:06 启动，12:01 第 11 轮后早停（连续 5 轮无提升），共约 40 分钟、单轮约 3.5 分钟；训练 18,513 studies、验证 859 studies。
+
+| epoch | lr | train_loss | valid_loss | valid_macro_auc | valid_macro_f1 |
+|---|---|---|---|---|---|
+| 1 | 1.50e-04 | 1.0027 | 0.9593 | 0.7694 | 0.3794 |
+| 2 | 3.00e-04 | 0.9364 | 0.9504 | 0.7781 | 0.3843 |
+| 3 | 3.00e-04 | 0.9113 | 0.9131 | 0.7859 | 0.3940 |
+| 4 | 2.99e-04 | 0.8941 | 0.9180 | 0.7842 | 0.4052 |
+| 5 | 2.94e-04 | 0.8766 | 0.9186 | 0.7876 | 0.3970 |
+| 6 | 2.87e-04 | 0.8661 | 0.9029 | **0.7913** | **0.4116** |
+| 7 | 2.77e-04 | 0.8518 | 0.9108 | 0.7887 | 0.4073 |
+| 8 | 2.65e-04 | 0.8375 | 0.9149 | 0.7867 | 0.4043 |
+| 9 | 2.50e-04 | 0.8249 | 0.9270 | 0.7895 | 0.4121 |
+| 10 | 2.33e-04 | 0.8063 | 0.9645 | 0.7832 | 0.4077 |
+| 11 | 2.15e-04 | 0.7948 | 0.9340 | 0.7841 | 0.4033 |
+
+**结论**：best epoch 6，valid macro-AUC **0.7912** / F1@0.5 **0.4120**（`run_eval.py` 在 valid 859 studies 上重算；`metrics.csv` 的 0.7913 / 0.4116，差异来自阈值口径，≤0.0002）；`best.pt` 28,456,243 B，metadata 确认 `pretrained_loaded: true`、`weights_sha256` 与上表一致、6,957,834 参数全量微调。
+
+- 阈值曲线（`run_eval.py`）：0.2 0.3562 / 0.3 0.3806 / 0.4 0.3965 / 0.5 0.4120 / 0.6 **0.4228（峰值）** / 0.7 0.3848；F1 峰值出现在 0.6，与 A-001（0.6 峰 0.4328）形态一致。
+- 逐类 AUC（valid）：class1 0.6881 / class2 0.8113 / class3 0.7895 / class4 0.7433 / class5 0.8632 / class6 0.7913 / class7 0.7697 / class8 0.6909 / class9 0.8956 / class10 0.8694；support 24/37/46/68/115/177/193/214/260/306。
+- 与参考 RUN-006（ImageNet DenseNet-121 @320×320、3 通道、imagenet 归一化、seed 42，0.7880 / 0.4070）相比：AUC **+0.0032**、F1@0.5 **+0.0050**；但分辨率（224 vs 320）、输入通道（1 vs 3）、归一化（xrv vs imagenet）与初始化来源同时不同，**差值不可归因于医学预训练**。
+- 与 A-001（ConvNeXt-Tiny，0.8038 / 0.4255）不可直接比较：骨干、预训练来源、输入分辨率与归一化均不同，仅记录数值。
+- **重叠风险**：本地数据来源不可确证，指纹（JPEG 量化表 q95、PatientOrientation 取值、规模占比）疑似 MIMIC-CXR-JPG 衍生子集；`densenet121-res224-all` 预训练集含 MIMIC-CXR（约 40%）→ 与本地训练集重叠风险**未知（疑似高）**，valid 指标可能乐观，不能声称无泄漏；唯一确证途径是向主办方询问数据来源。
+- 产物：`outputs/20261031-112106_B-001_xrv_densenet121_s224/`（`best.pt` 28,456,243 B / `last.pt` 112,857,109 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/B-001_full.txt`（阈值曲线与逐类明细）、`outputs/B-001_valid_predictions.csv`（859 个 valid study 的 Study_id / label_1..label_10 / p1..p10）。
+- 判读：本组仅回答「同划分、同聚合、同 seed 下医学预训练权重是否带来可复现差异」的前置研究问题；由于上述混杂与重叠风险，**不并入冻结结论、不参与骨干优劣判定、不进入提交候选**。若后续要推进，应先获得数据来源书面确认、再设计分辨率/归一化对齐的单变量实验。
+
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
@@ -2039,6 +2074,7 @@ class8 基本持平（−0.0008），高频 class9 / class10 低 −0.0064 / −
 | A-001-G5 | `exp_A001_G5.yaml` | A-001-B 的 ASL 正样本聚焦对照：`train.asl_gamma_pos: 0.0 → 1.0`（正样本聚焦） | 6（早停）/8 | 4 | 0.8002 | 0.4202 | 30m33s（串行，V100） | 与 A-001-B 差 AUC +0.0032（seed 波动内）、F1@0.5 +0.0099：五组 AUC 最高，但仍低于 A-001 的 0.8038 → 方向偏正面未达判定 |
 | A-002 | `exp_A002.yaml` | MobileNetV3-Small 0.5×（578,474 参数）；epoch=25 / patience=5 / seed=42 | 5（用户要求中止）/25 | — | — | — | 约 24m（V100） | 第 5 轮按用户要求停止（非早停），无 `best.pt`，不能与 A-003 配对；前 5 轮最佳 epoch 4（0.7634 / 0.3918）仅作历史参考 |
 | A-003 | `exp_A003.yaml` | MobileNetV3-Small 1.0×（1,528,106 参数）；epoch=25 / patience=5 / seed=42 | 17（早停）/25 | 12 | 0.7808 | 0.3881 | 1h17m19s（独占，V100） | 未过门：vs A-001（0.8038 / 0.4255）AUC -0.0230、F1@0.5 -0.0374，距方向性筛选门 0.7988 差 -0.0180；A-002 中止无 `best.pt` → 配对比较不成立 |
+| B-001 | `exp_B001.yaml` | B 组：TxRV `densenet121-res224-all` 医学预训练 + 单通道 224×224 + xrv 归一化（6,957,834 参数）；epoch=25 / patience=5 / seed=42，**仅研究** | 11（早停）/25 | 6 | 0.7912 | 0.4120 | 约 40m（独占，V100） | 与 RUN-006（0.7880 / 0.4070）差 AUC +0.0032、F1@0.5 +0.0050，但分辨率/归一化/通道/权重来源同时不同，差值不可归因医学预训练；本地数据与预训练集重叠风险未知 → 指标可能乐观；不用于提交/融合/候选选择 |
 
 注：RUN-001R / 002 的 macro-AUC 与 F1@0.5 取 `outputs/compare/summary.md` 的重算值（与 `metrics.csv` 的差异 ≤0.0003，见各 run 的「口径说明」）。
 注：RUN-003-B 与 RUN-003 / 003-A / 002-A 的 macro-AUC 与 F1@0.5 取 `outputs/compare_run003b/summary.md` 的重算值（RUN-003-B 与训练时 `metrics.csv` 的差异 ≤0.0002）。
@@ -2064,6 +2100,8 @@ class8 基本持平（−0.0008），高频 class9 / class10 低 −0.0064 / −
 
 注：A-002 / A-003 的结果取 A-003 `run_eval.py` 在 valid 上的重算值（与 best epoch 的 `metrics.csv` 一致）；A-002 于第 5 轮按用户要求中止，只有 `last.pt` 与 5 轮 metrics、没有 `best.pt`，不能与 A-003 做配对对照，A-002 一行的 AUC / F1 留空。A-003 与 A-001 同时差骨干、训练预算（25+5 vs 8+2）与 cosine 周期长度，只作方向性比较；单 seed，差值不作统计显著性结论。硬件同为 V100-SXM2-32G，与 RUN-001~008 的 RTX 3090 不同实例，耗时不可横向对照。
 
+注：B-001 为独立研究对照（B 组），权重为 TorchXRayVision `densenet121-res224-all`（Apache-2.0，SHA-256 56524913…8899），预训练数据含 NIH ChestX-ray14、PadChest、CheXpert、MIMIC-CXR、OpenI；本地数据来源不可确证、疑似 MIMIC-CXR-JPG 衍生子集，与预训练集重叠风险未知（疑似高），因此 valid 指标可能乐观，不能据此声称无泄漏；与 RUN-006（ImageNet DenseNet-121 @320、3 通道、imagenet 归一化）的差值同时来自分辨率、通道、归一化与初始化来源，不可单变量归因医学预训练；按赛题规则第 1 条，本组仅作研究，不接入提交、模型融合或候选选择。单 seed。
+
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 
 ## 环境
@@ -2072,5 +2110,6 @@ class8 基本持平（−0.0008），高频 class9 / class10 低 −0.0064 / −
 |---|---|
 | GPU | RTX 3090 24G（驱动 535.247.01，CUDA 12.2）；RUN-009 / A-001~A-001-G / A-002 / A-003 系列为 V100-SXM2-32G（驱动 580.105.08），两种硬件的耗时不可横向对照 |
 | Python / 框架 | Python 3.12、torch 2.10.0+cu128、timm 1.0.30、torchvision 0.25.0+cu128 |
+| B 组独立环境 | `/root/venv-b001`：Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7、timm 1.0.30（仅 B-001） |
 | 数据根目录 | `/root/sj-tmp`（`data/` 下以软链接挂入，数据本身不入库） |
 | 随机种子 | 42（RUN-002-B / RUN-006-A / RUN-007-A / RUN-007-B / RUN008-A~D / RUN-009-A / A-001-B(seed 2026) 为 2026，其余 run 均为 42） |

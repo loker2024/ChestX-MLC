@@ -31,6 +31,11 @@
 - `11:18`（变更）`docs/manual.md`、`docs/train_plan12.md`、`requirements.txt`：手册补 `exp_B001` 配置行、继承树、`image.in_channels` / `image.xrv_maxval` / `normalize: xrv`、`model.arch` / `model.xrv_*`、`run_eval --pred-out`；计划 12 状态行改为「适配代码与本机测试已完成、数据与权重已核验、GPU 训练待执行」并补执行记录；依赖清单注明 B 组可选的 `torchxrayvision==1.5.7` 不进入赛题环境。
 - `11:18`（变更）远端训练环境（不涉及仓库文件）：`densenet121-res224-all` 权重上传至 autodl `/root/.torchxrayvision/models_data/`，`sha256sum` 校验一致；核验数据划分 train 30,344 图 / 18,513 studies、valid 1,422 图 / 859 studies，Study_id 与 Subject_id 交集均为 0、图片均为 8 位灰度、`Dicom_id` 全部命中图片文件；本机 `pytest` 240 passed / 3 skipped。
 
+- `12:15`（变更）远端训练环境（不涉及仓库文件）：B-001（B 组医学预训练 DenseNet-121）在 autodl V100-SXM2-32G 独立环境 `/root/venv-b001` 上完成训练与评估——`configs/exp_B001.yaml` 224×224 单通道 xrv 归一化，11:21:06 启动、第 11 轮早停（best epoch 6，约 40 分钟），valid macro-AUC **0.7912** / F1@0.5 **0.4120**（F1 峰值 0.6：0.4228）；产物 `outputs/20261031-112106_B-001_xrv_densenet121_s224/`（`best.pt` 28,456,243 B / `last.pt` 112,857,109 B）、`outputs/eval_reports/B-001_full.txt`、`outputs/B-001_valid_predictions.csv`（859 个 valid study）。与 RUN-006（0.7880 / 0.4070）差 AUC +0.0032 / F1@0.5 +0.0050，但分辨率、通道、归一化与初始化来源同时不同，**不可归因医学预训练**；本地数据疑似 MIMIC-CXR-JPG 衍生、与预训练集重叠风险未知（疑似高），指标可能乐观；按赛题规则第 1 条仅作研究，不进入提交/融合/候选选择。
+- `12:15`（变更）`docs/training_log.md`：新增「B-001：B 组医学预训练 DenseNet-121 对照（224×224 / 单通道 / seed=42，仅研究）」小节（配置、权重与 SHA-256、环境、11 轮逐轮表、阈值曲线、逐类 AUC、重叠风险与判读、产物清单），汇总表新增 B-001 行并补口径注。
+- `12:15`（变更）`docs/experiments.md`：实验矩阵新增 B-001 行（仅研究、不用于提交）；「执行与结果」新增 B 组独立研究对照段（结果、与 RUN-006 差值不可归因预训练、重叠风险未知）。
+- `12:15`（变更）`docs/train_plan12.md`：状态行改为已完成（训练与评估已执行）；「待执行」替换为 2026-10-31 GPU 训练与评估执行记录与结论。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

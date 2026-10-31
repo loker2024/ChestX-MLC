@@ -1,6 +1,6 @@
 # 训练计划 12：B 组医学预训练 DenseNet-121 研究对照
 
-**状态：适配代码与本机测试已完成；数据、权重及 SHA-256 已核验；GPU 训练待执行（2026-10-31）。**
+**状态：已完成（2026-10-31）——适配代码、本机测试、数据与权重核验、GPU 训练（11 轮早停）与 valid 评估均已执行；本组仅研究，不用于赛题提交、融合或候选选择。**
 
 ## 目标与边界
 
@@ -49,8 +49,9 @@ B 组使用 TorchXRayVision 的 **DenseNet-121 + `densenet121-res224-all` 胸片
 - 测试：`python -m pytest` 240 passed / 3 skipped；`tests/test_xrv.py` 13 个用例覆盖配置锁定、单通道值域与形状、失败即报错不回退、10 类原始 logits、聚合反传、checkpoint 重载一致、`build_loader` 单通道。
 - 冒烟：CPU 合成数据 2 epoch（真实医学权重、224 单通道）训练 / 续训 / 评测 / 逐 study 概率导出全链路通过；`best.pt` metadata 含 `arch` / `weights_name` / `weights_sha256` / `pretrained_loaded`。
 
-### 待执行
+### 2026-10-31 GPU 训练与评估（autodl）
 
-- autodl V100-SXM2-32G 上按 `configs/exp_B001.yaml` 跑满 25 轮（早停 patience 5），记录 `train.log` / `metrics.csv` / `best.pt` / `last.pt`。
-- 用 `run_eval.py --pred-out` 导出 valid 逐 study 概率，整理评估汇总与逐类报告。
-- 回填 `docs/experiments.md`、`docs/training_log.md` 的 B-001 记录，并在训练环境提交。
+- 环境：独立 venv `/root/venv-b001`（Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7、timm 1.0.30），V100-SXM2-32G，`num_workers: 16`。
+- 训练：11:21:06 启动，第 11 轮后早停（连续 5 轮无提升，best epoch 6），共约 40 分钟；valid macro-AUC **0.7912** / F1@0.5 **0.4120**（F1 峰值在 0.6：0.4228），完整记录见 [training_log.md](training_log.md) 的「B-001」小节。
+- 评估与留存：`run_eval.py --pred-out` 导出 valid 859 个 study 的 10 类概率到 `outputs/B-001_valid_predictions.csv`，阈值曲线与逐类明细见 `outputs/eval_reports/B-001_full.txt`；run 目录 `outputs/20261031-112106_B-001_xrv_densenet121_s224/` 保留 `config.yaml` / `train.log` / `metrics.csv` / `best.pt` / `last.pt`。
+- 结论：与参考 RUN-006（ImageNet DenseNet-121 @320、0.7880 / 0.4070）差 AUC +0.0032、F1@0.5 +0.0050，但分辨率、通道、归一化与初始化来源同时不同 → **不可归因医学预训练**；本地数据疑似 MIMIC-CXR-JPG 衍生、与预训练集重叠风险未知（疑似高），指标可能乐观，不声称无泄漏；本组不并入冻结结论、不进入提交候选。计划已完成（仅研究）。

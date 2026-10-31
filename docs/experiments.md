@@ -13,6 +13,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | 数据 | 全量 train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 设备 | RTX 3090 24G（复用同一实例；本机只做代码与文档验证）；RUN-009 / A-001 系列为 V100-SXM2-32G，两种硬件耗时不可横向对照 |
 | 软件 | Python 3.12、torch 2.x（CUDA）、timm 1.0.30 |
+| B 组环境 | `/root/venv-b001`：Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7；B-001 输入 224×224 单通道、xrv 归一化（仅研究） |
 | 随机种子 | 42（RUN-002-B、RUN-006-A、RUN-007-A、RUN-007-B、RUN-009-A、RUN008-A/B/C/D、A-001-B(seed 2026) 为 2026） |
 | 输入 | 320×320，letterbox，ImageNet 归一化，默认无水平翻转 |
 | 骨干 | timm `resnet18.a1_in1k`，ImageNet 预训练 |
@@ -55,6 +56,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-001-G5 | `A-001-G5_convnext_tiny_asl_s42` | `configs/exp_A001_G5.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 6） | 否（ASL 与 `pos_weight` 互斥） | A-001-B 的 ASL 正样本聚焦对照：`train.asl_gamma_pos: 0.0 → 1.0`（正样本聚焦），其余口径逐字段不变，已完成 |
 | A-002 | `A-002_mobilenetv3_small050_s42` | `configs/exp_A002.yaml`（`_base: exp_A001.yaml`） | 25（实际 5，按用户要求中止） | 是 | A-001 的轻量骨干对照：ConvNeXt-Tiny → MobileNetV3-Small 0.5×（578,474 参数），轮数 25 / 早停 5；第 5 轮中止、无 `best.pt`，不能作配对对照 |
 | A-003 | `A-003_mobilenetv3_small100_s42` | `configs/exp_A003.yaml`（`_base: exp_A002.yaml`） | 25（早停 5，实际 17） | 是 | A-002 的宽度对照：MobileNetV3-Small 0.5× → 1.0×（1,528,106 参数），其余口径逐字段不变；已完成（0.7808 / 0.3881，未过 0.7988 门） |
+| B-001 | `B-001_xrv_densenet121_s224` | `configs/exp_B001.yaml`（`_base: default.yaml`） | 25（早停 5，实际 11） | 是 | B 组：TorchXRayVision 医学预训练 DenseNet-121（单通道 224×224 / xrv 归一化 / 6,957,834 参数）；**仅研究，不用于赛题提交、融合或候选选择**（规则第 1 条）；已完成（0.7912 / 0.4120，与预训练集重叠风险未知） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -237,6 +239,18 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   gamma_pos=1 方向偏正面、差值在 seed 波动内。五组 AUC 0.7855–0.8002 均未超过 A-001（0.8038）→
   **ASL 超参扫描没有改变「A-001 口径下 ASL 不优于 BCE + `pos_weight`」的结论，默认损失与 ASL 默认超参
   不切换**；若继续，应把 clip 0 + gamma_pos 1 组合另开单变量组并补 seed 复核，不在单 seed 上继续扫参数。
+
+**B 组：TorchXRayVision 医学预训练 DenseNet-121 独立研究对照**（配置 `configs/exp_B001.yaml`，数字来自 `run_eval.py`，产物
+`outputs/20261031-112106_B-001_xrv_densenet121_s224`，2026-10-31）：
+
+- 目的与边界：验证 TorchXRayVision `densenet121-res224-all`（18 类胸片预训练）在本地数据上的可复现差异；
+  **仅研究，不用于赛题提交、模型融合或候选选择**（规则第 1 条），计划见 [train_plan12.md](train_plan12.md)。
+- 口径：单通道 224×224 + xrv 归一化 [-1024,1024]、letterbox、全量微调、BCE + `pos_weight`、`view_weighted`
+  0.7/0.3、25 轮上限 + 早停 5、seed 42；与 A 组同数据划分、同聚合、同 seed。
+- 结果：第 11 轮早停（best epoch 6），valid macro-AUC **0.7912** / F1@0.5 **0.4120**（F1 峰值在 0.6：0.4228）；
+  参考 RUN-006（ImageNet DenseNet-121 @320、3 通道，0.7880 / 0.4070）与之差 AUC +0.0032、F1@0.5 +0.0050。
+- 判读：差值同时来自分辨率、通道、归一化与初始化来源，**不可归因医学预训练**；本地数据来源不可确证、
+  疑似 MIMIC-CXR-JPG 衍生，与预训练集重叠风险未知（疑似高）→ 指标可能乐观，不声称无泄漏；不并入冻结结论。
 
 ## 冻结结论
 
