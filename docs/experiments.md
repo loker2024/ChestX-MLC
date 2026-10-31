@@ -60,6 +60,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-004 | `A-004_convnext_tiny_dropout_wd_s42` | `configs/exp_A004.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的正则化组合对照：`model.dropout` 0.0 → 0.2（分类头 Dropout）+ `train.weight_decay` 0.01 → 0.05，其余口径逐字段不变；已完成（0.7988 / 0.4233，未过 0.8088 门） |
 | A-004-a | `A-004a_dropout_only_s42` | `configs/exp_A004a.yaml`（`_base: exp_A001.yaml`） | 8（跑满上限） | 是 | A-001 的分类头 dropout 单变量对照：只把 `model.dropout` 0.0 → 0.2，`train.weight_decay` 保持 0.01，其余口径逐字段不变；已完成（0.7944 / 0.4360，未过 0.8088 门） |
 | A-004-b | `A-004b_weight_decay_only_s42` | `configs/exp_A004b.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的 weight decay 单变量对照：只把 `train.weight_decay` 0.01 → 0.05，`model.dropout` 保持 0，其余口径逐字段不变；已完成（0.7999 / 0.4238，未过 0.8088 门） |
+| A-006 | `A-006_ml_decoder_s42` | `configs/exp_ml_decoder.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的分类头替换对照：把 timm 标准分类头换成轻量 ML-Decoder 头（10 类查询 + 单层 4 头交叉注意力 + 逐类权重向量，28,549,226 参数），其余口径逐字段不变；已完成（0.7900 / 0.4118，未过 0.8072 门） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -302,6 +303,31 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   不改排序；weight decay 单独的差值接近噪声；两组均未过门 → **A-001 口径与默认训练超参不切换，
   不在单 seed 上继续扫正则化参数**。若继续，应先补 seed 2026 配对复核，再考虑与其他增强的组合。
 
+**A-006：ML-Decoder 分类头对照**（配置 `configs/exp_ml_decoder.yaml`，数字来自 `run_eval.py`，产物
+`outputs/20261031-155701_A-006_ml_decoder_s42`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
+2026-10-31，计划见 [train_plan16.md](train_plan16.md)）：
+
+- 目的与口径：ConvNeXt-Tiny @320、epoch 8 / patience 2、seed 42、`view_weighted` 0.7/0.3、BCE +
+  `pos_weight`、cosine、batch 16 studies 全部与 A-001 一致，只把 `model.head` 由 `standard` 换成
+  `ml_decoder`（10 个类别查询对 768 维特征图做单层 4 头交叉注意力，再按逐类权重向量投影出 logits；
+  参数量 27,827,818 → 28,549,226）。按计划 16 的要求，主对照用同版本、同数据、同预算重训的标准头
+  （`A-005_baseline_s42`，15:11:14–15:40:35、best epoch 4、**0.8022 / 0.4210**、27,827,818 参数），
+  历史 A-001（0.8038）只作参考；方向性筛选门 = 0.8022 + 0.005 = **0.8072**。
+- 结果：A-006 15:57:01–16:29:40（32m39s）、第 7 轮早停（best epoch 5），macro-AUC **0.7900** /
+  F1@0.5 **0.4118**（F1 峰在 0.6：0.4173；基线 0.4383）。
+- 相对配对基线：ΔAUC **−0.0122**、ΔF1@0.5 **−0.0092**，距门 −0.0172 → 未过门；逐类 2 升 8 降
+  （class3 +0.0097、class7 +0.0076；class1 −0.0559、class2 −0.0455、class4 −0.0151 退化最大，
+  高支持类 class9 / class10 基本持平）。
+- 配对 bootstrap（859 studies × 2,000 次、按 study 重采样、seed 2026）：ΔAUC（基线 − A-006）=
+  **+0.0123**，95% CI **[+0.0001, +0.0245]**、P(Δ>0) = **0.976**；ΔF1@0.5 = +0.0092，
+  95% CI [−0.0018, +0.0205]、P = 0.952 → 标准头 AUC 显著更优，F1 方向一致但未跨零。
+- 训练行为：收敛更慢（epoch 1 0.7533 vs 基线 0.7736）、峰值更晚更低（epoch 5 / 0.7900 vs epoch 4 /
+  0.8022）；valid_loss 第 5 轮见底后反弹到 1.0157，与基线相同的「见顶即过拟合」形态，没有推迟过拟合。
+- 判读：分类头方向否定——10 类共享查询在低支持度类上退化最重（假设与类别查询冷启动有关，未单独
+  验证）；默认 `model.head: standard` 不切换，不补 seed 2026 配对，不进入候选提交。若继续注意力头，
+  应先解决稀疏类的类别先验/初始化，而不是在单 seed 上改结构。
+
+
 ## 冻结结论
 
 1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
@@ -314,7 +340,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
    对照，尚不能判断骨干优势是否在第二个 seed 复现；RUN-008 的 ConvNeXt-Tiny 在 6 轮
    预算下 0.8008 超过 +0.005 门，但预算与 RUN-007-A 不同且单 seed，同口径复核前
    不切换；A-001（2026-10-30，seed 42、epoch 8、早停 2）复现 0.8038，
-   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
+   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
    实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
    在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果；`train.pos_weight` 的 AUC 未达原增益门，但 F1@0.5 显著提高，现按要求设为 `true`；`train.lr_scheduler` 经 RUN-003-A 复核无 AUC 增益，现按要求改为 `cosine`。
 3. **复现口径**：默认 seed 为 42，seed 复核另有 2026；指标统一由 `run_compare.py` 在同一份 valid 上重算，
@@ -341,6 +367,8 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 | 更高分辨率 / TTA | 已验证（方向性） | `image.size`、`run_infer.py` 加翻转 TTA | **RUN-007-B 已做 384×384 + 6 轮短跑（macro-AUC 0.7959 / F1@0.5 0.4227）**：比 320 的 12 轮早停 0.7906 高 +0.0053，但轮数与 cosine 周期不同、不可单变量归因；需 25 轮完整对照再判定。**RUN-009-A（2026-10-30）**：EfficientNetV2-S RW @384×384 + 25 轮上限口径只跑 6/25 轮（用户要求停止），macro-AUC 0.7944，比同骨干 320×320 6 轮的 RUN-008-B（0.7954）低 −0.0010，未显示增量；25 轮完整对照仍待做。TTA 未做；448 显存未实测（3090 24G） |
 | 冻结骨干、仅训练分类头 | 已验证（大幅退化） | `configs/exp_freeze_head.yaml` / `configs/exp_A001c.yaml`、`model.freeze_backbone` | **A-001-C 已做（2026-10-30）**：ConvNeXt-Tiny @320 冻结骨干、仅训分类头（7,690 / 27,827,818 可训练参数），8 轮跑满 best epoch 8 macro-AUC 0.7264 / F1@0.5 0.3602 vs A-001 0.8038 / 0.4255（ΔAUC −0.0774、ΔF1@0.5 −0.0653）；逐轮增量衰减到 +0.0002 说明瓶颈在固定特征 → 该口径不作提交候选。RUN-010（ResNet-18 冻结）仍待执行。 |
 | 正则化（dropout / weight_decay） | 已验证（未达增益门） | `model.dropout` / `train.weight_decay` | **A-004（2026-10-31）**：A-001 口径下分类头 dropout 0.2 + weight_decay 0.05 组合，valid macro-AUC 0.7988 vs A-001 0.8038（Δ−0.0050）、F1@0.5 0.4233 vs 0.4255（Δ−0.0022），距方向性门 0.8088 差 −0.0100 → 未过门；各轮 train_loss 高于 A-001、valid_loss 走势未变（第 4 轮后仍反弹）；单 seed、两项同改不可分开归因，若继续应拆成两个单变量组并补 seed 复核；**A-004-a / A-004-b（2026-10-31）**：把组合拆成两个单变量组——A-004-a 只开 dropout （0.7944 / 0.4360，ΔAUC −0.0094、F1@0.5 +0.0105，F1 峰左移到 0.4 的 0.4400）、A-004-b 只提 weight_decay（0.7999 / 0.4238，ΔAUC −0.0039、F1@0.5 −0.0017）；两项单独均为负向，组合 −0.0050 主要由 weight decay 决定（组合 vs 单 wd 差 −0.0012），dropout 是主要负向项 → 正则化方向无增益，默认训练超参不变，后续应补 seed 2026 配对后再换档位 |
+
+| 分类头结构（ML-Decoder / CSRA） | 已验证（ML-Decoder 未达增益门） | `model.head` / `configs/exp_ml_decoder.yaml` / `configs/exp_csra.yaml` | **A-006（2026-10-31）**：A-001 口径下把标准头换成轻量 ML-Decoder（10 类查询 + 单层 4 头交叉注意力，28,549,226 参数），valid macro-AUC **0.7900** / F1@0.5 **0.4118** vs 同版本重训标准头 0.8022 / 0.4210（ΔAUC **−0.0122**、ΔF1@0.5 −0.0092），距方向性门 0.8072 差 −0.0172；配对 bootstrap ΔAUC（基线 − A-006）95% CI [+0.0001, +0.0245]、P=0.976、ΔF1@0.5 CI [−0.0018, +0.0205]；逐类 2 升 8 降、低支持类退化最大；收敛更慢（峰值 epoch 5 vs 4）、未推迟过拟合 → 分类头方向否定，`model.head: standard` 保持默认，不补 seed 2026 配对；CSRA 头（计划 15）本机测试已完成但 GPU 训练未执行，同一配对基线（`outputs/20261031-151114_A-005_baseline_s42`，0.8022 / 0.4210）可直接复用 |
 
 ### 正侧位加权聚合配置
 

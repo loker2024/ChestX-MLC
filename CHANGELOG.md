@@ -64,6 +64,11 @@
 - `15:37`（新增）`src/model/ml_decoder.py`、`configs/exp_ml_decoder.yaml`、`tests/test_ml_decoder.py`、`docs/ml_decoder_implementation.md`、`docs/train_plan16.md`：接入轻量类别查询交叉注意力分类头、实验配置、测试和实现与训练计划；GPU 实验未执行。
 - `15:37`（变更）`src/common/config.py`、`src/model/network.py`、`docs/manual.md`：增加分类头选择与使用限制，保留原模型默认路径。
 
+- `16:41`（变更）远端训练环境（不涉及仓库文件）：A-006（轻量 ML-Decoder 分类头对照）在 autodl 独占 V100-SXM2-32G 上完成训练、评估与配对 bootstrap——15:57:01 启动、16:29:40 第 7 轮早停（best epoch 5，32m39s），valid macro-AUC **0.7900** / F1@0.5 **0.4118**（F1 峰在 0.6：0.4173），28,549,226 参数（+721,408）；配对基线为同版本标准头重训 `outputs/20261031-151114_A-005_baseline_s42`（15:11:14–15:40:35、best epoch 4、**0.8022** / **0.4210**、27,827,818 参数）；相对基线 ΔAUC **−0.0122**、ΔF1@0.5 **−0.0092**，距方向性门 0.8072 差 −0.0172 → 未过门；配对 bootstrap（859 studies × 2,000 次、按 study 重采样、seed 2026、2,000 次均 10 类有效）ΔAUC（基线 − A-006）= +0.0123、95% CI [+0.0001, +0.0245]、P=0.976，ΔF1@0.5 = +0.0092、95% CI [−0.0018, +0.0205]、P=0.952 → 标准头 AUC 显著更优；训练中观测显存 11,906 MiB。产物 `outputs/20261031-155701_A-006_ml_decoder_s42/`（`best.pt` 114,276,003 B / `last.pt` 457,115,795 B）、`outputs/eval_reports/A-006_decoder_full.txt`、`outputs/A-006_decoder_valid.csv`、`outputs/compare_A006/`、`outputs/plan16_bootstrap.py`。
+- `16:41`（变更）`docs/training_log.md`：新增「A-006：轻量 ML-Decoder 分类头对照」小节（配置差异与头结构、命令、代码版本、设备、数据与权重核验、配对基线、7 轮逐轮表、阈值曲线、逐类 AUC、配对 bootstrap、学习曲线与判读）与「A-005_baseline」配对基线条目，汇总表新增 A-005_baseline / A-006 两行并补口径注，环境表 GPU 说明补 A-005_baseline 与 A-006。
+- `16:41`（变更）`docs/experiments.md`：实验矩阵新增 A-006 行（分类头替换对照，已完成、未过 0.8072 门）；「执行与结果」新增「A-006：ML-Decoder 分类头对照」段（配对基线口径、结果、逐类形态、配对 bootstrap、训练行为与判读）；冻结结论第 2 条补 A-006 无增益；「后续待验证优化项」新增「分类头结构（ML-Decoder / CSRA）」行。
+- `16:41`（变更）`docs/train_plan16.md`：状态行由「计划；未执行 GPU 训练或评估」改为已完成，并补「执行记录」小节（执行前核对、配对基线、A-006 实测指标与耗时、评估产物、配对 bootstrap、结论与后续边界）。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
