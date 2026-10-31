@@ -11,9 +11,9 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | 项目 | 值 |
 | --- | --- |
 | 数据 | 全量 train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
-| 设备 | RTX 3090 24G（复用同一实例；本机只做代码与文档验证） |
+| 设备 | RTX 3090 24G（复用同一实例；本机只做代码与文档验证）；RUN-009 / A-001 系列为 V100-SXM2-32G，两种硬件耗时不可横向对照 |
 | 软件 | Python 3.12、torch 2.x（CUDA）、timm 1.0.30 |
-| 随机种子 | 42（RUN-002-B、RUN-006-A、RUN-007-A、RUN008-A/B/C/D 为 2026） |
+| 随机种子 | 42（RUN-002-B、RUN-006-A、RUN-007-A、RUN-007-B、RUN-009-A、RUN008-A/B/C/D、A-001-B(seed 2026) 为 2026） |
 | 输入 | 320×320，letterbox，ImageNet 归一化，默认无水平翻转 |
 | 骨干 | timm `resnet18.a1_in1k`，ImageNet 预训练 |
 
@@ -53,6 +53,8 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-001-G3 | `A-001-G3_convnext_tiny_asl_s42` | `configs/exp_A001_G3.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 6） | 否（ASL 与 `pos_weight` 互斥） | A-001-B 的 ASL 概率移位关闭对照：`train.asl_clip: 0.05 → 0.00`（关闭概率移位），其余口径逐字段不变，已完成 |
 | A-001-G4 | `A-001-G4_convnext_tiny_asl_s42` | `configs/exp_A001_G4.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 3） | 否（ASL 与 `pos_weight` 互斥） | A-001-B 的 ASL 概率移位增大对照：`train.asl_clip: 0.05 → 0.10`（增大概率移位），其余口径逐字段不变，已完成 |
 | A-001-G5 | `A-001-G5_convnext_tiny_asl_s42` | `configs/exp_A001_G5.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 6） | 否（ASL 与 `pos_weight` 互斥） | A-001-B 的 ASL 正样本聚焦对照：`train.asl_gamma_pos: 0.0 → 1.0`（正样本聚焦），其余口径逐字段不变，已完成 |
+| A-002 | `A-002_mobilenetv3_small050_s42` | `configs/exp_A002.yaml`（`_base: exp_A001.yaml`） | 25（早停 5） | 是 | A-001 的轻量 CNN 骨干对照：`mobilenetv3_small_050.lamb_in1k`（578,474 参数），同时 epochs 8→25、patience 2→5；待执行 |
+| A-003 | `A-003_mobilenetv3_small100_s42` | `configs/exp_A003.yaml`（`_base: exp_A002.yaml`） | 25（早停 5） | 是 | A-002 的宽度对照：`mobilenetv3_small_100.lamb_in1k`（1,528,106 参数），其余同 A-002；待执行 |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -181,26 +183,6 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 口径注意：seed 2026 同时改变数据划分与初始化/增强随机性，本组与 A-001-B(s42) 构成 seed 配对，
   与 A-001 的对照仍受损失方案差异混杂。
 
-## 冻结结论
-
-1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
-   macro-AUC 需要排序信息，全 10 类输出更稳妥；`--threshold 0.5` 只用于对齐赛题示例
-   的过滤形态。
-2. **配置**：`configs/default.yaml` 即最终配置（25 epoch、`pos_weight: true`、
-   `eval.threshold: 0.5`，骨干维持 `resnet18`——RUN-003-B 补齐同口径基线后，RUN-005 /
-   RUN-006 的 macro-AUC 只高 0.0020 / 0.0043，单 seed 差距不足以判定骨干优劣；
-   RUN-006-A 用 seed 2026 复核 DenseNet-121 得 0.7913，但缺少同 seed 的 ResNet-18
-   对照，尚不能判断骨干优势是否在第二个 seed 复现；RUN-008 的 ConvNeXt-Tiny 在 6 轮
-   预算下 0.8008 超过 +0.005 门，但预算与 RUN-007-A 不同且单 seed，同口径复核前
-   不切换；A-001（2026-10-30，seed 42、epoch 8、早停 2）复现 0.8038，
-   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）与 A-001-C（冻结骨干，0.7264）也未带来增益，默认 `image.hflip: false`、`freeze_backbone: false` 保持不变）；
-   实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
-   在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果；`train.pos_weight` 的 AUC 未达原增益门，但 F1@0.5 显著提高，现按要求设为 `true`；`train.lr_scheduler` 经 RUN-003-A 复核无 AUC 增益，现按要求改为 `cosine`。
-3. **复现口径**：默认 seed 为 42，seed 复核另有 2026；指标统一由 `run_compare.py` 在同一份 valid 上重算，
-   训练设备与预训练加载情况记在 checkpoint 的 `metadata` 里。
-4. **分工**：本机只跑 `python -m pytest` 和文档校验；训练相关命令都在训练环境执行，
-   实测结果回填训练记录，对照结论记录在本文件。
-
 **A-001-D 取消正侧位加权对照**（配置 `configs/exp_A001d.yaml`，数字来自 `run_eval.py`，产物
 `outputs/20261030-190645_A-001d_convnext_tiny_mean_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
 只覆盖 `model.aggregation: view_weighted → mean`，study 内多张图片改为等权均值，其余口径逐字段
@@ -247,6 +229,26 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   gamma_pos=1 方向偏正面、差值在 seed 波动内。五组 AUC 0.7855–0.8002 均未超过 A-001（0.8038）→
   **ASL 超参扫描没有改变「A-001 口径下 ASL 不优于 BCE + `pos_weight`」的结论，默认损失与 ASL 默认超参
   不切换**；若继续，应把 clip 0 + gamma_pos 1 组合另开单变量组并补 seed 复核，不在单 seed 上继续扫参数。
+
+## 冻结结论
+
+1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
+   macro-AUC 需要排序信息，全 10 类输出更稳妥；`--threshold 0.5` 只用于对齐赛题示例
+   的过滤形态。
+2. **配置**：`configs/default.yaml` 即最终配置（25 epoch、`pos_weight: true`、
+   `eval.threshold: 0.5`，骨干维持 `resnet18`——RUN-003-B 补齐同口径基线后，RUN-005 /
+   RUN-006 的 macro-AUC 只高 0.0020 / 0.0043，单 seed 差距不足以判定骨干优劣；
+   RUN-006-A 用 seed 2026 复核 DenseNet-121 得 0.7913，但缺少同 seed 的 ResNet-18
+   对照，尚不能判断骨干优势是否在第二个 seed 复现；RUN-008 的 ConvNeXt-Tiny 在 6 轮
+   预算下 0.8008 超过 +0.005 门，但预算与 RUN-007-A 不同且单 seed，同口径复核前
+   不切换；A-001（2026-10-30，seed 42、epoch 8、早停 2）复现 0.8038，
+   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）与 A-001-C（冻结骨干，0.7264）也未带来增益，默认 `image.hflip: false`、`freeze_backbone: false` 保持不变）；
+   实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
+   在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果；`train.pos_weight` 的 AUC 未达原增益门，但 F1@0.5 显著提高，现按要求设为 `true`；`train.lr_scheduler` 经 RUN-003-A 复核无 AUC 增益，现按要求改为 `cosine`。
+3. **复现口径**：默认 seed 为 42，seed 复核另有 2026；指标统一由 `run_compare.py` 在同一份 valid 上重算，
+   训练设备与预训练加载情况记在 checkpoint 的 `metadata` 里。
+4. **分工**：本机只跑 `python -m pytest` 和文档校验；训练相关命令都在训练环境执行，
+   实测结果回填训练记录，对照结论记录在本文件。
 
 ## 后续待验证优化项（未排期）
 

@@ -417,6 +417,16 @@ def test_a002_experiment_config_loads():
     assert cfg.seed == 42
 
 
+def test_a003_experiment_config_loads():
+    """A-003 与 A-002 仅有骨干和配套预训练权重的差异。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    baseline = load_config(configs / "exp_A002.yaml").to_dict()
+    candidate = load_config(configs / "exp_A003.yaml").to_dict()
+    assert baseline["model"].pop("backbone") == "mobilenetv3_small_050.lamb_in1k"
+    assert candidate["model"].pop("backbone") == "mobilenetv3_small_100.lamb_in1k"
+    assert candidate == baseline
+
+
 # A-001-G1…G5 五组 ASL 超参对照：(gamma_pos, gamma_neg, clip)，与分组表一致。
 _A001_ASL_GROUPS = {
     "G1": (0.0, 2.0, 0.05),

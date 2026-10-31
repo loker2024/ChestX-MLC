@@ -1,0 +1,6 @@
+# A-003：以 A-002 为基准，将 MobileNetV3-Small 宽度从 0.5× 换为 1.0×。
+# 保持 320×320、seed 42、25 轮上限及早停 patience 5 等其余配置不变。
+_base: exp_A002.yaml
+
+model:
+  backbone: mobilenetv3_small_100.lamb_in1k

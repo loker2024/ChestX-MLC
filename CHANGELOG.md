@@ -8,22 +8,15 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
-## 2026-10-30
+## 2026-10-31
 
-- `22:45`（变更）`docs/training_log.md`：回填 A-001-G1…G5 五组 ASL 超参扫描实测——G1 gamma_neg 2（0.7949 / 0.3956）、G2 gamma_neg 6（0.7999 / 0.3391）、G3 clip 0.00（0.7971 / 0.4320）、G4 clip 0.10（0.7855 / 0.3695，best epoch 1、3 轮早停）、G5 gamma_pos 1（0.8002 / 0.4202）；新增「A-001-G 组」小节（组设计表、5 个 run 的配置/命令/环境/产物/耗时/逐轮表/结论、组间阈值曲线与逐类 AUC 对照、判读），汇总表新增 5 行并加注口径说明。
-- `22:45`（变更）`docs/experiments.md`：实验矩阵新增 A-001-G1…G5 五行；「执行与结果」新增 G 组扫描结论（gamma_neg 2→4→6 时 AUC 单调升但 F1@0.5 在 6 处崩、clip 0 只改校准且 F1@0.5 组内最高、clip 0.10 训练早期退化、gamma_pos 1 的 AUC 0.8002 组内最高仍低于 A-001 0.8038 → 默认损失不切换）；「损失函数设计（ASL / focal）」待验证项补本轮结果。
-- `22:45`（变更）远端训练环境（不涉及仓库文件）：在 autodl V100-SXM2-32G 上以链式脚本串行跑完 A-001-G1…G5（2026-10-30 20:11:24–22:36:29，共 2h25m05s，代码 `78ce901`、seed 42）；每组产物 `outputs/20261030-*_A-001-G<g>_convnext_tiny_asl_s42/`（best.pt 111,384,939 B），评测明细含 0.2–0.7 阈值重算，保存在 `outputs/eval_reports/A-001-G<g>_full.txt`。
-- `20:56`（变更）`outputs/submission_ensemble_3m_prob_211_rank1.csv`、`outputs/submission_ensemble_3m_prob_111_rank2.csv`、`Submission.md`：按“直接在 csv 上改名字、标注清楚”的要求整理融合提交文件——删除重复归档副本，把两个 `submission.csv` 分别直接改名为 `submission_ensemble_3m_prob_211_rank1.csv`（第一名，权重 2:1:1）与 `submission_ensemble_3m_prob_111_rank2.csv`（第二名，权重 1:1:1），文件名同时标注 valid 排名与融合权重；更新 `Submission.md` 两节的路径引用。
-- `20:52`（变更）`Submission.md`、`outputs/submission_ensemble_3m_prob_111_rank2.csv`：归档 valid 融合矩阵排名第二的候选提交——3 模型（A-001 / RUN-009-A / A-001-D）probability 等权融合、权重 1:1:1，valid Macro-AUC 0.8100 / Macro-F1@0.5 0.4409；`submission.csv` 由 `python src/run_ensemble.py --split test --out outputs/ensemble/test_w111` 生成并通过 `validate_submission` 校验（1,414 个 study、14,140 行），下载回本机后直接改名为 `outputs/submission_ensemble_3m_prob_111_rank2.csv` 保存，记录 SHA-256。
-- `20:20`（变更）`Submission.md`、`outputs/submission_ensemble_3m_prob_211_rank1.csv`：归档多模型融合候选提交——3 模型（A-001 / RUN-009-A / A-001-D）probability 融合、权重 2:1:1，valid Macro-AUC 0.8104 / Macro-F1@0.5 0.4389；`submission.csv` 由训练环境 `python src/run_ensemble.py --split test --out outputs/ensemble/test` 生成并已通过 `validate_submission` 校验（1,414 个 study、14,140 行），下载回本机后直接改名为 `outputs/submission_ensemble_3m_prob_211_rank1.csv` 保存（被 Git 忽略），报告完整融合对比、命令与 SHA-256。
-- `20:09`（新增）`configs/exp_A001_G1.yaml`…`configs/exp_A001_G5.yaml`、`tests/test_config.py`：新增 A-001-G1…G5 五组 ASL 超参对照配置——均以 `_base: exp_A001.yaml` 继承 A-001，只把损失换成 ASL（`train.loss: asl`、`train.pos_weight: false`）并各自覆盖 `asl_gamma_pos / asl_gamma_neg / asl_clip`：G1（0 / 2 / 0.05，减弱负样本抑制）、G2（0 / 6 / 0.05，更强负样本抑制）、G3（0 / 4 / 0.00，关闭概率移位）、G4（0 / 4 / 0.10，增大概率移位）、G5（1 / 4 / 0.05，正样本聚焦）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视角加权聚合、8 轮 cosine、早停 2、seed 42）。补参数化测试 `test_a001g_experiment_config_loads`（5 组），断言除 ASL 五项外与 A-001 逐字段一致、`_base` 行存在及关键字段。本机 `python -m pytest tests/test_config.py -q` 39 passed。
-- `19:21`（修复）`src/run_ensemble.py`、`tests/test_ensemble.py`：融合前新增跨模型 `Study_id -> Subject_id` 一致性校验，避免不同 test 数据源静默生成错误患者 ID；补回归测试。
-- `19:09`（新增）`configs/exp_A001d.yaml`、`tests/test_config.py`：新增实验 A-001-D 配置——以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位加权，study 内图片等权均值，`frontal_weight` 保留原值但不参与计算）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001d_experiment_config_loads` 断言除聚合方式外逐字段一致。本机 `python -m pytest tests/test_config.py -q` 34 passed。
-- `19:12`（新增）`src/run_ensemble.py`、`tests/test_ensemble.py`、`docs/manual.md`：新增多模型融合 CLI；支持概率 / logits 加权、`train` / `valid` AUC-F1 重算、`test` submission 校验和使用说明；专项测试 12 passed。
-- `19:05`（新增）`src/infer/predict.py`、`tests/test_ensemble.py`：新增 study-level logits 推理入口并复用现有聚合逻辑；专项与模型推理测试 28 passed / 1 skipped。
-- `19:01`（新增）`src/infer/ensemble.py`、`tests/test_ensemble.py`：新增概率加权 / logits 加权融合函数、权重归一化、Study_id 对齐与输入校验；8 项专项测试通过。
-- `18:52`（新增）`docs/superpowers/plans/2026-10-30-ensemble.md`：拆分多模型融合实现任务，覆盖融合函数、study-level logits、train/valid 指标产物、test submission 与全量验证。
-- `18:49`（新增）`docs/superpowers/specs/2026-10-30-ensemble-design.md`：确定多模型融合设计，支持概率加权与 logits 加权；`valid` / `train` 复用现有 Macro-AUC、Macro-F1 和逐类报告，`test` 输出完整 10 类 submission。
+- `00:03`（新增）`docs/train_plan12.md`：制定 B 组 TorchXRayVision 医学预训练 DenseNet-121 独立研究计划，记录输入适配、权重和数据核验、赛题边界及评估要求；尚未实施或训练。
+- `10:24`（变更）`docs/experiments.md`：修正 A-001-D 与 A-001-G1…G5 实测记录错位（原位于「冻结结论」章节内，现移回「执行与结果」）；实验矩阵补登记 A-002（轻量 CNN 骨干对照，578,474 参数）与 A-003（宽度对照，1,528,106 参数）两行；实验环境表补 V100-SXM2-32G 说明与全部 seed 2026 run（RUN-007-B、RUN-009-A、A-001-B(seed 2026)），并注明两种硬件耗时不可横向对照。
+- `10:24`（变更）`docs/training_log.md`：A-001-C 耗时口径由 37 分 54 秒（17:32:49 → 18:10:43）更正为 38 分 01 秒（17:32:49 → 18:10:50），与汇总表、`docs/experiments.md`、已提交 CHANGELOG 条目一致。
+- `10:24`（变更）`docs/train_plan10.md`：状态行由「计划，尚未创建实验配置或执行训练」更正为「配置已创建（`configs/exp_A002.yaml`），尚未执行 GPU 训练」。
+- `10:24`（修复）`CHANGELOG.md`：2026-10-30、2026-10-29 两段条目按同日时间正序重排（条目内容不变）。
+
+## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。
 - `14:02`（变更）远端训练环境（不涉及仓库文件）：autodl 训练环境项目由 `/root/autodl-tmp/ChestX-MLC` 整体迁移至系统盘 `/root/ChestX-MLC`（代码 + `.venv`，合计约 7.4G），`data/` 保留在数据盘 `/root/autodl-tmp/ChestX-MLC/data` 并以软链接接入；venv 内 22 个脚本的绝对路径已修正，`torch 2.10.0+cu128`、CUDA 可用，`pytest` 194 passed / 1 skipped。
@@ -31,7 +24,6 @@
 - `14:55`（变更）`docs/experiments.md`：实验矩阵新增 RUN-009-A 行（实际 6/25 轮后停止）；「执行与结果」新增 2026-10-30 结论（384 + 完整轮数在 6 轮内未见增量、未达 +0.005 门、比 RUN-008-B 低 −0.0010、出现过拟合迹象、不能判定 25 轮完整预算）；「更高分辨率 / TTA」待验证项补 RUN-009-A 结果。
 - `14:55`（变更）`docs/train_plan09.md`：执行记录由「计划串行 009-B → 009-A」改为实际执行（新 V100 实例、先跑 RUN-009-A、6/25 轮后按用户要求停止、RUN-009-B 未执行、`best.pt` 由 `last.pt` 导出）。
 - `14:55`（变更）远端训练环境（不涉及仓库文件）：RUN-009-A 提前停止导致 `best.pt` 缺失，用临时脚本从 `last.pt` 的 `extras.best_state`（epoch 5）导出 `outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt`（89,586,379 B），供 `run_eval.py` 与后续耗时自检使用。
-
 - `15:50`（新增）`configs/exp_A001.yaml`、`tests/test_config.py`：新增 A-001 实验配置（RUN-008-C 重跑：`train.epochs: 8`、`train.early_stop_patience: 2`、输入 320×320、`seed: 42`），完整展开、无 `_base`，与 `exp_run008c.yaml` 展开结果仅差这三处；补 `test_a001_experiment_config_loads` 断言除三处外逐字段一致、文本无 `_base:` 行及关键字段。本机 `python -m pytest -q` 193 passed / 3 skipped，训练环境 195 passed / 1 skipped。
 - `15:50`（变更）`docs/training_log.md`：回填 A-001 `A-001_convnext_tiny_s42` 实测——ConvNeXt-Tiny @320×320、8 轮上限 + 早停 2，第 6 轮早停，最优 epoch 4（macro-AUC **0.8038** / F1@0.5 0.4255，与 `run_eval.py` 重算一致）；记录运行命令、V100-SXM2-32G 环境、ModelScope 权重下载（SHA-256 与 RUN008-C 一致）与 `HF_HUB_OFFLINE=1` 加载、34m01s 耗时、阈值曲线与逐类 AUC 对比；汇总表新增一行并加注「与 RUN008-C 三项配置同时不同，非单变量对照」。
 - `15:50`（变更）`docs/experiments.md`：实验矩阵新增 A-001 行；「执行与结果」新增 A-001 结论（ConvNeXt-Tiny 在 seed 42、8 轮上限、早停 2 下复现 0.8038，与 RUN008-C 差异混杂、不足以判定骨干优劣）；「冻结结论」与「新骨干对照」待验证项同步更新。
@@ -49,27 +41,24 @@
 - `17:19`（新增）`configs/exp_A001a.yaml`：新增实验 A-001-a 配置——以 A-001 为基准只把 `image.hflip` 由 `false` 改为 `true`（训练随机水平翻转），其余逐项沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视图加权聚合、8 轮上限 + 早停 2、seed 42）；文件为完整展开配置、无 `_base`。
 - `17:22`（变更）`.gitignore`：忽略本机工具产物目录 `.playwright-cli/` 与 `.workbuddy/`，避免 `git status` 出现未跟踪项。
 - `17:26`（新增）`configs/exp_A001c.yaml`、`tests/test_config.py`：新增实验 A-001-C 配置——以 `_base: exp_A001.yaml` 只把 `model.freeze_backbone` 由 `false` 改为 `true`（冻结 ImageNet 预训练 ConvNeXt-Tiny 骨干、仅训练分类头；训练时骨干固定为 `eval()` 保持 BatchNorm running statistics 不变），其余口径逐字段沿用 A-001（320×320 letterbox、7:3 视角加权、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001c_experiment_config_loads` 断言除该字段外与 A-001 逐字段一致及关键字段。本机 `python -m pytest tests/test_config.py -q` 33 passed；合成模型验证 ConvNeXt-Tiny 冻结后 `total_params` 27,827,818 / `trainable_params` 7,690（仅分类头），骨干 `eval` + 分类头 `train` 状态正确。
-- **17:38**（变更）`docs/training_log.md`：回填 A-001-B（A-001 的 ASL 损失对照，ConvNeXt-Tiny @320×320 / seed=42 / 6 轮早停）实测——best epoch 4 macro-AUC 0.7970 / F1@0.5 0.4103，与 A-001（0.8038 / 0.4255）差 AUC −0.0068、F1@0.5 −0.0152；记录运行命令、起止时间 16:57:34→17:32:15（34m41s）、V100 显存 13.8–14.3 GB、阈值曲线与逐类 AUC 对比及判读，汇总表新增 A-001-B 行。
-- **17:38**（变更）`docs/experiments.md`：实验矩阵新增 A-001-B 行；「执行与结果」补 A-001-B 结论（A-001 口径下 ASL 未达增益门、−0.0068 超 ±0.005 且约 2 倍 seed 波动、替换同时移除 `pos_weight` 非纯单变量、单 seed 不判死）；待验证表新增「损失函数设计（ASL / focal）」行。
-- **17:38**（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_A001b.yaml` 行，继承树说明补 A-001-B 归属。
-- **17:38**（变更）远端训练环境（不涉及仓库文件）：在 autodl V100-SXM2-32G 实例执行 A-001-B 训练（产物 `outputs/20261030-165734_A-001b_convnext_tiny_asl_s42/`，`best.pt` 111,384,875 B / `last.pt` 445,536,235 B）与 `run_eval.py` 重算；训练前 `.venv` 内 `pytest tests/test_model.py tests/test_config.py -q` 为 52 passed。
-- **18:56**（变更）`docs/training_log.md`：回填 A-001-C `A-001c_convnext_tiny_freeze_s42` 与 A-001-B（seed 2026）`A-001b_convnext_tiny_asl_s2026` 实测——A-001-C 为 ConvNeXt-Tiny 骨干冻结、仅训分类头（7,690 / 27,827,818 可训练参数），8 轮跑满 best epoch 8，macro-AUC **0.7264** / F1@0.5 0.3602（vs A-001 差 AUC −0.0774 / F1 −0.0653）；A-001-B(s2026) 为 seed 复核，7 轮早停 best epoch 5，macro-AUC **0.7952** / F1@0.5 0.4182（vs s42 配对差 AUC −0.0018 在 seed 波动内、vs A-001 BCE 差 AUC −0.0086 仍超门）；汇总表新增两行并加注耗时/显存/metadata 与口径说明。
-- **18:56**（变更）`docs/experiments.md`：实验矩阵新增 A-001-C 与 A-001-B(s2026) 两行；「执行与结果」新增 A-001-C 冻结骨干对照结论（逐轮增量从 +0.0215 衰减到 +0.0002、瓶颈在固定特征、不作提交候选）与 A-001-B(s2026) seed 复核结论（ASL 无增益在两 seed 复现、确认不切换默认损失）；「损失函数设计（ASL / focal）」待验证项补 seed 2026 复核，「冻结骨干、仅训练分类头」待验证项由「待执行」更新为「已验证（大幅退化）」（RUN-010 仍待执行）。
-- **18:56**（变更）远端训练环境（不涉及仓库文件）：A-001-C 由链式脚本在 A-001-B 结束后自动启动，产物 `outputs/20261030-173249_A-001c_convnext_tiny_freeze_s42`（best.pt 111,384,939 B，约 38m01s，显存约 6.0 GB）；A-001-B(s2026) 随后启动，产物 `outputs/20261030-181110_A-001b_convnext_tiny_asl_s2026`（best.pt 111,384,939 B，约 37m29s，显存约 12.2 GB）；两次运行均以 `HF_HUB_OFFLINE=1` 加载预训练权重，`run_eval.py` 阈值 0.3–0.7 扫描已完成。
-
-- **18:58**（变更）`docs/training_log.md`：回填 A-001-a（A-001 的训练随机水平翻转对照）实测——best epoch 4 macro-AUC 0.7960 / F1@0.5 0.4045，与 A-001（0.8038 / 0.4255）差 AUC −0.0078、F1@0.5 −0.0210；记录运行命令、起止时间 15:46:52→16:23:50（36m58s）、6 轮早停、阈值曲线与逐类 AUC 对比及判读；汇总表与注新增 A-001-a 行/注；环境表补充 V100-SXM2-32G 实例与各 run 的 seed 归属。
-- **18:58**（变更）`docs/experiments.md`：实验矩阵新增 A-001-a 行；「执行与结果」补 A-001-a 结论（训练随机水平翻转无增益：ΔAUC −0.0078 超 ±0.005 门且约 2.4 倍 seed 波动，逐类 4 升 6 降、退化集中在低频类）；「冻结结论」第 2 条补 A-001-a / A-001-C 也证实默认 `image.hflip: false`、`freeze_backbone: false` 不改；待验证表新增「数据增强（训练水平翻转）」行。
-- **18:59**（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_A001a.yaml` 与 `configs/exp_A001c.yaml` 两行，继承树说明补 A-001-a（完整展开、不入树）与 A-001-C（以 `_base: exp_A001.yaml` 继承、不入树）的归属说明。
-- **18:59**（变更）远端训练环境（不涉及仓库文件）：A-001-a 于 2026-10-30 15:46:52–16:23:50 在 autodl V100-SXM2-32G 独占执行（产物 `outputs/20261030-154652_A-001-a_convnext_tiny_s42/`，`best.pt` 111,384,683 B / `last.pt` 445,536,107 B，6 轮早停）；随后用 `.venv` 的 `run_eval.py` 对 A-001-a / A-001-C / A-001-B(s2026) 三组重算阈值与逐类指标并保存到 `outputs/eval_reports/`。
-- **18:59**（变更）远端训练环境（不涉及仓库文件）：训练环境 `.venv/bin/python -m pytest -q` 全量测试通过（208 passed / 1 skipped；本次文档回填未改动 `src/` 与 `tests/`）。
-
-- **19:55**（变更）`docs/training_log.md`：回填 A-001-D 实测——ConvNeXt-Tiny @320×320，以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位 0.7/0.3 加权），8/8 轮跑满，最优 epoch 6（macro-AUC **0.7931** / F1@0.5 0.4340，`run_eval.py` 重算一致）；记录运行命令、V100-SXM2-32G 环境、40m03s 耗时与约 14.0 GB 显存、阈值曲线与逐类 AUC（4 升 6 降）；汇总表新增一行并加注。
-- **19:55**（变更）`docs/experiments.md`：实验矩阵新增 A-001-D 行；「执行与结果」新增 A-001-D 结论（取消正侧位加权 AUC −0.0107、超 ±0.005 判读门、约 3.2 倍 seed 波动；F1 峰位 0.6→0.5 属校准差 → 等权不优于加权）；「视图元信息（ViewPosition）」与「聚合方式消融」两个待验证项同步更新。
-- **19:55**（变更）远端训练环境（不涉及仓库文件）：A-001-D 于 2026-10-30 19:06:45–19:46:48 在 autodl V100-SXM2-32G 独占执行（产物 `outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/`，`best.pt` 111,384,875 B / `last.pt` 445,536,427 B，8 轮跑满无早停）；训练记录在训练环境内回填并提交。
-
+- `18:49`（新增）`docs/superpowers/specs/2026-10-30-ensemble-design.md`：确定多模型融合设计，支持概率加权与 logits 加权；`valid` / `train` 复用现有 Macro-AUC、Macro-F1 和逐类报告，`test` 输出完整 10 类 submission。
+- `18:52`（新增）`docs/superpowers/plans/2026-10-30-ensemble.md`：拆分多模型融合实现任务，覆盖融合函数、study-level logits、train/valid 指标产物、test submission 与全量验证。
+- `19:01`（新增）`src/infer/ensemble.py`、`tests/test_ensemble.py`：新增概率加权 / logits 加权融合函数、权重归一化、Study_id 对齐与输入校验；8 项专项测试通过。
+- `19:05`（新增）`src/infer/predict.py`、`tests/test_ensemble.py`：新增 study-level logits 推理入口并复用现有聚合逻辑；专项与模型推理测试 28 passed / 1 skipped。
+- `19:09`（新增）`configs/exp_A001d.yaml`、`tests/test_config.py`：新增实验 A-001-D 配置——以 `_base: exp_A001.yaml` 只把 `model.aggregation` 由 `view_weighted` 改为 `mean`（取消正侧位加权，study 内图片等权均值，`frontal_weight` 保留原值但不参与计算）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320、BCE + `pos_weight`、8 轮 cosine、早停 2、seed 42）；补 `test_a001d_experiment_config_loads` 断言除聚合方式外逐字段一致。本机 `python -m pytest tests/test_config.py -q` 34 passed。
+- `19:12`（新增）`src/run_ensemble.py`、`tests/test_ensemble.py`、`docs/manual.md`：新增多模型融合 CLI；支持概率 / logits 加权、`train` / `valid` AUC-F1 重算、`test` submission 校验和使用说明；专项测试 12 passed。
+- `19:21`（修复）`src/run_ensemble.py`、`tests/test_ensemble.py`：融合前新增跨模型 `Study_id -> Subject_id` 一致性校验，避免不同 test 数据源静默生成错误患者 ID；补回归测试。
+- `20:09`（新增）`configs/exp_A001_G1.yaml`…`configs/exp_A001_G5.yaml`、`tests/test_config.py`：新增 A-001-G1…G5 五组 ASL 超参对照配置——均以 `_base: exp_A001.yaml` 继承 A-001，只把损失换成 ASL（`train.loss: asl`、`train.pos_weight: false`）并各自覆盖 `asl_gamma_pos / asl_gamma_neg / asl_clip`：G1（0 / 2 / 0.05，减弱负样本抑制）、G2（0 / 6 / 0.05，更强负样本抑制）、G3（0 / 4 / 0.00，关闭概率移位）、G4（0 / 4 / 0.10，增大概率移位）、G5（1 / 4 / 0.05，正样本聚焦）；其余口径逐字段沿用 A-001（ConvNeXt-Tiny fb_in1k、320×320 letterbox、7:3 视角加权聚合、8 轮 cosine、早停 2、seed 42）。补参数化测试 `test_a001g_experiment_config_loads`（5 组），断言除 ASL 五项外与 A-001 逐字段一致、`_base` 行存在及关键字段。本机 `python -m pytest tests/test_config.py -q` 39 passed。
+- `20:20`（变更）`Submission.md`、`outputs/submission_ensemble_3m_prob_211_rank1.csv`：归档多模型融合候选提交——3 模型（A-001 / RUN-009-A / A-001-D）probability 融合、权重 2:1:1，valid Macro-AUC 0.8104 / Macro-F1@0.5 0.4389；`submission.csv` 由训练环境 `python src/run_ensemble.py --split test --out outputs/ensemble/test` 生成并已通过 `validate_submission` 校验（1,414 个 study、14,140 行），下载回本机后直接改名为 `outputs/submission_ensemble_3m_prob_211_rank1.csv` 保存（被 Git 忽略），报告完整融合对比、命令与 SHA-256。
+- `20:52`（变更）`Submission.md`、`outputs/submission_ensemble_3m_prob_111_rank2.csv`：归档 valid 融合矩阵排名第二的候选提交——3 模型（A-001 / RUN-009-A / A-001-D）probability 等权融合、权重 1:1:1，valid Macro-AUC 0.8100 / Macro-F1@0.5 0.4409；`submission.csv` 由 `python src/run_ensemble.py --split test --out outputs/ensemble/test_w111` 生成并通过 `validate_submission` 校验（1,414 个 study、14,140 行），下载回本机后直接改名为 `outputs/submission_ensemble_3m_prob_111_rank2.csv` 保存，记录 SHA-256。
+- `20:56`（变更）`outputs/submission_ensemble_3m_prob_211_rank1.csv`、`outputs/submission_ensemble_3m_prob_111_rank2.csv`、`Submission.md`：按“直接在 csv 上改名字、标注清楚”的要求整理融合提交文件——删除重复归档副本，把两个 `submission.csv` 分别直接改名为 `submission_ensemble_3m_prob_211_rank1.csv`（第一名，权重 2:1:1）与 `submission_ensemble_3m_prob_111_rank2.csv`（第二名，权重 1:1:1），文件名同时标注 valid 排名与融合权重；更新 `Submission.md` 两节的路径引用。
 - `22:28`（新增）`docs/train_plan10.md`：制定 A-002 约 58 万参数 MobileNetV3-Small 对照计划，记录配置、预训练权重核验、执行步骤、判读门及结果回填要求；尚未创建配置或训练。
 - `22:32`（变更）`docs/train_plan10.md`：A-002 调整为最多 25 轮、早停 patience 5；说明与 A-001 的训练预算和 cosine 周期不同，并补充同预算骨干配对的复核条件。
 - `22:38`（新增）`configs/exp_A002.yaml`、`tests/test_config.py`：新增实验 A-002 配置——以 `_base: exp_A001.yaml` 继承 A-001，只覆盖三处：`model.backbone` 改为 `mobilenetv3_small_050.lamb_in1k`（10 类头 578,474 参数，对比 A-001 的 27,827,818）、`train.epochs: 8 → 25`、`train.early_stop_patience: 2 → 5`；其余口径逐字段沿用 A-001（320×320 letterbox、ImageNet 归一化、无水平翻转、正侧位 7:3 加权聚合、BCE + `pos_weight`、warmup 2 后 cosine、`batch_studies: 16`、seed 42）。注意 `epochs` 同时决定 cosine 周期（5 → 22 步），比较时不能把轮数差当作收敛快慢证据。补 `test_a002_experiment_config_loads` 断言除上述三项外与 A-001 逐字段一致、`_base` 行存在及关键字段。本机 `python -m pytest tests/test_config.py -q` 40 passed。
+- `22:45`（变更）`docs/training_log.md`：回填 A-001-G1…G5 五组 ASL 超参扫描实测——G1 gamma_neg 2（0.7949 / 0.3956）、G2 gamma_neg 6（0.7999 / 0.3391）、G3 clip 0.00（0.7971 / 0.4320）、G4 clip 0.10（0.7855 / 0.3695，best epoch 1、3 轮早停）、G5 gamma_pos 1（0.8002 / 0.4202）；新增「A-001-G 组」小节（组设计表、5 个 run 的配置/命令/环境/产物/耗时/逐轮表/结论、组间阈值曲线与逐类 AUC 对照、判读），汇总表新增 5 行并加注口径说明。
+- `22:45`（变更）`docs/experiments.md`：实验矩阵新增 A-001-G1…G5 五行；「执行与结果」新增 G 组扫描结论（gamma_neg 2→4→6 时 AUC 单调升但 F1@0.5 在 6 处崩、clip 0 只改校准且 F1@0.5 组内最高、clip 0.10 训练早期退化、gamma_pos 1 的 AUC 0.8002 组内最高仍低于 A-001 0.8038 → 默认损失不切换）；「损失函数设计（ASL / focal）」待验证项补本轮结果。
+- `22:45`（变更）远端训练环境（不涉及仓库文件）：在 autodl V100-SXM2-32G 上以链式脚本串行跑完 A-001-G1…G5（2026-10-30 20:11:24–22:36:29，共 2h25m05s，代码 `78ce901`、seed 42）；每组产物 `outputs/20261030-*_A-001-G<g>_convnext_tiny_asl_s42/`（best.pt 111,384,939 B），评测明细含 0.2–0.7 阈值重算，保存在 `outputs/eval_reports/A-001-G<g>_full.txt`。
+- `23:02`（新增）`docs/train_plan11.md`、`configs/exp_A003.yaml`、`tests/test_config.py`：新增 A-003 的 MobileNetV3-Small 1.0× 训练计划和配置，继承 A-002 并仅替换骨干，增加逐字段配置对照测试；尚未开展 GPU 训练。
 
 ## 2026-10-29
 
@@ -79,20 +68,16 @@
 - `12:05`（变更）`docs/manual.md`：§2.2 现有配置文件中 `exp_resnet50.yaml` / `exp_densenet121.yaml` 的「训练待排期」改为「已完成（RUN-005 / RUN-006）」；骨干说明段更新为已按 train_plan04 完成、结果见训练记录与调优记录、默认骨干维持 `resnet18`，并把「许可证核验与 T4 耗时」限定为仅当后续切换骨干时才需补做。
 - `12:21`（新增）`configs/exp_run003b.yaml`、`tests/test_config.py`：新增 RUN-003-B 配置与加载断言——当前默认口径的 ResNet-18 完整复跑，显式固定 `backbone: resnet18`、`train.pos_weight: true`、`train.lr_scheduler: cosine`、`train.lr_min: 1e-5`、顶层 `seed: 42`（取值与当前 `default.yaml` 一致），其余继承 `default.yaml`；测试断言骨干、调度、`pos_weight`、25 轮、早停 5、`num_workers` 16 与 seed 42。本机 `python -m pytest -q` 182 passed / 3 skipped。
 - `12:21`（变更）`docs/experiments.md`、`docs/manual.md`：实验矩阵新增 RUN-003-B 行（tag `run003b_cosine_pos_weight`，用途为给 RUN-005 / RUN-006 提供同口径的 ResNet-18 基线）；§2.2 配置表与继承关系树补 `configs/exp_run003b.yaml`。
-
 - `12:42`（新增）`configs/exp_view_weighted.yaml`、`tests/test_model.py`、`tests/test_dataset.py`：增加正侧位 7:3 聚合实验配置与视角对齐、梯度和推理一致性测试。
 - `12:42`（变更）`src/common/config.py`、`src/data/index.py`、`src/data/dataset.py`、`src/model/network.py`、`src/train/engine.py`、`src/infer/predict.py`、`src/run_infer.py`、`src/run_eval.py`、`src/run_compare.py`、`src/cost.py`、`docs/experiments.md`：贯通视角元数据与可配置聚合，未知视角回退全图均值并确保训练、推理及耗时校验一致。
-
 - `12:45`（变更）`docs/manual.md`、`docs/architecture.md`、`docs/model_flow.md`、`docs/cost.md`、`docs/experiments.md`：补充聚合配置、视角数据流和耗时校验限制，区分默认均值与待验证的加权实验。
 - `12:58`（变更）`docs/training_log.md`：回填 RUN-003-B `run003b_cosine_pos_weight` 实测——原样贴入配置与 `metrics.csv`，记录运行命令、起止时间（北京 12:19:49 → 12:53:33）、产物目录与耗时；最优 epoch 8、macro-AUC 0.7837、F1@0.5 0.4040，第 13 轮早停（33m44s）；补 ResNet-18 四口径组合表与逐类 AUC 对比表；汇总表加 RUN-003-B 行，RUN-005 / RUN-006 结论列改为与 RUN-003-B 的同口径比较（Δ+0.0020 / +0.0043），并更新口径脚注。
 - `12:58`（变更）`docs/experiments.md`：实验矩阵 RUN-003-B 标已完成；「执行与结果」新增 RUN-003-B 结论（四组 ResNet-18 口径差异均 ≤0.005，cosine + `pos_weight` 无 AUC 增益）与 2026-10-29 同口径骨干对照（ResNet-50 比基线高 0.0020、DenseNet-121 高 0.0043），修正此前「新骨干未超过 ResNet-18 历史结果」的不可比说法；冻结结论与待验证项同步更新。
 - `12:58`（变更）`docs/manual.md`、`docs/train_plan04.md`：manual 配置表与继承树标注 RUN-003-B 已完成、骨干说明段改为同口径结论；train_plan04 由两组扩为三组（加 RUN-003-B 同口径基线），训练命令与 `run_compare` 输出同步为 `compare_backbone_s42`。
-
 - `13:55`（新增）`configs/exp_run006a.yaml`、`tests/test_config.py`：新增 RUN-006-A 配置——以 `_base: exp_densenet121.yaml` 继承 RUN-006 全部口径，只覆盖顶层 `seed: 2026`；补 `test_run006a_experiment_config_loads`，断言两份配置除 seed 外零差异。本机 `python -m pytest -q` 186 passed / 3 skipped。
 - `13:55`（新增）`docs/train_plan05.md`：新增 RUN-006-A（DenseNet-121 的 seed 复核）训练计划，记录配置差异、启动前配置核对脚本、训练 / 对照命令与判读门。
 - `13:55`（变更）`docs/training_log.md`：回填 RUN-006-A `densenet121_s2026` 实测——原样贴入配置与 10 轮 `metrics.csv`，记录命令、起止时间（北京 13:15:14 → 13:49:28）、产物目录与耗时；最优 epoch 5、macro-AUC 0.7913、F1@0.5 0.4103，第 10 轮早停（34m14s，与 experiment4 的 EfficientNet-B2 实验并行执行，耗时不可与 RUN-006 的独占 44m32s 直接对照）；补逐类 AUC 对比表与 seed 复核结论，汇总表、环境表种子行与注脚同步更新。
 - `13:55`（变更）`docs/experiments.md`、`docs/manual.md`：实验矩阵加 RUN-006-A 行；「执行与结果」补 seed 复核结论（AUC 比 RUN-006 高 +0.0033，DenseNet-121 两个 seed 均高于同口径 ResNet-18 基线，但 seed 间差与骨干差同量级，仍不足以判定骨干优劣）；待验证项「新骨干对照」与冻结结论补 RUN-006-A；manual 配置表、继承树与骨干说明段同步。
-
 - `14:13`（修复）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan05.md`、`docs/manual.md`：修正 RUN-006-A 跨 seed 骨干对照的判读、RUN-001 / RUN-001R 种子与波动说明，以及种子汇总、阈值提交和运行差异的表述；保留原始实验数据与配置快照。
 - `14:16`（新增）`configs/exp_run007.yaml`、`docs/train_plan06.md`：新增 DenseNet-121 正侧位 7:3 加权聚合配置与 RUN-006 单变量对照计划，记录核对、训练和比较命令。
 - `15:02`（变更）`docs/training_log.md`：回填 RUN-007 `densenet121_viewweighted_s42` 实测——原样贴入配置与 13 轮 `metrics.csv`，记录命令、起止时间（北京 14:20:02 → 14:54:58）、产物目录与耗时；最优 epoch 8、macro-AUC 0.7892、F1@0.5 0.4122，第 13 轮早停（34m56s）；补逐类 AUC 对比表与单 seed 判定，汇总表加 RUN-007 行，并加代码版本（`53568fe` vs RUN-006 的 `da8fef7`）与 seed 波动口径脚注。
@@ -103,28 +88,20 @@
 - `15:44`（变更）`docs/training_log.md`：回填 RUN-007-A `densenet121_viewweighted_s2026` 实测——原样贴入配置与 12 轮 `metrics.csv`，记录命令、起止时间（北京 15:07:33 → 15:42:34）、产物目录与耗时；最优 epoch 7、macro-AUC 0.7906、F1@0.5 0.4198，第 12 轮早停（35m01s）；补两个 seed 的「加权−等权」配对差表与逐类 AUC 对比，汇总表加 RUN-007-A 行，并加 seed 2026 配对与代码版本口径脚注。
 - `15:44`（变更）`docs/experiments.md`：实验矩阵标注 RUN-007-A 已完成；「执行与结果」新增 seed 复核结论（seed 2026 配对 Δ−0.0007，与 seed 42 的 +0.0012 方向相反、均值 +0.00025，均在 seed 波动内 → 加权聚合判定无效，默认维持 `mean`）；待验证项「视图元信息」改为已验证（无效）；正侧位加权聚合配置段同步两个 seed 结果。
 - `15:44`（变更）`docs/manual.md`：§2.2 配置表新增 `configs/exp_run007a.yaml` 行，继承树补其位于 `exp_run007.yaml` 之下。
-
 - `17:05`（新增）`src/infer/aggregation_compare.py`、`src/run_aggregation_compare.py`、`tests/test_aggregation_compare.py`：实现 RUN-008 聚合空间对照工具——`export` 在 valid 上逐批前向一次导出逐图 logits 缓存（`image_logits.npz`：logits / offsets / labels / Study_id / Subject_id / Dicom_id / 视角）与 `metadata.json`（格式版本、代码与环境指纹、checkpoint / valid CSV / NPZ 的 SHA-256、图片身份与内容哈希清单、G0 基准差值），并用 `predict_loader` 独立校验 G0 与现有路径最大绝对差 ≤1e-6；`compare` 只读缓存离线重算 G0（logits 均值后 sigmoid）与 G1（逐图 sigmoid 后均值），按 Study_id 严格对齐后写出 `predictions_g0.csv` / `predictions_g1.csv`、`summary.csv` / `summary.md`（全体 / 单图 / 多图 AUC、各阈值 F1、概率差、有效 AUC 类别数、空子集标无结果）与 `per_class.csv`；缓存哈希或格式版本不符、ID 重复 / 缺失 / 额外时拒绝执行。合成数据测试覆盖数值排序反转、单图一致、变长与未知视角、单次前向计数、配置回退、非 mean 聚合拒绝、缓存往返、ID 对齐、空子集与 CLI 全链路；本机 `python -m pytest -q` 206 passed / 3 skipped（新文件 19 passed）。
-
 - `18:27`（移除）`docs/train_plan08.md`：删除固定 checkpoint 聚合对照计划及其新增、更新记录；保留已实现的聚合对照工具、测试与实现记录。
-
 - `18:37`（修复）`docs/manual.md`、`docs/architecture.md`、`docs/experiments.md`：对照配置与源码补充聚合对照入口、视角字段和实验状态，修正配置示例及 seed 记录，精简重复的实验说明。
-
 - `18:39`（移除）`src/infer/aggregation_compare.py`、`src/run_aggregation_compare.py`、`tests/test_aggregation_compare.py`：回退 RUN-008 聚合空间对照工具和测试；同步移除 `docs/manual.md`、`docs/architecture.md` 的工具说明，并将 `docs/experiments.md` 恢复为待评估状态。`docs/train_plan08.md` 已在此前工作区变更中移除。
-
 - `20:00`（变更）`Submission.md`：根据提交截图记录 RUN-006-A 与 RUN-007-A 的官方得分、提交 ID、时间及文件信息，并保留各自验证指标与 CSV 哈希。
 - `20:31`（新增）`docs/train_plan08.md`：制定基于 RUN-007-A 的 RUN008-A / B / C / D 四组骨干及预训练权重对照，明确配置继承、权重许可与来源核验、执行命令和结果判读。
 - `20:45`（新增）`configs/exp_run007b.yaml`、`tests/test_config.py`：新增 RUN-007-B 分辨率探针配置与加载断言——在 RUN-007-A 上只把 `image.size` 由 320 改为 384、`train.epochs` 由 25 改为 6，其余口径不变；测试断言除这两项外与 RUN-007-A 逐字段零差异。
-- `20:52`（变更）`configs/exp_run008a.yaml`、`configs/exp_run008b.yaml`、`configs/exp_run008c.yaml`、`configs/exp_run008d.yaml`、`tests/test_config.py`、`docs/train_plan08.md`：按用户要求把四组实验由「最多 25 轮 + 早停耐心 5 + 串行」改为「固定 6 轮 + 无早停 + A+B、C+D 两两并行」；配置统一覆盖 `train.epochs: 6` 与 `train.early_stop_patience: 0`，测试断言同步允许这两项差异，计划文档更新固定条件、两两并行启动命令，并注明与 RUN-007-A 训练预算不同、差值只作方向性参考。
 - `20:45`（新增）`configs/exp_run008a.yaml`、`configs/exp_run008b.yaml`、`configs/exp_run008c.yaml`、`configs/exp_run008d.yaml`、`tests/test_config.py`：新增 RUN008-A / B / C / D 四组骨干对照配置与参数化加载断言，均以 `_base: exp_run007a.yaml` 只覆盖 `model.backbone`（`efficientnet_b2.ra_in1k`、`efficientnetv2_rw_s.ra2_in1k`、`convnext_tiny.fb_in1k`、`convnextv2_nano.fcmae_ft_in1k`）；断言除骨干外与 RUN-007-A 逐字段一致，并固定 320×320、`view_weighted` / 正位权重 0.7、seed 2026、25 轮与 `pretrained: true`。本机 `python -m pytest -q` 192 passed / 3 skipped。
-
+- `20:52`（变更）`configs/exp_run008a.yaml`、`configs/exp_run008b.yaml`、`configs/exp_run008c.yaml`、`configs/exp_run008d.yaml`、`tests/test_config.py`、`docs/train_plan08.md`：按用户要求把四组实验由「最多 25 轮 + 早停耐心 5 + 串行」改为「固定 6 轮 + 无早停 + A+B、C+D 两两并行」；配置统一覆盖 `train.epochs: 6` 与 `train.early_stop_patience: 0`，测试断言同步允许这两项差异，计划文档更新固定条件、两两并行启动命令，并注明与 RUN-007-A 训练预算不同、差值只作方向性参考。
 - `21:04`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/manual.md`：回填 RUN-007-B `densenet121_viewweighted_s2026_384` 实测——原样贴入 6 轮 `metrics.csv`，记录运行命令、起止时间（北京 20:31:58 → 20:55:40）、产物目录与耗时 23m42s；最优 epoch 5、macro-AUC 0.7959、F1@0.5 0.4227；与 RUN-007-A 的 12 轮早停结果相比 AUC +0.0053、F1 +0.0029，但轮数与 cosine 周期不同、不可单变量归因分辨率；汇总表加 RUN-007-B 行，实验矩阵标注已完成，待验证项「更高分辨率 / TTA」改为已验证（方向性），§2.2 配置表与继承树补 `configs/exp_run007b.yaml`。
-
 - `22:35`（变更）`docs/training_log.md`：回填 RUN008-A/B/C/D 四组骨干对照实测——新增 RUN-008 章节，记录四组配置原文、运行命令、权重来源 / HF commit / SHA-256 与许可（EfficientNet-B2、EfficientNetV2-S RW、ConvNeXt-Tiny 为 Apache-2.0，ConvNeXtV2-Nano 为 CC BY-NC 4.0）、起止时间与耗时（北京 A 20:59:07→21:33:40、B 21:01:44→21:36:48、C 21:38:17→22:02:35、D 22:02:48→22:25:27）、产物目录、`metrics.csv` 原样与逐类 AUC；最优 macro-AUC：A 0.7952 / F1@0.5 0.4095（epoch 4）、B 0.7954 / 0.4100（epoch 2）、C 0.8008 / 0.4382（epoch 5）、D 0.4977 / 0.1604（epoch 2，训练异常）；记录四组与 RUN-007-A 的组间对照及并行 / 预算差异口径，汇总表新增 4 行与 3 条注脚。
 - `22:35`（变更）`docs/experiments.md`：实验矩阵标注 RUN008-A/B/C/D 已完成并更新随机种子行；「执行与结果」新增 RUN-008 骨干对照四条结论（ConvNeXt-Tiny 在 6 轮预算下 0.8008、比 RUN-007-A 高 +0.0102 但预算不同且单 seed，只作候选方向；EfficientNet-B2 / V2-S 分别 +0.0046 / +0.0048 未达 +0.005 门；ConvNeXtV2-Nano 训练异常且 CC BY-NC 4.0 不合规、仅研究记录；四组两两并行、耗时不可横向比较）；待验证项「新骨干对照」补 RUN-008 结果；冻结结论说明同口径复核前不切换默认骨干。
 - `22:35`（变更）`docs/manual.md`：§2.2 现有配置表新增 `configs/exp_run008a~d.yaml` 四行，继承关系树补其位于 `exp_run007a.yaml` 之下的分支。
 - `22:49`（变更）`AGENTS.md`：新增「与 GitHub 同步」一节，约定 clone / fetch / push 统一走 SSH 密钥方式，远端固定为 `git@github.com:loker2024/ChestX-MLC.git`，禁止 HTTPS 地址与账号密码 / Personal Access Token 推送；给出 HTTPS 远端改 SSH 的命令、`ssh -T git@github.com` 验证方式及「私钥 / 口令 / token 不得入库」约束。本机 `origin` 已由 HTTPS 改为 SSH 并验证 `git ls-remote` 可读。
-
 - `23:05`（新增）`configs/exp_run009a.yaml`、`configs/exp_run009b.yaml`、`docs/train_plan09.md`：新增 RUN-009 两组骨干 @384×384 完整口径复核配置与训练计划——分别继承 RUN-008-B（EfficientNetV2-S RW）与 RUN-008-C（ConvNeXt-Tiny），只覆盖 `image.size: 320 → 384`、`train.epochs: 6 → 25`、`train.early_stop_patience: 0 → 5`，其余继承 RUN-007-A 的 seed 2026、正侧位 7:3 加权聚合、`pos_weight`、cosine 调度与 `batch_studies: 16`；计划记录目的与基线、权重许可来源、串行执行安排、判读门与回填口径。训练已按计划于 23:00:52 CST 启动 RUN-009-B，结束后串行启动 RUN-009-A；两组配置解析校验确认相对 RUN-007-A 仅差骨干、分辨率、轮数与早停四项。
 
 ## 2026-10-28
