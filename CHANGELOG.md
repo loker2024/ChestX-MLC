@@ -69,6 +69,8 @@
 - `16:41`（变更）`docs/experiments.md`：实验矩阵新增 A-006 行（分类头替换对照，已完成、未过 0.8072 门）；「执行与结果」新增「A-006：ML-Decoder 分类头对照」段（配对基线口径、结果、逐类形态、配对 bootstrap、训练行为与判读）；冻结结论第 2 条补 A-006 无增益；「后续待验证优化项」新增「分类头结构（ML-Decoder / CSRA）」行。
 - `16:41`（变更）`docs/train_plan16.md`：状态行由「计划；未执行 GPU 训练或评估」改为已完成，并补「执行记录」小节（执行前核对、配对基线、A-006 实测指标与耗时、评估产物、配对 bootstrap、结论与后续边界）。
 
+- `17:28`（新增）`configs/exp_A007.yaml`、`docs/train_plan17.md`：制定 A-007 实验——以 `_base: exp_A001.yaml` 只覆盖 `model.backbone: convnext_small.fb_in22k_ft_in1k`（ConvNeXt-Small，ImageNet-22k 预训练后在 ImageNet-1k 微调；10 类头 49,462,378 参数，比 A-001 的 ConvNeXt-Tiny 27,827,818 多 21,634,560），其余口径（320×320、`view_weighted`、BCE + `pos_weight`、8 轮 / 早停 2、seed 42）逐字段继承 A-001；训练计划明确预训练权重来源 / SHA-256 / 许可核验、GPU 执行命令与以 A-001 0.8038 为参考的方向性筛选门 0.8088。
+
 ## 2026-10-30
 
 - `14:02`（变更）`.gitignore`：根目录数据目录忽略规则由仅 `/data/` 扩为同时匹配 `/data`，兼容 `data` 为软链接（指向数据盘）的部署形式，避免 `git status` 出现未跟踪项。

@@ -1,0 +1,17 @@
+# A-007：A-001 的骨干与预训练权重对照：ConvNeXt-Tiny（fb_in1k）→ ConvNeXt-Small（fb_in22k_ft_in1k）。
+#
+# 以 `configs/exp_A001.yaml` 为基准，只改一处（timm 模型名同时决定骨干结构与预训练权重来源）：
+#   model.backbone: convnext_tiny.fb_in1k → convnext_small.fb_in22k_ft_in1k
+# 其余口径（320×320 letterbox、8 轮 / patience 2、seed 42、view_weighted 聚合、pos_weight 等）
+# 逐字段继承 A-001，不重复展开，保证与 A-001 是单变量对照。
+#
+# 权重来源：timm `convnext_small.fb_in22k_ft_in1k`（Facebook ConvNeXt，ImageNet-22k 预训练后
+# 在 ImageNet-1k 微调）；加载预训练时须保证训练机 HF 缓存已就绪，离线环境用 `HF_HUB_OFFLINE=1`。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_A007.yaml --seed 42 --tag A-007_convnext_small_in22k_ft_s42
+
+_base: exp_A001.yaml
+
+model:
+  backbone: convnext_small.fb_in22k_ft_in1k
