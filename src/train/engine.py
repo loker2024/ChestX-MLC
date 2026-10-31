@@ -143,9 +143,13 @@ def train_one_epoch(
         optimizer.zero_grad(set_to_none=True)
         with torch.autocast(device_type=device.type, enabled=use_amp):
             # 每张图各出一个 10 维 logits，再按 study 平均 —— 和计算指标的口径一致。
-            study_logits = aggregate_logits(model(images), offsets,
-                batch["views"].to(device, non_blocking=True) if config.model.aggregation == "view_weighted" else None,
-                config.model.frontal_weight)
+            study_logits = aggregate_logits(
+                model(images),
+                offsets,
+                batch["views"].to(device, non_blocking=True) if config.model.uses_views else None,
+                config.model.frontal_weight,
+                config.model.probability_space,
+            )
             loss = criterion(study_logits, labels)
 
         scaler.scale(loss).backward()
@@ -188,9 +192,13 @@ def evaluate(
         offsets = batch["offsets"].to(device, non_blocking=True)
 
         with torch.autocast(device_type=device.type, enabled=use_amp):
-            study_logits = aggregate_logits(model(images), offsets,
-                batch["views"].to(device, non_blocking=True) if config.model.aggregation == "view_weighted" else None,
-                config.model.frontal_weight)
+            study_logits = aggregate_logits(
+                model(images),
+                offsets,
+                batch["views"].to(device, non_blocking=True) if config.model.uses_views else None,
+                config.model.frontal_weight,
+                config.model.probability_space,
+            )
 
         num_studies = len(batch["study_ids"])
         total_loss += criterion(study_logits, labels).item() * num_studies

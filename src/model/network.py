@@ -22,6 +22,10 @@ from torch import nn
 
 from common.config import Config
 
+# 概率空间聚合时夹住两端，避免 logit(0) / logit(1) 变成 ±inf。
+# 1e-6 对应 logit 约 ±13.8，BCE 在这种概率下已经饱和，误差远小于指标波动。
+PROBABILITY_EPS = 1e-6
+
 
 def _freeze_backbone(model: nn.Module, backbone: str) -> None:
     """冻结模型参数，只解冻 timm 暴露的分类头。"""
@@ -113,9 +117,57 @@ def build_model(cfg: Config) -> nn.Module:
     return model
 
 
+def _study_mean(
+    values: torch.Tensor,
+    offsets: torch.Tensor,
+    views: torch.Tensor | None = None,
+    frontal_weight: float = 0.7,
+) -> torch.Tensor:
+    """把逐图 `[N, C]` 值按 study 聚合为 `[B, C]`。
+
+    没有 for 循环逐个 study 求 mean，而是先把 B 个 study 的图片展开成
+    「每张图属于第几个 study」的下标 `study_index`，用一次 `index_add` 求和，
+    再除以每个 study 的图片数。好处是只有一次算子调用，GPU 上不用等 B 次同步；
+    而且 `index_add` 对输入可导，训练时梯度能正常传回骨干。
+
+    `views` 为 0 正位、1 侧位、2 未知：含未知视角或只有一种视角的 study 回退
+    全图均值；两种已知视角先分别求均值，再按 `frontal_weight` 加权。
+    """
+    counts = offsets[1:] - offsets[:-1]  # [B]，每个 study 有几张图
+    study_index = torch.repeat_interleave(
+        torch.arange(len(counts), device=values.device), counts
+    )
+
+    # 先按 study 把值加起来；out-of-place 的 index_add 不会改动输入张量，
+    # 反向传播时能正确地把梯度分散回每张图。
+    sums = torch.zeros(
+        len(counts), values.shape[1], dtype=values.dtype, device=values.device
+    ).index_add(0, study_index, values)
+
+    mean = sums / counts.unsqueeze(1)
+    if views is None:
+        return mean
+    if views.ndim != 1 or views.numel() != values.shape[0]:
+        raise ValueError("views 必须与图片数量一致")
+    if not 0 < frontal_weight < 1:
+        raise ValueError("frontal_weight 必须在 (0, 1) 内")
+    # 未知视角的 study 使用全图均值；单一已知视角同样使用该组均值。
+    group_means = []
+    group_counts = []
+    for view_id in (0, 1):
+        mask = (views == view_id).to(values.dtype)
+        counts_view = torch.zeros(len(counts), dtype=values.dtype, device=values.device).index_add(0, study_index, mask)
+        sums_view = torch.zeros_like(sums).index_add(0, study_index, values * mask.unsqueeze(1))
+        group_means.append(sums_view / counts_view.clamp_min(1).unsqueeze(1))
+        group_counts.append(counts_view)
+    both = (group_counts[0] > 0) & (group_counts[1] > 0) & ((group_counts[0] + group_counts[1]) == counts)
+    weighted = frontal_weight * group_means[0] + (1 - frontal_weight) * group_means[1]
+    return torch.where(both.unsqueeze(1), weighted, mean)
+
+
 def aggregate_logits(
     logits: torch.Tensor, offsets: torch.Tensor, views: torch.Tensor | None = None,
-    frontal_weight: float = 0.7,
+    frontal_weight: float = 0.7, probability_space: bool = False,
 ) -> torch.Tensor:
     """把逐图 logits 聚合为 study 级 logits；提供 views 时按视角加权。
 
@@ -128,40 +180,20 @@ def aggregate_logits(
       C = 10 个类别；
     - `offsets`：`[B + 1]`，第 i 个 study 的图片是 `logits[offsets[i]:offsets[i+1]]`，
       与 `data.dataset.collate_studies` 的输出完全对应；
+    - `probability_space`：聚合在哪个空间进行。`False`（默认）在 logits 空间
+      平均（G0）；`True` 先逐图 sigmoid、在概率空间聚合（G1），最后用 logit
+      变换回 logits 空间，即返回 `logit(A(sigmoid(z)))`；
     - 返回：`[B, C]`，每个 study 一行。
 
-    实现上没有 for 循环逐个 study 求 mean，而是先把 B 个 study 的图片展开成
-    「每张图属于第几个 study」的下标 `study_index`，用一次 `index_add` 求和，
-    再除以每个 study 的图片数。好处是只有一次算子调用，GPU 上不用等 B 次同步；
-    而且 `index_add` 对 logits 可导，训练时梯度能正常传回骨干。
+    概率空间下仍返回 logits，是为了让下游不必分支：`BCEWithLogitsLoss` 对
+    `logit(p)` 的取值与直接用概率算 BCE 等价，推理侧 `sigmoid(logit(p)) == p`，
+    拿到的正是概率空间均值。两端用 `PROBABILITY_EPS` 夹住，避免 `logit(0)` /
+    `logit(1)` 变成无穷；概率先升到 fp32 再算，逐步 sigmoid 在 fp16 下会下溢。
     """
-    counts = offsets[1:] - offsets[:-1]  # [B]，每个 study 有几张图
-    study_index = torch.repeat_interleave(
-        torch.arange(len(counts), device=logits.device), counts
-    )
+    if not probability_space:
+        return _study_mean(logits, offsets, views, frontal_weight)
 
-    # 先按 study 把 logits 加起来；out-of-place 的 index_add 不会改动输入张量，
-    # 反向传播时能正确地把梯度分散回每张图。
-    sums = torch.zeros(
-        len(counts), logits.shape[1], dtype=logits.dtype, device=logits.device
-    ).index_add(0, study_index, logits)
-
-    mean = sums / counts.unsqueeze(1)
-    if views is None:
-        return mean
-    if views.ndim != 1 or views.numel() != logits.shape[0]:
-        raise ValueError("views 必须与图片数量一致")
-    if not 0 < frontal_weight < 1:
-        raise ValueError("frontal_weight 必须在 (0, 1) 内")
-    # 未知视角的 study 使用全图均值；单一已知视角同样使用该组均值。
-    group_means = []
-    group_counts = []
-    for view_id in (0, 1):
-        mask = (views == view_id).to(logits.dtype)
-        counts_view = torch.zeros(len(counts), dtype=logits.dtype, device=logits.device).index_add(0, study_index, mask)
-        sums_view = torch.zeros_like(sums).index_add(0, study_index, logits * mask.unsqueeze(1))
-        group_means.append(sums_view / counts_view.clamp_min(1).unsqueeze(1))
-        group_counts.append(counts_view)
-    both = (group_counts[0] > 0) & (group_counts[1] > 0) & ((group_counts[0] + group_counts[1]) == counts)
-    weighted = frontal_weight * group_means[0] + (1 - frontal_weight) * group_means[1]
-    return torch.where(both.unsqueeze(1), weighted, mean)
+    probs = torch.sigmoid(logits.float())
+    merged = _study_mean(probs, offsets, views, frontal_weight)
+    clamped = merged.clamp(PROBABILITY_EPS, 1.0 - PROBABILITY_EPS)
+    return torch.logit(clamped).to(logits.dtype)

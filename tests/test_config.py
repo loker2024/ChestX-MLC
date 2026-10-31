@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from common.config import TrainConfig, config_from_dict, load_config
+from common.config import ModelConfig, TrainConfig, config_from_dict, load_config
 
 BASE = """data:
   train: {csv: data/train.csv, images: data/images/train}
@@ -470,6 +470,35 @@ def test_a001g_experiment_config_loads(group):
     assert cfg.train.loss == "asl"
     assert cfg.train.pos_weight is False
     assert cfg.seed == 42
+
+
+def test_a008_probability_aggregation_config_loads():
+    """A-008 只把聚合空间从 logits 换成概率，正侧位权重仍是 7:3。"""
+    configs = Path(__file__).resolve().parents[1] / "configs"
+    a001 = load_config(configs / "exp_A001.yaml").to_dict()
+    config = load_config(configs / "exp_A008.yaml").to_dict()
+
+    assert config["model"].pop("aggregation") == "view_weighted_probability"
+    assert a001["model"].pop("aggregation") == "view_weighted"
+    # 除聚合空间外逐字段一致（含 frontal_weight 0.7、训练与数据口径）。
+    assert config == a001
+
+    path = configs / "exp_A008.yaml"
+    text = path.read_text(encoding="utf-8")
+    assert any(line.strip() == "_base: exp_A001.yaml" for line in text.splitlines())
+
+    cfg = load_config(path)
+    assert cfg.model.frontal_weight == pytest.approx(0.7)
+    assert cfg.model.uses_views is True
+    assert cfg.model.probability_space is True
+
+
+def test_probability_aggregation_rejects_unknown_value():
+    """aggregation 只接受三种取值，拼错要直接报错，不能静默当成 mean。"""
+    with pytest.raises(ValueError, match="aggregation"):
+        ModelConfig(aggregation="probability")
+    with pytest.raises(ValueError, match="aggregation"):
+        ModelConfig(aggregation="mean_probability")
 
 
 def test_asl_loss_rejects_pos_weight_combination():

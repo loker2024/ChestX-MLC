@@ -104,15 +104,19 @@ def _forward_probabilities(
     device: torch.device,
     views: torch.Tensor | None = None,
     frontal_weight: float = 0.7,
+    probability_space: bool = False,
 ) -> torch.Tensor:
     """CPU 上的 images/offsets -> CPU 上的 `[B, 10]` fp32 概率。
 
     这是全仓库唯一的「前向 + study 聚合 + sigmoid」实现：
     搬设备、按模型 dtype 转换输入、aggregate_logits 求 study 均值、sigmoid 后
     再转回 fp32 CPU 张量。predict_loader / predict_image / predict_study 都走它。
+
+    `probability_space=True` 时聚合在概率空间进行（G1），此时 aggregate_logits
+    返回的是 `logit(mean(sigmoid))`，外层 sigmoid 正好还原成概率空间均值。
     """
     return torch.sigmoid(
-        _forward_logits(model, images, offsets, device, views, frontal_weight)
+        _forward_logits(model, images, offsets, device, views, frontal_weight, probability_space)
     )
 
 
@@ -123,12 +127,14 @@ def _forward_logits(
     device: torch.device,
     views: torch.Tensor | None = None,
     frontal_weight: float = 0.7,
+    probability_space: bool = False,
 ) -> torch.Tensor:
-    """CPU 上的 images/offsets -> CPU 上的 `[B, 10]` fp32 study logits."""
+    """CPU 上的 images/offsets -> CPU 上的 `[B, 10]` fp32 study logits。"""
     model_images = images.to(device=device, dtype=_model_dtype(model), non_blocking=True)
     model_offsets = offsets.to(device=device, non_blocking=True)
     study_logits = aggregate_logits(model(model_images), model_offsets,
-                                    views.to(device) if views is not None else None, frontal_weight)
+                                    views.to(device) if views is not None else None,
+                                    frontal_weight, probability_space)
     # 先转 float32 再搬 CPU：以后即使模型用半精度推理，融合也使用稳定的 fp32 logits。
     return study_logits.float().cpu()
 
@@ -156,8 +162,9 @@ def predict_loader(
     for batch in loader:
         probabilities = _forward_probabilities(
             model, batch["images"], batch["offsets"], device,
-            batch["views"] if config is not None and config.model.aggregation == "view_weighted" else None,
+            batch["views"] if config is not None and config.model.uses_views else None,
             config.model.frontal_weight if config is not None else 0.7,
+            config.model.probability_space if config is not None else False,
         )
         study_ids.extend(batch["study_ids"])
         probability_batches.append(probabilities)
@@ -188,8 +195,9 @@ def predict_loader_logits(
             batch["images"],
             batch["offsets"],
             device,
-            batch["views"] if config is not None and config.model.aggregation == "view_weighted" else None,
+            batch["views"] if config is not None and config.model.uses_views else None,
             config.model.frontal_weight if config is not None else 0.7,
+            config.model.probability_space if config is not None else False,
         )
         study_ids.extend(batch["study_ids"])
         logit_batches.append(logits)
@@ -231,6 +239,7 @@ def predict_study(
     device: torch.device,
     views: Sequence[int] | None = None,
     frontal_weight: float = 0.7,
+    probability_space: bool = False,
 ) -> np.ndarray:
     """一次检查（study）的 10 类概率：该 study 所有图片 logits 求均值后 sigmoid。
 
@@ -248,5 +257,8 @@ def predict_study(
         [transform(load_image(path, convert_rgb=False)) for path in paths]
     )
     offsets = torch.tensor([0, len(paths)], dtype=torch.long)
-    return _forward_probabilities(model, images, offsets, device,
-                                  torch.tensor(views) if views is not None else None, frontal_weight)[0].numpy()
+    return _forward_probabilities(
+        model, images, offsets, device,
+        torch.tensor(views) if views is not None else None,
+        frontal_weight, probability_space,
+    )[0].numpy()

@@ -106,6 +106,48 @@ def test_aggregate_logits_keeps_gradient():
     assert torch.allclose(logits.grad[2], torch.ones(10))
 
 
+def test_aggregate_logits_probability_space_matches_mean_of_sigmoid():
+    """probability_space=True 返回 logit(mean(σ(z)))，sigmoid 后就是概率空间均值（G1）。"""
+    logits = torch.tensor([[4.0], [-4.0], [2.0]]).repeat(1, 10)
+    offsets = torch.tensor([0, 2, 3])
+    views = torch.tensor([0, 1, 0])
+
+    probs = torch.sigmoid(aggregate_logits(logits, offsets, views, 0.7, True))
+
+    expected = 0.7 * torch.sigmoid(torch.tensor(4.0)) + 0.3 * torch.sigmoid(torch.tensor(-4.0))
+    assert probs[0, 0] == pytest.approx(expected.item(), abs=1e-6)
+    # 单图 study 两个空间必然一致
+    assert probs[1, 0] == pytest.approx(torch.sigmoid(torch.tensor(2.0)).item(), abs=1e-6)
+
+    # 与 G0 对照：logits 空间加权得到 σ(0.7·4 + 0.3·(-4)) = σ(1.6)，两者不同。
+    g0 = torch.sigmoid(aggregate_logits(logits, offsets, views, 0.7, False))
+    assert g0[0, 0].item() == pytest.approx(0.8320184, abs=1e-5)
+    assert probs[0, 0] < g0[0, 0]
+
+
+def test_aggregate_logits_probability_space_stays_finite_at_extremes():
+    """端到端饱和时用 EPS 夹住，不能出现 inf / nan。"""
+    logits = torch.tensor([[80.0], [-80.0]]).repeat(1, 10)
+
+    merged = aggregate_logits(logits, torch.tensor([0, 1, 2]), None, 0.7, True)
+
+    assert torch.isfinite(merged).all()
+    probs = torch.sigmoid(merged)
+    assert probs[0, 0] == pytest.approx(1.0, abs=1e-5)
+    assert probs[1, 0] == pytest.approx(0.0, abs=1e-5)
+
+
+def test_aggregate_logits_probability_space_keeps_gradient():
+    """概率空间聚合也要可导，否则训练第一步就崩。"""
+    logits = torch.randn(3, 10, requires_grad=True)
+
+    aggregate_logits(logits, torch.tensor([0, 2, 3]), None, 0.7, True).sum().backward()
+
+    assert logits.grad is not None
+    assert torch.isfinite(logits.grad).all()
+    assert (logits.grad.abs() > 0).all()
+
+
 def test_default_loss_has_no_pos_weight():
     """默认就是普通 BCEWithLogitsLoss，不传训练标签也能构建。"""
     loss = build_loss(_config())
@@ -280,3 +322,45 @@ def test_weighted_loader_and_study_prediction_match(labeled_split):
     np.testing.assert_allclose(result.iloc[0, 1:].to_numpy(dtype=float), direct, atol=1e-7)
     logits = torch.stack([transform(Image.open(path)).mean() for path in records[0].image_paths])
     assert direct[0] == pytest.approx(torch.sigmoid(0.7 * logits[0] + 0.3 * logits[1]).item())
+
+
+def test_predict_loader_probability_space_matches_weighted_mean_of_sigmoid(labeled_split):
+    """A-008 口径：predict_loader 输出应等于 0.7·σ(正位) + 0.3·σ(侧位)。
+
+    这条链路覆盖 config.model.probability_space → predict_loader →
+    aggregate_logits(probability_space=True) → 概率空间加权，是训练与提交共用的
+    同一段代码，所以只要这里对，训练时的 loss 输入也是概率空间均值。
+    """
+    from data.dataset import StudyDataset, collate_studies
+    from data.index import read_split
+    from data.transforms import build_eval_transform
+    from PIL import Image
+    from torch.utils.data import DataLoader
+
+    records = read_split(labeled_split["csv"], labeled_split["images"])
+    # study_00000 的第一张是正位，把第二张（侧位）改成完全不同的像素值。
+    Image.new("RGB", (64, 48), (10, 200, 30)).save(records[0].image_paths[1])
+    transform = build_eval_transform(32, normalize="none")
+    loader = DataLoader(StudyDataset(records, transform), batch_size=2, collate_fn=collate_studies)
+
+    class PixelModel(torch.nn.Module):
+        def forward(self, images):
+            return images.mean(dim=(1, 2, 3)).unsqueeze(1).repeat(1, 10)
+
+    base = _config()
+    config = replace(
+        base,
+        model=replace(
+            base.model, aggregation="view_weighted_probability", frontal_weight=0.7
+        ),
+    )
+    assert config.model.uses_views is True and config.model.probability_space is True
+
+    result = predict_loader(PixelModel(), loader, torch.device("cpu"), config)
+
+    logits = torch.stack([transform(Image.open(path)).mean() for path in records[0].image_paths])
+    expected = 0.7 * torch.sigmoid(logits[0]) + 0.3 * torch.sigmoid(logits[1])
+    assert result.iloc[0, 1] == pytest.approx(expected.item(), abs=1e-6)
+    # 与 logits 空间的结果必须有差别，否则说明开关没生效。
+    logit_space = torch.sigmoid(0.7 * logits[0] + 0.3 * logits[1])
+    assert abs(result.iloc[0, 1] - logit_space.item()) > 1e-6

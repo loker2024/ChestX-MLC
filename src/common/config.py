@@ -74,6 +74,17 @@ class ImageConfig:
             )
 
 
+# 聚合口径的取值范围：
+# - `mean`：study 内全部图片等权均值，在 logits 空间（G0）；
+# - `view_weighted`：先按正位 / 侧位分组求均值，再按 frontal_weight 加权，仍在
+#   logits 空间（G0）；
+# - `view_weighted_probability`：分组与权重同上，但先逐图 sigmoid 再在概率空间
+#   平均（G1）。训练损失与推理提交共用这条路径，保证口径一致。
+ALL_AGGREGATIONS = frozenset({"mean", "view_weighted", "view_weighted_probability"})
+VIEW_AGGREGATIONS = frozenset({"view_weighted", "view_weighted_probability"})
+PROBABILITY_AGGREGATIONS = frozenset({"view_weighted_probability"})
+
+
 @dataclass(frozen=True)
 class ModelConfig:
     """模型结构与权重来源。"""
@@ -93,6 +104,16 @@ class ModelConfig:
     xrv_cache_dir: Path | None = None  # 权重缓存目录；None=TxRV 默认 ~/.torchxrayvision/models_data
     xrv_sha256: str | None = None  # 期望的权重文件 SHA-256；None=不校验
 
+    @property
+    def uses_views(self) -> bool:
+        """聚合是否需要逐图视角信息（正/侧位分组）。"""
+        return self.aggregation in VIEW_AGGREGATIONS
+
+    @property
+    def probability_space(self) -> bool:
+        """聚合是否在概率空间进行（逐图 sigmoid 后再平均，即 G1）。"""
+        return self.aggregation in PROBABILITY_AGGREGATIONS
+
     def __post_init__(self) -> None:
         if self.head not in {"standard", "csra", "ml_decoder"}:
             raise ValueError("model.head 只能是 standard、csra 或 ml_decoder")
@@ -107,8 +128,12 @@ class ModelConfig:
                 raise ValueError("注意力分类头目前仅支持全量微调且 dropout=0")
         if not 0.0 <= self.dropout < 1.0:
             raise ValueError("model.dropout 必须在 [0, 1) 内")
-        if self.aggregation not in {"mean", "view_weighted"}:
-            raise ValueError("model.aggregation 只能是 mean 或 view_weighted")
+        if self.aggregation not in ALL_AGGREGATIONS:
+            raise ValueError(
+                "model.aggregation 只能是 "
+                + "、".join(sorted(ALL_AGGREGATIONS))
+                + f"，当前为 {self.aggregation!r}"
+            )
         if not 0.0 < self.frontal_weight < 1.0:
             raise ValueError("model.frontal_weight 必须在 (0, 1) 内")
         if not self.backbone:

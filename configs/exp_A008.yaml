@@ -1,0 +1,25 @@
+# A-008：A-001 的聚合空间对照：view_weighted（logits 空间，G0）
+#        → view_weighted_probability（概率空间，G1）。
+#
+# 以 `configs/exp_A001.yaml` 为基准，只改一处：
+#   model.aggregation: view_weighted → view_weighted_probability
+# 正位 / 侧位权重仍是 0.7 / 0.3（`model.frontal_weight: 0.7`，与 A-001 一致），
+# 分组规则、单视角与未知视角回退规则都不变。因此与 A-001 是单变量对照，
+# 差值只可能来自「先平均 logits 再 sigmoid」还是「先 sigmoid 再平均概率」。
+#
+# 口径（训练、验证、推理、提交全程一致）：
+#   G0（A-001）  sigmoid(0.7·mean(z_正位) + 0.3·mean(z_侧位))
+#   G1（A-008）  0.7·mean(σ(z_正位)) + 0.3·mean(σ(z_侧位))
+# 实现上 `aggregate_logits(..., probability_space=True)` 返回 logit(mean(σ(z)))：
+# `BCEWithLogitsLoss` 对这种输入的取值与直接用概率算 BCE 等价，推理侧
+# `sigmoid(logit(p)) == p`，所以下游不需要任何分支。
+# 不能只在推理侧切换聚合空间——训练与推理口径不一致时，差值无法归因。
+#
+# 用法（在仓库根目录执行）：
+#     python src/run_train.py --config configs/exp_A008.yaml --seed 42 --tag A-008_convnext_tiny_g1_s42
+
+_base: exp_A001.yaml
+
+model:
+  aggregation: view_weighted_probability
+  frontal_weight: 0.7

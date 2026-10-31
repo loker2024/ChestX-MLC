@@ -448,12 +448,13 @@ def _run(args: argparse.Namespace) -> int:
 
     # 一致性校验：把 100 张图按 study 分组，用同一套推理函数聚合，再和提交文件比对。
     # 这一步不计时（规则只要求提交结果一致，不要求它属于耗时区间）。
-    if config.model.aggregation == "view_weighted" and records_by_study is None and any(len(paths) > 1 for paths in full_paths_by_study.values()):
+    if config.model.uses_views and records_by_study is None and any(len(paths) > 1 for paths in full_paths_by_study.values()):
         raise ValueError("视角加权的多图一致性校验需要完整测试集索引")
     study_probabilities = {
         study_id: predict_study(model, paths, transform, device,
-            records_by_study[study_id].views if config.model.aggregation == "view_weighted" and records_by_study is not None else None,
-            config.model.frontal_weight)
+            records_by_study[study_id].views if config.model.uses_views and records_by_study is not None else None,
+            config.model.frontal_weight,
+            config.model.probability_space)
         for study_id, paths in full_paths_by_study.items()
     }
     comparison = compare_study_predictions(

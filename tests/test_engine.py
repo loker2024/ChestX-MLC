@@ -75,6 +75,35 @@ def test_fit_one_epoch_updates_weights(config: Config) -> None:
     assert set(result["best_state"]) == set(model.state_dict())
 
 
+def test_fit_with_probability_space_aggregation(config: Config) -> None:
+    """A-008 口径：概率空间聚合也要能训练——loss 有限、参数更新、指标可算。
+
+    概率空间分支返回的是 `logit(mean(σ(z)))`，仍交给 BCEWithLogitsLoss，
+    所以这里同时验证了「梯度能穿过 sigmoid / logit / clamp 回到骨干」。
+    """
+    g1 = replace(
+        config,
+        model=replace(
+            config.model, aggregation="view_weighted_probability", frontal_weight=0.7
+        ),
+    )
+    device = torch.device("cpu")
+    torch.manual_seed(0)
+    train_loader, val_loader = _loaders(g1)
+    model = build_model(g1)
+    before = {name: value.clone() for name, value in model.state_dict().items()}
+
+    result = fit(g1, model, train_loader, val_loader, device)
+
+    record = result["history"][0]
+    assert math.isfinite(record["train_loss"])
+    assert math.isfinite(record["valid_loss"])
+    assert 0.0 <= record["valid_macro_auc"] <= 1.0
+    assert any(
+        not torch.equal(value, before[name]) for name, value in model.state_dict().items()
+    )
+
+
 def test_frozen_fit_only_passes_trainable_parameters_to_optimizer(
     config: Config, monkeypatch
 ) -> None:

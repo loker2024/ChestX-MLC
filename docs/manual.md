@@ -137,6 +137,7 @@ train:
 | `configs/exp_A001c.yaml` | A-001-C：A-001 的冻结骨干对照（`freeze_backbone: true`，只训练分类头），已完成 | `_base: exp_A001.yaml` | 只覆盖 `model.freeze_backbone: true` |
 | `configs/exp_A002.yaml` | A-002：A-001 的轻量骨干对照（ConvNeXt-Tiny → MobileNetV3-Small 0.5×、578,474 参数；轮数 8→25、早停 2→5），第 5 轮按用户要求中止 | `_base: exp_A001.yaml` | 只覆盖 `model.backbone`、`train.epochs: 25`、`train.early_stop_patience: 5` |
 | `configs/exp_A003.yaml` | A-003：A-002 的宽度对照（MobileNetV3-Small 0.5× → 1.0×、1,528,106 参数），已完成（0.7808 / 0.3881，未过门） | `_base: exp_A002.yaml` | 只覆盖 `model.backbone: mobilenetv3_small_100.lamb_in1k` |
+| `configs/exp_A008.yaml` | A-008：A-001 的聚合空间对照（logits 空间 G0 → 概率空间 G1，正侧位仍 7:3），待训练 | `_base: exp_A001.yaml` | 只覆盖 `model.aggregation: view_weighted_probability`，并显式固定 `model.frontal_weight: 0.7` |
 | `configs/exp_B001.yaml` | B-001：B 组医学预训练 DenseNet-121 研究对照（TxRV `densenet121-res224-all`，224×224 单通道），仅研究、不用于赛题提交 | `_base: default.yaml` | `image.size: 224`、`normalize: xrv`、`in_channels: 1`、`model.arch: xrv_densenet121`、`xrv_sha256` 固定 |
 | `configs/exp_resnet50.yaml` | ResNet-50 骨干对照，已完成（RUN-005） | `_base: default.yaml` | `backbone: resnet50` |
 | `configs/exp_example.yaml` | 示例数据冒烟 | `_base: default.yaml` | `data` 三个 split 指向 `data/example` |
@@ -233,8 +234,8 @@ data:
 | `model.pretrained` | 布尔 | `true` | `true` / `false` | 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）。timm 链路离线拿不到权重时会告警并回退随机初始化；B 组加载失败一律直接报错、不回退，训练日志与 checkpoint 的 `metadata.pretrained_loaded` 会记录真实情况。 |
 | `model.freeze_backbone` | 布尔 | `false` | `true` / `false` | 是否冻结骨干、仅训练 timm 识别的分类头。冻结实验应使用单独配置；默认关闭以保持全量微调。 |
 | `model.num_classes` | 整数 | `10` | 必须等于 `10` | 赛题固定 10 类，写其他值会直接报错。 |
-| `model.aggregation` | 字符串 | `mean` | `mean` / `view_weighted` | 图片等权均值或按正侧位均值加权。 |
-| `model.frontal_weight` | 数字 | `0.7` | `0 < 值 < 1` | 视角加权时正位权重；侧位权重为 `1 - frontal_weight`。 |
+| `model.aggregation` | 字符串 | `mean` | `mean` / `view_weighted` / `view_weighted_probability` | 聚合口径。`mean`：study 内图片等权均值（logits 空间）；`view_weighted`：按正/侧位分组均值再按 `frontal_weight` 加权（logits 空间，G0）；`view_weighted_probability`：分组与权重同上，但先逐图 sigmoid 再在概率空间加权（G1）。训练、验证、推理、提交共用同一口径。 |
+| `model.frontal_weight` | 数字 | `0.7` | `0 < 值 < 1` | 视角加权时正位权重；侧位权重为 `1 - frontal_weight`。`mean` 下不生效。 |
 | `model.arch` | 字符串 | `timm` | `timm` / `xrv_densenet121` | 模型实现分支。默认走 timm；`xrv_densenet121` 为 B 组隔离研究（TorchXRayVision DenseNet-121 医学预训练），仅研究，不用于赛题提交、融合或候选选择；该分支禁止 `freeze_backbone`。 |
 | `model.xrv_weights` | 字符串 | `densenet121-res224-all` | 非空 | 仅 `arch: xrv_densenet121` 生效：TxRV 预训练权重名。 |
 | `model.xrv_cache_dir` | 路径 / 空 | 空 | 可省略 | 仅 B 组生效：权重缓存目录；省略时用 TxRV 默认 `~/.torchxrayvision/models_data`。 |

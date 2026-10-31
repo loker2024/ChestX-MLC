@@ -11,7 +11,7 @@
 - ID 规则：`Subject_id`、`Study_id`、`Dicom_id` 均带前导零，读取与写出全程使用字符串。
 - 数据划分：官方 train/valid 已按患者划分且无重叠，直接沿用；valid 只用于选型与早停。
 - 部署约束：模型总分 ≤500MB、单图端到端 ≤100ms（T4 16GB），默认 ResNet-18 + 320px 输入。
-- 聚合口径：逐图 forward 得到 logits，默认同一 study 内按图片取均值；可选正侧位分组均值加权，未知视角或单视角回退全图均值；聚合后 sigmoid，训练损失与推理提交使用同一口径。
+- 聚合口径：逐图 forward 得到 logits，默认同一 study 内按图片取均值；可选正侧位分组均值加权，未知视角或单视角回退全图均值。聚合空间由 `model.aggregation` 决定：`mean` / `view_weighted` 在 logits 空间聚合后 sigmoid（G0），`view_weighted_probability` 先逐图 sigmoid、在概率空间加权后经 logit 变换回 logits（G1）。训练损失、验证指标、推理提交与耗时自检使用同一口径。
 
 ## 2. 目录总览
 
@@ -71,7 +71,7 @@ outputs/
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `network.py` | timm 骨干（默认 ResNet-18）+ 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets, views=None, frontal_weight=0.7) -> Tensor[B, 10]` |
+| `network.py` | timm 骨干（默认 ResNet-18）+ 单层分类头；study 级 logits 聚合 | `build_model(cfg) -> nn.Module`、`aggregate_logits(logits, offsets, views=None, frontal_weight=0.7, probability_space=False) -> Tensor[B, 10]`（`probability_space=True` 时在概率空间聚合，返回 `logit(A(σ(z)))`） |
 | `losses.py` | `train.loss` 选择 BCEWithLogitsLoss（可选按训练集频率计算 `pos_weight`）或 ASL 非对称损失；并显式指定设备 | `build_loss(cfg, train_labels=None, device=None)` |
 
 ### 3.4 train：训练逻辑
@@ -87,6 +87,7 @@ outputs/
 | `predict.py` | 加载 checkpoint 对 loader / 单图 / 单 study 推理，聚合为 study 级概率；`predict_loader`、`predict_image`、`predict_study` 共用内部前向 | `load_checkpoint_model(config, path, device)`、`build_eval_inference_transform(config)`、`predict_loader(model, loader, device, config=None) -> pd.DataFrame`（`Study_id, p1..p10`）、`predict_image(model, image_path, transform, device) -> np.ndarray`（单图，计时用）、`predict_study(model, image_paths, transform, device) -> np.ndarray`（study 聚合，一致性校验用） |
 | `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出；阈值必须在 `[0, 1]` | `build_submission_frame(predictions, study_subjects, threshold=None)`、`validate_submission(path, test_csv, require_all_classes=True)`、`write_submission(df, path)` |
 | `profiling.py` | 耗时评测的可测口径：图片发现与身份解析、提交文件读取校验、阈值选择、study 预测比对、计时统计与结论格式化；不含 `torch` | `COST_LIMIT_MS` / `DEFAULT_ROUNDS` / `DEFAULT_WARMUP_IMAGES` / `DEFAULT_TOLERANCE`、`list_images`、`parse_image_identity`、`group_images_by_study`、`read_submission`、`select_prediction_rows`、`compare_study_predictions`、`summarize_timings`、`format_conclusion` |
+| `aggregation_compare.py` | 聚合空间对照：逐图 logits 缓存导出（含元数据与 SHA-256 指纹）、缓存校验、G0/G1 配对重算与报告；支持 `mean` 与 `view_weighted` 两种聚合，正位权重可覆盖；`compare` 不加载模型、不读图片 | `aggregate_pair(logits, offsets, views=None, frontal_weight=0.7) -> (g0, g1)`、`export_run(run_dir, out_dir, device, frontal_weight=None)`、`load_cache(cache_dir, verify_hash=True)`、`compare_cache(cache_dir, thresholds, frontal_weight=None)` |
 
 ### 3.6 入口脚本
 
@@ -97,6 +98,8 @@ outputs/
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 | `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `per_class.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
+| `run_ensemble.py` | 多模型融合入口：`--fusion probability`（默认，概率平均）或 `logit`（先平均 study 级 logits 再 sigmoid），按 `Study_id` 对齐后写提交或验证报告 |
+| `run_aggregation_compare.py` | 聚合空间对照入口：`export` 导出固定 checkpoint 的逐图 logits 缓存，`compare` 离线重算 G0（logits 平均后 sigmoid）与 G1（逐图 sigmoid 后平均），只读缓存、不加载模型。设计见 [train_plan_aggregation.md](train_plan_aggregation.md) |
 | `src/cost.py` | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径。调用方式、索引降级行为和限制见 [cost.md](cost.md) |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
