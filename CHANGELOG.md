@@ -123,6 +123,8 @@
 - `21:20`（变更）`docs/experiments.md`、`docs/training_log.md`、`docs/train_plan20.md`：回填 A-009-r2（A-009 二轮 warm start：以首轮 `best.pt` 为初始权重、按 A-009 同配置重训 10 轮）实测——20:49:14–21:13:48（24m34s，GPU 与另一容器共享）、第 5 轮早停（best epoch 1），valid macro-AUC **0.7764** / F1@0.5 **0.4117**；相对首轮 A-009（0.7799 / 0.4101）差 AUC −0.0035 / F1@0.5 +0.0016，相对 A-001（0.8038 / 0.4255）差 AUC −0.0274 / F1@0.5 −0.0138，距 0.8088 门差 −0.0324 → 未过门；lr 重新 warmup 破坏首轮已收敛权重（train_loss 0.6562 → 0.7556，ep1 后 4 轮无提升），warm start 二轮无增益，A-009 首轮否定结论不变。experiments 矩阵新增 A-009-r2 行，train_plan20 状态改为已完成。
 
 - `21:35`（新增）`configs/exp_A001_seed216.yaml`：新增 A-001(s216) 实验配置，以 `_base: exp_A001.yaml` 继承 A-001，只覆盖 `train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，并把 `seed` 设为 216；用于 A-001 口径下的 seed 复核与训练预算/正则组合验证。训练已启动（2026-10-31 21:34:05），实测待回填。
+- `22:22`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 A-001(s216) 实测——2026-10-31 21:34:05 → 22:17:50（43m45s）、第 10 轮后连续 4 轮无提升早停（best epoch 6），valid macro-AUC **0.7947** / F1@0.5 **0.4235**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0091、F1@0.5 −0.0020，距 0.8088 门差 −0.0141 → 未过门；ep6 达峰后 train_loss 0.7075 → 0.2446、valid_loss 0.9631 → 2.0729，12 轮预算无后段增益、wd 0.02 未推迟过拟合；四项同改（seed 216 / 12 轮 / patience 4 / wd 0.02）不可单变量归因，方向否定、默认口径不变。training_log 新增 A-001(s216) 小节与汇总表行，experiments 矩阵新增一行、执行与结果新增结论、环境表补 seed 216。
+- `22:22`（变更）远端训练环境（不涉及仓库文件）：A-001(s216)（A-001 口径 + seed 216 + 12 轮 / patience 4 / wd 0.02）在 autodl V100-SXM2-32G 上完成训练与评估——产物 `outputs/20261031-213405_A-001_convnext_tiny_s216/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-001-s216_full.txt`、`outputs/A-001-s216_valid_predictions.csv`；训练分支 `exp/A-001-s216`（提交 `f2a06db`）。
 
 ## 2026-10-30
 

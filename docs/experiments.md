@@ -16,7 +16,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | 设备 | RTX 3090 24G（复用同一实例；本机只做代码与文档验证）；RUN-009 / A-001 系列为 V100-SXM2-32G，两种硬件耗时不可横向对照 |
 | 软件 | Python 3.12、torch 2.x（CUDA）、timm 1.0.30 |
 | B 组环境 | `/root/venv-b001`：Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7；B-001 输入 224×224 单通道、xrv 归一化（仅研究） |
-| 随机种子 | 42（RUN-002-B、RUN-006-A、RUN-007-A、RUN-007-B、RUN-009-A、RUN008-A/B/C/D、A-001-B(seed 2026) 为 2026） |
+| 随机种子 | 42（RUN-002-B、RUN-006-A、RUN-007-A、RUN-007-B、RUN-009-A、RUN008-A/B/C/D、A-001-B(seed 2026) 为 2026、A-001(s216) 为 216） |
 | 输入 | 320×320，letterbox，ImageNet 归一化，默认无水平翻转 |
 | 骨干 | timm `resnet18.a1_in1k`，ImageNet 预训练 |
 
@@ -68,6 +68,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-008 | `A-008_convnext_tiny_g1_s42` | `configs/exp_A008.yaml`（`_base: exp_A001.yaml`） | 8（早停 2，实际 7） | 是 | A-001 的聚合空间对照：`model.aggregation: view_weighted → view_weighted_probability`（先逐图 sigmoid 再在概率空间按正侧位 7:3 加权），其余口径逐字段不变；已完成（0.7974 / 0.4197，未过 0.8088 门） |
 | A-009 | `A-009_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`） | 10（跑满上限） | 是 | A-001 的优化超参联合放大对照：`train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余口径逐字段不变；已完成（0.7799 / 0.4101，未过 0.8088 门） |
 | A-009-r2 | `A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`）+ `src/run_train.py --init-from` 首轮 `best.pt` | 10（早停 4，实际 5） | 是 | A-009 的二轮 warm start 对照：以首轮 A-009 `best.pt`（epoch 10 权重）为初始权重、按 A-009 同配置重训 10 轮；已完成（0.7764 / 0.4117，未过 0.8088 门，低于首轮 0.7799 / 0.4101） |
+| A-001(s216) | `A-001_convnext_tiny_s216` | `configs/exp_A001_seed216.yaml`（`_base: exp_A001.yaml`） | 12（早停 4，实际 10） | 是 | A-001 的 seed 216 复核 + 预算/正则三项覆盖：`seed` 42 → 216、`train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，其余口径逐字段不变；已完成（0.7947 / 0.4235，未过 0.8088 门） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -420,6 +421,14 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 阈值曲线（0.2–0.7）：A-009-r2 0.3684 / 0.3833 / 0.3966 / 0.4117 / 0.4137 / 0.4022，首轮 A-009 0.3825 / 0.3991 / 0.4053 / 0.4101 / 0.4083 / 0.3925；低阈值段（0.2–0.3）二轮更低、0.5–0.7 段略高，属校准形态变化。
 - 逐类：class5 0.8579 / class9 0.8942 / class10 0.8678 相对稳定，class1 0.6993 / class4 0.6764 / class8 0.6973 偏低；未做与首轮 A-009 逐类差异的显著性检验。
 - 判读：以首轮 ep10 权重初始化后，lr 重新从 5e-4 warmup 到 1e-3 破坏了已收敛的权重——train_loss 由首轮的 0.6562 反弹到 0.7556，valid AUC 由源权重 0.7799 掉到 0.7764 后连续 4 轮未回升，5 轮即早停；**warm start 二轮无增益**，A-009 首轮的否定结论不变。本轮耗时受 GPU 共享影响（每轮约 6–7 分钟 vs 首轮 4.4 分钟/轮），不可横向比较。
+
+**A-001(s216)：A-001 口径下的 seed 216 复核（+12 轮 / patience 4 / wd 0.02）**（配置 `configs/exp_A001_seed216.yaml`，产物
+`outputs/20261031-213405_A-001_convnext_tiny_s216`，2026-10-31）：
+- 配置：相对 A-001 同时改四项——`seed` 42 → 216、`train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，其余逐字段不变。
+- 结果：21:34:05–22:17:50（43m45s）、第 10 轮后连续 4 轮无提升早停（best epoch 6），valid macro-AUC **0.7947** / F1@0.5 **0.4235**（`run_eval.py` 重算）。
+- 阈值曲线（0.2–0.7）：0.3768 / 0.3992 / 0.4127 / 0.4235 / 0.4245 / 0.3960，F1 峰在 0.6；低阈值段高于 A-001、0.4 以上低于 A-001，属校准形态变化。
+- 逐类：4 升（class4 +0.0264 最大）6 降（class1 −0.0494 最大，support 24），没有单类崩掉。
+- 判读：AUC 相对 A-001 差 **−0.0091**、F1@0.5 差 **−0.0020**，距 0.8088 门差 −0.0141 → **未过门**；ep6 达峰后 valid_loss 由 0.9631 反弹到 2.0729，12 轮预算未带来后段增益、wd 0.02 未推迟过拟合；四项同改不可单变量归因，方向否定、默认口径不变（seed 42 / 8 轮 / patience 2 / wd 0.01）。
 
 ## 冻结结论
 
