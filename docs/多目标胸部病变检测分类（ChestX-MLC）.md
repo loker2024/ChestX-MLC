@@ -37,8 +37,21 @@ images/
 ```
 
 - **类别标签说明**
-  - 总共10个类别，每个类别只有在相关研究报告中被正面提及且出现在对应图像中，才会被标记。以下是每个类别id与标签的映射关系：
-  -
+  - 总共10个类别，每个类别只有在相关研究报告中被正面提及且出现在对应图像中，才会被标记。以下是每个类别id与标签的映射关系（原转录缺失，按赛事官方通知补齐，见 [类别定义与分布](classes.md)）：
+
+| 类别id | 中文名称 | 英文名称 |
+| :---: | :--- | :--- |
+| 1 | 纵隔心影增大 | Enlarged Cardiomediastinum |
+| 2 | 气胸 | Pneumothorax |
+| 3 | 肺部实变 | Consolidation |
+| 4 | 肺炎 | Pneumonia |
+| 5 | 肺水肿 | Edema |
+| 6 | 心影扩大 | Cardiomegaly |
+| 7 | 肺不张 | Atelectasis |
+| 8 | 肺部阴影 | Lung Opacity |
+| 9 | 胸腔积液 | Pleural Effusion |
+| 10 | 无异常发现 | No Finding |
+
 - **相关字段说明**
   - Subject_id：单个患者的唯一id
   - Study_id：单个检查的唯一id，可能包含一张或多张胸部x光片
