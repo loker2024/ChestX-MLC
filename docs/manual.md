@@ -221,6 +221,7 @@ data:
 | `image.letterbox` | 布尔 | `true` | `true` / `false` | `true`：等比缩放到最长边等于 `size`，再居中补黑边，保持胸片比例；`false`：直接拉伸成 `size × size`，可能使器官轮廓变形。 |
 | `image.normalize` | 字符串 | `imagenet` | `imagenet` / `none` / `xrv` | `imagenet`：减 ImageNet 均值、除标准差，配合预训练权重；`none`：只把像素缩到 0–1；`xrv`：按 TorchXRayVision 口径把像素映射到 `[-1024, 1024]`，仅 B 组使用。 |
 | `image.hflip` | 布尔 | `false` | `true` / `false` | 仅训练增强是否做水平翻转。胸片左右有方向含义，默认关闭。 |
+| `image.brightness` / `image.contrast` | 浮点数 | `0.15` / `0.15` | `[0, 1]` | 仅训练时的 ColorJitter 亮度和对比度扰动幅度；例如 0.05 表示因子在 0.95–1.05 之间抽样。验证与推理不做随机增强；续训不得修改。 |
 | `image.in_channels` | 整数 | `3` | `3` / `1` | 输入通道数。timm 链路固定 3 通道；B 组 TxRV 医学权重是单通道，必须设 `1`，且 `normalize: xrv` 要求 `in_channels: 1`、`normalize: imagenet` 要求 `in_channels: 3`。 |
 | `image.xrv_maxval` | 整数 | `255` | `> 0` | 仅 `normalize: xrv` 生效：归一化公式 `(2 * pixel / maxval - 1) * 1024` 的像素上限。当前 B 组配置按 8 位灰度 JPEG/PNG 使用 255；16 位灰度图可用 65535，原始像素超过该值会在预处理前报错。 |
 
@@ -253,6 +254,7 @@ data:
 | `train.head_lr` | 浮点或 `null` | `null` | 有限正数或 `null` | `null` 保持单参数组；设置后 `train.lr` 用于骨干，`head_lr` 用于 `get_classifier()` 返回的分类头，其余可训练参数为骨干。两组学习率按相同倍率调度；不支持空分类头或空骨干。 |
 | `train.weight_decay` | 浮点 | `0.01` | `>= 0` | AdamW 权重衰减。 |
 | `train.pos_weight` | 布尔 | `true` | `true` / `false` | 默认配置按训练集类别频率给 BCE 正样本加权（`负样本数 / 正样本数`）；未指定字段时兼容旧配置，使用 `false`。 |
+| `train.pos_weight_power` | 浮点数 | `1.0` | `[0, 1]` | 开启 `pos_weight` 时，权重为 `(负 study 数 / 正 study 数) ** pos_weight_power`；`0.5` 取平方根，`0` 权重为 1，`1` 保持旧行为。全正或全负类别权重仍为 1；关闭 `pos_weight` 或使用 ASL 时无效。续训不能更改此值。 |
 | `train.warmup_epochs` | 整数 | `2` | `0 <= warmup < epochs` | 线性 warmup 轮数，按 epoch 逐步把学习率升到 `lr`。默认下第 1 轮为 `lr/2`、第 2 轮为 `lr`。 |
 | `train.lr_scheduler` | 字符串 | `cosine` | `warmup` / `cosine` | 默认配置在预热后余弦衰减；`warmup` 在预热后保持学习率。未指定字段时兼容旧配置，使用 `warmup`。 |
 | `train.lr_min` | 浮点 | `0.00001` | `0 <= lr_min <= lr` | 余弦调度的最低学习率；提前停止时可能尚未到达。 |
@@ -327,6 +329,16 @@ train:
 | `配置文件内容为空` | YAML 为空 | 至少写入 `data` 或 `_base` |
 
 ---
+
+### 平方根类别权重示例
+
+`configs/exp_pos_weight_sqrt.yaml` 继承 A-001，只将 `train.pos_weight_power` 设为 `0.5`；默认值 `1.0` 保持历史权重。以下命令仅为未来训练示例，需先核验数据、预训练权重和训练环境：
+
+```bash
+python src/run_train.py --config configs/exp_pos_weight_sqrt.yaml --seed 42 --tag pos_weight_sqrt_s42
+```
+
+将其与同数据、同 seed、同训练预算的 A-001 对照，以 study 级 Macro-AUC 为主，辅以逐类 AUC 与 F1。当前配置不代表已训练或已获得性能收益。
 
 ## 3. output 目录结构与产物
 

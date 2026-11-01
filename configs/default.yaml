@@ -32,6 +32,8 @@ image:
   letterbox: true
   normalize: imagenet        # imagenet=减 ImageNet 均值除方差；none=只缩放像素到 0~1
   hflip: false               # 训练是否水平翻转；胸片左右有方向含义，默认关闭
+  brightness: 0.15           # 训练时亮度随机扰动幅度
+  contrast: 0.15             # 训练时对比度随机扰动幅度
 
 # 模型：ResNet-18 骨干（1000 类版约 11.7M，换成 10 类头后约 11.2M）+ 单层分类头。
 model:
@@ -46,6 +48,7 @@ train:
   lr: 0.0003                 # 注意用小数写法；YAML 1.1 会把 3e-4 读成字符串
   weight_decay: 0.01
   pos_weight: true           # 按训练集类别频率给正样本加权
+  pos_weight_power: 1.0      # 正样本权重指数；0.5 为平方根，1.0 为原始权重
   warmup_epochs: 2
   lr_scheduler: cosine       # warmup 后余弦衰减；warmup 表示预热后保持学习率
   lr_min: 0.00001            # cosine 的最低学习率

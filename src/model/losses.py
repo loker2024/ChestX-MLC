@@ -91,7 +91,8 @@ def build_loss(
 
     - `train.loss="asl"` 时返回 `AsymmetricLoss`，超参取 `train.asl_*`；
     - `train.loss="bce"`（默认）时返回 `BCEWithLogitsLoss`；`train.pos_weight=True`
-      时启用 `pos_weight`：第 c 类的权重取「训练集负样本数 / 正样本数」。
+      时启用 `pos_weight`：第 c 类权重为「负样本数 / 正样本数」的
+      `train.pos_weight_power` 次方，正负样本均按训练集 study 计数。
       稀有类的正样本因此获得更大权重，模型不敢轻易把稀有类全判成负；
     - 启用 pos_weight 时必须传入 `train_labels`（`[num_studies, 10]` 的 0/1
       矩阵，通常由训练集的 `StudyRecord.labels` 纵向拼成），否则没法统计频率；
@@ -129,6 +130,7 @@ def build_loss(
         negatives / np.maximum(positives, 1.0),
         1.0,
     )
+    pos_weight = np.power(pos_weight, cfg.train.pos_weight_power)
 
     return nn.BCEWithLogitsLoss(
         pos_weight=torch.tensor(pos_weight, dtype=torch.float32, device=device)

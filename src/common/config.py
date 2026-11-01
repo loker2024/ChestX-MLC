@@ -63,10 +63,16 @@ class ImageConfig:
     letterbox: bool = True  # True=等比缩放后补边；False=直接拉伸到 size×size
     normalize: str = "imagenet"  # "imagenet"=减均值除方差；"none"=只把像素缩到 0~1；"xrv"=TxRV 的 [-1024,1024]
     hflip: bool = False  # 训练是否水平翻转；胸片左右有方向含义，默认关闭
+    brightness: float = 0.15  # 训练时亮度扰动幅度
+    contrast: float = 0.15  # 训练时对比度扰动幅度
     in_channels: int = 3  # 模型输入的通道数；B 组 TxRV DenseNet 使用单通道 1
     xrv_maxval: int = 255  # normalize="xrv" 时的像素上限；8 位图 255、16 位图 65535
 
     def __post_init__(self) -> None:
+        for name in ("brightness", "contrast"):
+            value = getattr(self, name)
+            if not math.isfinite(value) or not 0 <= value <= 1:
+                raise ValueError(f"image.{name} 必须为 [0, 1] 内的有限数值")
         if self.size <= 0:
             raise ValueError(f"image.size 必须是正整数，当前为 {self.size}")
         if self.in_channels not in {1, 3}:
@@ -189,6 +195,7 @@ class TrainConfig:
     head_lr: float | None = None  # None 沿用单组；否则为分类头峰值学习率
     weight_decay: float = 0.01
     pos_weight: bool = False  # 按训练集类别频率给 BCE 的正样本加权；类别极不平衡时打开
+    pos_weight_power: float = 1.0  # 正样本权重指数；0.5 为平方根，1.0 保持旧行为
     warmup_epochs: int = 2  # 前几个 epoch 线性升温到 lr
     lr_scheduler: str = "warmup"  # "warmup"=预热后保持 lr；"cosine"=预热后余弦衰减到 lr_min
     lr_min: float = 1e-5  # cosine 衰减的终点学习率；"warmup" 模式下不生效
@@ -213,6 +220,8 @@ class TrainConfig:
             raise ValueError("train.head_lr 必须是有限正数或 null")
         if self.weight_decay < 0:
             raise ValueError(f"train.weight_decay 必须 >= 0，当前为 {self.weight_decay}")
+        if not math.isfinite(self.pos_weight_power) or not 0 <= self.pos_weight_power <= 1:
+            raise ValueError("train.pos_weight_power 必须是 [0, 1] 内的有限数值")
         if not 0 <= self.warmup_epochs < self.epochs:
             raise ValueError(
                 f"train.warmup_epochs 必须满足 0 <= warmup < epochs，"

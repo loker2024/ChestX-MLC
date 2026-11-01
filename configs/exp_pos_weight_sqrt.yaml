@@ -1,0 +1,5 @@
+# A-001 的平方根正样本权重候选；未执行训练。
+_base: exp_A001.yaml
+
+train:
+  pos_weight_power: 0.5

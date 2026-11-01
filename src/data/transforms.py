@@ -89,7 +89,7 @@ def build_train_transform(size: int, cfg: ImageConfig) -> Callable[[Image.Image]
     增强只做「不改变语义」的几何与光照扰动：
 
     - 旋转 ±7°、缩放 0.9~1.1、平移 5%：胸片拍摄时患者体位本来就有轻微差异；
-    - 亮度 / 对比度 ±15%：不同设备的曝光和窗宽窗位不一样。
+    - 亮度 / 对比度扰动幅度由 cfg 配置，默认均为 0.15。
 
     是否水平翻转由 `cfg.hflip` 决定，默认关闭：胸片左右肺、心脏位置都有方向
     含义，翻转会把「左侧病变」变成「右侧病变」，属于污染标签的增强。
@@ -112,26 +112,27 @@ def build_train_transform(size: int, cfg: ImageConfig) -> Callable[[Image.Image]
             interpolation=InterpolationMode.BILINEAR,
             fill=0,
         ),
-        T.ColorJitter(brightness=0.15, contrast=0.15),
+        T.ColorJitter(brightness=cfg.brightness, contrast=cfg.contrast),
     ]
     if cfg.hflip:
         steps.append(T.RandomHorizontalFlip(p=0.5))
     steps.extend(_normalize_steps(cfg.normalize, cfg.in_channels, cfg.xrv_maxval))
     transform = T.Compose(steps)
-    return _XrvBitDepthTransform(transform, size, cfg.letterbox, cfg.xrv_maxval, True, cfg.hflip) if cfg.normalize == "xrv" else transform
+    return _XrvBitDepthTransform(transform, size, cfg.letterbox, cfg.xrv_maxval, True, cfg.hflip, cfg.brightness, cfg.contrast) if cfg.normalize == "xrv" else transform
 
 
 class _XrvBitDepthTransform:
     """保留 16 位输入，并在任何通道转换前检查原始像素范围。"""
 
     def __init__(self, eight_bit: Callable, size: int, letterbox: bool, maxval: int,
-                 train: bool, hflip: bool = False) -> None:
+                 train: bool, hflip: bool = False, brightness: float = 0.15,
+                 contrast: float = 0.15) -> None:
         self.eight_bit, self.size, self.letterbox, self.maxval = eight_bit, size, letterbox, maxval
         self.train, self.hflip = train, hflip
         self.augment = T.Compose([
             T.RandomAffine(degrees=7, translate=(0.05, 0.05), scale=(0.9, 1.1),
                            interpolation=InterpolationMode.BILINEAR, fill=0),
-            T.ColorJitter(brightness=0.15, contrast=0.15),
+            T.ColorJitter(brightness=brightness, contrast=contrast),
             *([T.RandomHorizontalFlip(p=0.5)] if hflip else []),
         ])
 
