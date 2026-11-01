@@ -8,6 +8,10 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-11-01
+
+- `10:47`（修复）`CHANGELOG.md`：还原 `2026-10-31` 的 `10:58` 条目——该条目在 `8acd94b` 解决合并冲突时被 `19:48` 的两条从中割断，正文混入裸 `## 2026-10-30` 标题且丢失开引号；同时把 `19:48` 两条恢复为独立条目并按同日时间正序归位到 `19:03` 组之后。条目内容未改写。
+
 ## 2026-10-31
 
 - `00:03`（新增）`docs/train_plan12.md`：制定 B 组 TorchXRayVision 医学预训练 DenseNet-121 独立研究计划，记录输入适配、权重和数据核验、赛题边界及评估要求；尚未实施或训练。
@@ -22,9 +26,7 @@
 - `10:24`（变更）`docs/training_log.md`：A-001-C 耗时口径由 37 分 54 秒（17:32:49 → 18:10:43）更正为 38 分 01 秒（17:32:49 → 18:10:50），与汇总表、`docs/experiments.md`、已提交 CHANGELOG 条目一致。
 - `10:24`（变更）`docs/train_plan10.md`：状态行由「计划，尚未创建实验配置或执行训练」更正为「配置已创建（`configs/exp_A002.yaml`），尚未执行 GPU 训练」。
 - `10:24`（修复）`CHANGELOG.md`：2026-10-30、2026-10-29 两段条目按同日时间正序重排（条目内容不变）。
-- `10:58`（修复）把 AutoDL 训练环境未提交的 A-002 / A-003 实测回填合并到 `8acd94b` 并推送：`docs/experiments.md` 解决三方合并冲突（实验矩阵 A-002 / A-003 两行取实测版，A-002 / A-003 结论小节并入「执行与结果」，删除重复的旧「冻结结论」块）；`CHANGELOG.md` 冲突段重排为 `00:03`、`00:30`（5 条）、`10:24`（4 条）后接 `- `19:48`（变更）远端训练环境（不涉及仓库文件）：A-008（A-001 的聚合空间对照，概率空间 G1）在 autodl V100-SXM2-32G 上完成训练与评估——19:06:29 启动、第 7 轮早停（best epoch 5，32m19s），valid macro-AUC **0.7974** / F1@0.5 **0.4197**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0064 / F1@0.5 −0.0058，距 0.8088 门差 −0.0114 → 未过门，概率空间聚合训练方向否定，默认聚合保持 `view_weighted`。产物 `outputs/20261031-190629_A-008_convnext_tiny_g1_s42/`、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv`。
-- `19:48`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan18.md`：回填 A-008 实测（配置差异、命令、环境、7 轮逐轮、与 A-001 判读）；experiments 矩阵新增 A-008 行；train_plan18 状态行改为已完成。
-## 2026-10-30`；`docs/train_plan10.md` 状态行取回填版、`docs/train_plan11.md` 取已执行版；`docs/training_log.md`、`docs/manual.md`、`tests/test_config.py` 干净应用；`configs/exp_A003.yaml` 与已提交版一致。
+- `10:58`（修复）把 AutoDL 训练环境未提交的 A-002 / A-003 实测回填合并到 `8acd94b` 并推送：`docs/experiments.md` 解决三方合并冲突（实验矩阵 A-002 / A-003 两行取实测版，A-002 / A-003 结论小节并入「执行与结果」，删除重复的旧「冻结结论」块）；`CHANGELOG.md` 冲突段重排为 `00:03`、`00:30`（5 条）、`10:24`（4 条）后接 `## 2026-10-30`；`docs/train_plan10.md` 状态行取回填版、`docs/train_plan11.md` 取已执行版；`docs/training_log.md`、`docs/manual.md`、`tests/test_config.py` 干净应用；`configs/exp_A003.yaml` 与已提交版一致。
 
 - `11:18`（新增）`src/model/xrv.py`、`configs/exp_B001.yaml`、`tests/test_xrv.py`：B 组隔离研究（TorchXRayVision DenseNet-121 医学预训练）的构建入口、实验配置与 13 个用例测试；`xrv.py` 用空占位 `torchxrayvision.baseline_models` 绕过该包与仓库 `model` 包的同名导入冲突，加载 `densenet121-res224-all` 后替换 10 类头、清空 `op_threshs` 输出原始 logits，权重 SHA-256 与 `model.xrv_sha256` 校验不符或加载失败时直接报错、不回退随机初始化。
 - `11:18`（变更）`src/common/config.py`：`ImageConfig` 新增 `in_channels`（3/1）与 `xrv_maxval`（默认 255），`normalize` 支持 `xrv`，并校验 `xrv` 仅配单通道、`imagenet` 仅配三通道；`ModelConfig` 新增 `arch`（`timm` / `xrv_densenet121`）、`xrv_weights`、`xrv_cache_dir`、`xrv_sha256`（64 位十六进制校验）且 B 组禁止冻结骨干；`_convert` 支持 `Optional`/`Path | None`，修复 checkpoint 配置中空字符串被当作非空路径的回归。
@@ -113,6 +115,9 @@
 - `19:03`（变更）`src/infer/aggregation_compare.py`：明确拒绝在概率空间聚合的模型（`view_weighted_probability`）做 G0/G1 对照——该模型本身已是 G1，再对照没有意义；报错信息说明原因，`mean` / `view_weighted` 模型不受影响。
 - `19:03`（变更）`tests/test_model.py`、`tests/test_config.py`、`tests/test_engine.py`：新增 7 个用例——概率空间加权等于 `0.7·σ(正位)+0.3·σ(侧位)`（0.6928 vs G0 的 0.8320）、极端 logits（±80）不产生 inf/nan、概率空间可反传、`predict_loader` 端到端复现 G1 且与 G0 有可测差异、A-008 与 A-001 除聚合空间外逐字段一致、非法 `aggregation` 取值被拒、`fit` 在 G1 口径下 loss 有限且参数更新。全量 `python -m pytest -q` 301 passed / 3 skipped。
 - `19:03`（变更）`docs/manual.md`、`docs/architecture.md`：手册配置表补 `exp_A008.yaml` 行，`model.aggregation` / `model.frontal_weight` 字段说明改为三值口径；架构文档更新聚合口径描述与 `aggregate_logits` 签名。
+
+- `19:48`（变更）远端训练环境（不涉及仓库文件）：A-008（A-001 的聚合空间对照，概率空间 G1）在 autodl V100-SXM2-32G 上完成训练与评估——19:06:29 启动、第 7 轮早停（best epoch 5，32m19s），valid macro-AUC **0.7974** / F1@0.5 **0.4197**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0064 / F1@0.5 −0.0058，距 0.8088 门差 −0.0114 → 未过门，概率空间聚合训练方向否定，默认聚合保持 `view_weighted`。产物 `outputs/20261031-190629_A-008_convnext_tiny_g1_s42/`、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv`。
+- `19:48`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan18.md`：回填 A-008 实测（配置差异、命令、环境、7 轮逐轮、与 A-001 判读）；experiments 矩阵新增 A-008 行；train_plan18 状态行改为已完成。
 
 - `20:44`（新增）`configs/exp_A009.yaml`、`docs/train_plan19.md`：新增 A-009 优化超参联合放大对照（相对 A-001 只覆盖 `train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余逐字段继承），并记录该组的判读门（0.8088）、执行命令、实现口径与「四项同改不可拆单项」的限制；训练已启动，实测待回填。
 
