@@ -1,0 +1,66 @@
+# C-001-b：完整独立配置，不使用 _base。
+# 使用 train.head_lr 启用骨干与分类头两组学习率。
+# train.lr / lr_min 为骨干峰值 / 末轮学习率；head_lr 为分类头峰值。
+# 分类头使用相同调度倍率，末轮学习率为 0.000015。
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+  resplit:
+    enabled: false
+    valid_fraction: 0.1
+    seed: 42
+image:
+  size: 320
+  letterbox: true
+  normalize: imagenet
+  hflip: false
+  in_channels: 3
+  xrv_maxval: 255
+model:
+  backbone: efficientnet_b2.ra_in1k
+  pretrained: true
+  num_classes: 10
+  dropout: 0.0
+  head: standard
+  csra_residual_weight: 0.4
+  csra_temperature: 1.0
+  freeze_backbone: false
+  aggregation: view_weighted
+  frontal_weight: 0.7
+  arch: timm
+  xrv_weights: densenet121-res224-all
+  xrv_cache_dir: null
+  xrv_sha256: null
+train:
+  epochs: 12
+  batch_studies: 16
+  lr: 5.0e-05
+  weight_decay: 0.01
+  pos_weight: true
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 5.0e-06
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  tensorboard: auto
+  early_stop_patience: 4
+  loss: bce
+  asl_gamma_pos: 0.0
+  asl_gamma_neg: 4.0
+  asl_clip: 0.05
+  head_lr: 0.00015
+eval:
+  batch_studies: 32
+  threshold: 0.5
+output:
+  run_dir: outputs
+seed: 42
+device: auto
