@@ -138,6 +138,8 @@
 - `22:36`（新增）`docs/classes.md`：整理赛题 10 个类别的 ID → 中文名 → 英文名映射（来源为 2026 年第八届全国高校计算机能力挑战赛官方通知，原转录缺失该表），并给出 train/valid 的图像级与 study 级阳性数、占比、差值、长尾倍数、数据集结构（study / 图 / 患者 / 图数与视图分布）、两比例 z 检验及复现命令；统计发现类别 9（胸腔积液）验证集 study 级占比 30.27% 比训练集 25.14% 高 5.13pp（z = 3.38），其余 9 类 |z| < 1。
 - `22:36`（变更）`docs/多目标胸部病变检测分类（ChestX-MLC）.md`：补齐「类别标签说明」中原为空的类别 ID 与标签映射表（10 行，中文名 + 英文名），并链接到 `docs/classes.md`。
 
+- `23:10`（变更）`Submission.md`：补录 ENSEMBLE-3M（probability 权重 2:1:1）官方提交得分 76.82，以及 ENSEMBLE-3M-R2（probability 等权）官方提交得分 76.62；成绩由用户提供。
+
 - `23:15`（新增）`docs/experiments.md`、`docs/training_log.md`：回填 A-FUSE-1（valid 多模型概率融合选型与 test 提交通道，纯推理融合、无新训练）——8 个候选单模型 valid 基准（A-001 0.8038、A-005_baseline 0.8022、A-004-b 0.7999、A-008 0.7974 等）、9 组手动概率空间加权融合、6 模型 249 组权重网格（top1 0.8124），最终采用 A-001 + A-004-b + RUN-009-A + A-001-D 四模型等权融合，valid macro-AUC **0.8116** / F1@0.5 **0.4416**（相对 A-001 +0.0078，过 0.8088 门；相对历史最佳 fuse3 w211 +0.0012）；按规则排除 B-001（研究用）与 RUN-008-D（CC BY-NC），并记录未做配对 bootstrap、权重在 valid 上搜索非无偏等限制。experiments 矩阵新增 A-FUSE-1 行。
 - `23:15`（新增）远端训练环境（不涉及仓库文件）：A-FUSE-1 融合产物——`outputs/ensemble/valid/single_<tag>/predictions.csv` 共 11 个单模型概率缓存（新增 A005b / A001(s216) / A004b / A008 四个，单模型约 50 秒）、融合评测脚本 `/root/fusion_eval.py` 与结果 `/root/fusion_eval_result.json`、test 提交文件 `outputs/ensemble/test_fuse4/submission.csv`（14,140 行 = 1414 studies × 10 类，概率 0.0019–0.9955，656 KB，UTF-8，四模型 test 推理 112 秒）。
 

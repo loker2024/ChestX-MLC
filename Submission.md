@@ -106,7 +106,7 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 
 ### 提交记录
 
-- 状态：尚未提交官方平台（候选提交，等待正式提交）。
+- 状态：已提交官方平台；官方得分 **76.82**（用户反馈）。
 - 提交文件：[submission_ensemble_3m_prob_211_rank1.csv](outputs/predictions/submissions/submission_ensemble_3m_prob_211_rank1.csv)（`rank1` 标注 valid 排名第一，`211` 标注权重 2:1:1；原远程输出为 `outputs/ensemble/test/submission.csv`，下载后直接改名，无重复副本）。
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列；概率范围 0.002269–0.996524；训练环境内已通过 `validate_submission` 校验。
 - SHA-256：`52a47fc31892386221fa63c371d49e958dd375a1e03957fc5d85b7ab5c8d98d3`。
@@ -143,7 +143,7 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 
 ### 提交记录
 
-- 状态：备选提交（valid 第二名），尚未提交官方平台。
+- 状态：已提交官方平台；官方得分 **76.62**（用户反馈）。
 - 提交文件：[submission_ensemble_3m_prob_111_rank2.csv](outputs/predictions/submissions/submission_ensemble_3m_prob_111_rank2.csv)（`rank2` 标注 valid 排名第二，`111` 标注等权；原远程输出为 `outputs/ensemble/test_w111/submission.csv`，下载后直接改名，无重复副本）。
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列；概率范围 0.001919–0.996157；训练环境内已通过 `validate_submission` 校验。
 - SHA-256：`dcd6e4b5eb2097e418be565a99027b89545941a254e96786146093e7f3bdf6ab`。
