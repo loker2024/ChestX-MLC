@@ -52,7 +52,7 @@
 - `17:08`（变更）`tests/test_run_train.py`：端到端断言补 `valid_macro_auc_fp32` / `valid_macro_f1_fp32` 两列、无 CUDA 时两套数一致、日志含「fp32 复评」、`best.pt` 的 `metrics` 与 CSV 的 fp32 列一致。
 - `17:08`（变更）`docs/architecture.md`、`docs/manual.md`：架构总览第 4 步与 `engine.py` 表格行补 `evaluate(use_amp=False)` 与 fp32 复评；run 目录段落说明 `valid_*` 是训练期 AMP 实测、`*_fp32` 是提交口径，两者差千分位属正常；`train.amp` 配置行补同样的说明。
 - `17:45`（新增）远端训练环境（不涉及仓库文件）：C-002 补充两组串行完成——`outputs/20261101-162622_C-002-b-EXTRA`（7/8 轮、best 5、0.7958 / 0.4431、31m57s、16:26:17–16:58:14）、`outputs/20261101-165819_C-002-e`（9/12 轮、best 7、0.7844 / 0.4132、39m38s、16:58:14–17:37:52），两组均按 `patience 2` 早停、`HF_HUB_OFFLINE=1` 加载 `convnext_tiny.fb_in1k` 成功；评测写入 `outputs/eval_reports/C-002-b-EXTRA.txt`、`outputs/eval_reports/C-002-e.txt` 与 `outputs/predictions/valid/C-002-{b-EXTRA,e}.csv`。判读：短预算组 AUC 与 C-002-b 差 −0.0018（落在 seed 噪声内）、耗时省 3m51s，F1 抬升 +0.0182 主要来自 best.pt 落在 AUC 仅差 0.00005 的第 5 轮（选点效应），且 `epochs` 12→8 会缩短 cosine 周期，**不构成纯 patience 对照**；上扫组 6e-4 从 epoch 1 即退化，比 C-002-a 低 0.0118、F1 低 0.0086 → **学习率合理区间为 1.5e-4–3e-4，3e-4 为上界**。驱动脚本 `run_C002rest.sh` 置于远端仓库根，不入库。
-- `17:45`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 C-002 补充两组执行记录——训练记录在 C-002 章节追加「补充两组」小节（改动对照表、两张逐轮表、阈值曲线、逐类 AUC 与五条判读，并把「未执行」清单改写为含「仅改 patience 的严格对照」）；调优记录实验矩阵补 `C-002-b-EXTRA`、`C-002-e` 两行，C-002 执行小节补一段结论。
+- `17:45`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan22.md`：回填 C-002 补充两组执行记录——训练记录在 C-002 章节追加「补充两组」小节（改动对照表、两张逐轮表、阈值曲线、逐类 AUC 与五条判读，并把「未执行」清单改写为含「仅改 patience 的严格对照」）；调优记录实验矩阵补 `C-002-b-EXTRA`、`C-002-e` 两行，C-002 执行小节补一段结论；计划 22 第 6 节末尾补一段，引用补充两组结果并说明其支持「不切换学习率」的结论。
 
 ## 2026-10-31
 
