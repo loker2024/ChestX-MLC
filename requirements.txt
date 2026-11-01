@@ -73,6 +73,12 @@ tqdm==4.70.1
 opencv-python-headless==5.0.0.93
 albumentations==2.0.8
 
+# ---- 可选：训练曲线可视化（不进入赛题依赖）----
+# 只用于观测，不参与训练、推理与提交；默认链路不会导入它，所以不锁定在赛题依赖中。
+# 不装时 train.tensorboard=auto 会自动跳过曲线，训练与产物完全不受影响。
+# 曲线写到 outputs/<run>/tb/，用 `tensorboard --logdir outputs` 查看：
+#   python -m pip install "tensorboard==2.20.0"
+
 # ---- 测试 ----
 pytest==9.1.1
 

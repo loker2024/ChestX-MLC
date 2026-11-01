@@ -12,6 +12,10 @@
     metrics.csv   每个 epoch 的 loss / macro-AUC / macro-F1
     best.pt       valid macro-AUC 最高的那一轮权重
     last.pt       每个 epoch 结束时的完整状态，用于断点续训
+    tb/           TensorBoard 曲线（仅在装了 tensorboard 且 train.tensorboard
+                  不为 false 时生成；没装就跳过，不影响训练）
+
+曲线查看：`tensorboard --logdir outputs`，面板名就是 run 目录名加 `/tb`。
 
 `--resume` 既可以给 run 目录，也可以直接给其中的 last.pt。续训会复用原 run
 目录、追加写 train.log、沿用已完成的 epoch 与最优权重，不会新建目录重头再来。
@@ -38,6 +42,7 @@ import yaml
 from common.checkpoint import load_checkpoint, save_checkpoint
 from common.config import Config, config_from_dict, load_config
 from common.constants import CSV_ENCODING
+from common.tracking import TENSORBOARD_DIR_NAME, build_writer
 from common.utils import make_run_dir, resolve_device, seed_everything
 from data.dataset import build_loader
 from data.resplit import MANIFEST_NAME, prepare_resplit, manifest_digest, checkpoint_manifest_path
@@ -158,6 +163,8 @@ def _validate_resume_config(config: Config, saved: Config) -> None:
         if saved.train.lr_scheduler != "cosine":
             values["train"].pop("epochs")
         values["train"].pop("num_workers")
+        # tensorboard 只是观测开关，改它不会影响训练轨迹，不该拦续训。
+        values["train"].pop("tensorboard")
         values["eval"].pop("batch_studies")
     differences = []
     for section, value in current_values.items():
@@ -298,6 +305,14 @@ def run_training(
     """
     if checkpoint is not None:
         _validate_resume_config(config, config_from_dict(checkpoint["config"]))
+    # 曲线开关先于数据加载处理：mode=true 却没装 tensorboard 时应当立刻失败，
+    # 而不是等几分钟建完 loader 才报错。auto 模式下不装就安静跳过。
+    writer = build_writer(run_dir / TENSORBOARD_DIR_NAME, config.train.tensorboard)
+    if writer is not None:
+        print(
+            f"训练曲线: {run_dir / TENSORBOARD_DIR_NAME} | "
+            f"查看方式: tensorboard --logdir {run_dir.parent}"
+        )
     pin_memory = device.type == "cuda"
     manifest_path = run_dir / MANIFEST_NAME if config.data.resplit.enabled else None
     split_digest = None
@@ -391,18 +406,24 @@ def run_training(
             split_digest=split_digest,
         )
 
-    result = fit(
-        config,
-        model,
-        train_loader,
-        val_loader,
-        device,
-        progress=progress,
-        optimizer_state=optimizer_state,
-        scheduler_state=scheduler_state,
-        scaler_state=scaler_state,
-        on_epoch_end=on_epoch_end,
-    )
+    try:
+        result = fit(
+            config,
+            model,
+            train_loader,
+            val_loader,
+            device,
+            progress=progress,
+            optimizer_state=optimizer_state,
+            scheduler_state=scheduler_state,
+            scaler_state=scaler_state,
+            on_epoch_end=on_epoch_end,
+            writer=writer,
+        )
+    finally:
+        # 训练抛异常也要关掉 writer，否则 events 文件的最后一段可能没落盘。
+        if writer is not None:
+            writer.close()
 
     # best_state 是所有 epoch 里由 fit 挑出来的最优权重，最后才落盘，
     # 这样 best.pt 永远是完整文件，不会出现“写到一半”的坏权重。

@@ -52,6 +52,7 @@ train:
   amp: true                  # 混合精度，仅 CUDA 生效
   grad_clip: 5.0
   num_workers: 16
+  tensorboard: auto          # 训练曲线：auto=装了 tensorboard 就写 run 目录下 tb/，没装则跳过；true=必须写；false=关闭
   early_stop_patience: 5     # valid macro-AUC 连续 5 个 epoch 不提升就停；0 关闭
 
 # 验证与推理。

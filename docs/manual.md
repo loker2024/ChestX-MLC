@@ -250,6 +250,7 @@ data:
 | `train.epochs` | 整数 | `25` | `>= 1` | 总训练轮数。warmup 调度续训时可调整；cosine 调度须与断点一致。 |
 | `train.batch_studies` | 整数 | `16` | `>= 1` | 每个 batch 的**检查数**，不是图片数；实际图片数是一次检查的 1–7 张之和。显存不足时优先调小。 |
 | `train.lr` | 浮点 | `0.0003` | `> 0` | AdamW 基础学习率。必须用小数写法，不要写 `3e-4`。 |
+| `train.head_lr` | 浮点或 `null` | `null` | 有限正数或 `null` | `null` 保持单参数组；设置后 `train.lr` 用于骨干，`head_lr` 用于 `get_classifier()` 返回的分类头，其余可训练参数为骨干。两组学习率按相同倍率调度；不支持空分类头或空骨干。 |
 | `train.weight_decay` | 浮点 | `0.01` | `>= 0` | AdamW 权重衰减。 |
 | `train.pos_weight` | 布尔 | `true` | `true` / `false` | 默认配置按训练集类别频率给 BCE 正样本加权（`负样本数 / 正样本数`）；未指定字段时兼容旧配置，使用 `false`。 |
 | `train.warmup_epochs` | 整数 | `2` | `0 <= warmup < epochs` | 线性 warmup 轮数，按 epoch 逐步把学习率升到 `lr`。默认下第 1 轮为 `lr/2`、第 2 轮为 `lr`。 |
@@ -258,6 +259,7 @@ data:
 | `train.amp` | 布尔 | `true` | `true` / `false` | 混合精度。仅在 CUDA 上生效，CPU / MPS 上自动等价于关闭。 |
 | `train.grad_clip` | 浮点 | `5.0` | `>= 0` | 梯度范数裁剪上限；`0` 表示不裁剪。 |
 | `train.num_workers` | 整数 | `8` | `>= 0` | DataLoader 工作进程数，train / valid / test 共用。Windows 或调试时可设为 `0`。 |
+| `train.tensorboard` | 字符串 | `auto` | `auto` / `true` / `false` | 训练曲线开关。`auto`：装了 `tensorboard` 就写到 run 目录下 `tb/`，没装则跳过并在训练日志里说明；`true`：必须写，缺包时直接报错；`false`：不写。纯观测开关，不影响训练轨迹，改它不会拦住续训。 |
 | `train.early_stop_patience` | 整数 | `5` | `>= 0` | valid macro-AUC 连续多少个 epoch 不提升就停止；`0` 关闭早停。AUC 为 NaN 的轮次不算提升。 |
 | `train.loss` | 字符串 | `bce` | `bce` / `asl` | 训练损失。`bce` 为普通二分类交叉熵；`asl` 为非对称损失（Ben-Baruch et al., ICCV 2021），自带正负样本非对称重加权，因此不能与 `train.pos_weight` 同时开启。 |
 | `train.asl_gamma_pos` | 浮点 | `0.0` | `>= 0` | ASL 正样本聚焦指数；论文默认 `0`，即不衰减正样本。 |
@@ -382,6 +384,7 @@ outputs/
 | `metrics.csv` | 每个 epoch 结束时重写 | 每个 epoch 一行的训练/验证指标，见 3.4。中断时保留最后一个完整 epoch。 |
 | `best.pt` | 训练**正常结束后** | valid macro-AUC 最高的权重。推理、验证、对比都使用它。训练被中断时不会生成。 |
 | `last.pt` | 每个 epoch 结束时 | 可续训的完整状态：权重、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史。文件明显大于 `best.pt`。 |
+| `tb/` | 训练中每轮追加（需已装 `tensorboard` 且 `train.tensorboard` 不为 `false`） | TensorBoard 事件文件，内容和 `metrics.csv` 同源，另含 10 类逐类 AUC / F1。查看：`tensorboard --logdir outputs`，面板名是 run 目录名加 `/tb`。没装 tensorboard 时该目录不存在，训练不受影响。 |
 | `summary.csv` / `per_class.csv` / `summary.md` | `run_compare.py` 运行后 | 多个 run 的指标对比表与逐类指标，见 3.6。 |
 | `submission.csv` | `run_infer.py` 运行后 | 赛题提交文件，长表格式，见 3.7。 |
 
@@ -393,6 +396,7 @@ outputs/
 | --- | --- |
 | `epoch` | 轮次，从 1 开始。 |
 | `lr` | 该轮训练实际使用的学习率（warmup 期间小于配置的 `train.lr`）。 |
+| `head_lr` | 仅设置 `train.head_lr` 时出现：该轮分类头实际学习率；`lr` 此时为骨干学习率。 |
 | `train_loss` | 训练集按 study 数加权的平均 BCE loss。 |
 | `valid_loss` | 验证集按 study 数加权的平均 loss。 |
 | `valid_macro_auc` | 验证集 macro-AUC，是挑选最优权重和早停的依据；退化类别（全阴/全阳）不参与平均，全部退化时为 NaN。 |
@@ -520,7 +524,7 @@ python src/run_train.py --config configs/exp_short.yaml --seed 42 --tag short_ba
 
 1. 读配置并校验，创建 `outputs/<时间戳>_<tag>/`；
 2. 写入 `config.yaml`，随后开始逐 epoch 训练；
-3. 每个 epoch 结束写 `metrics.csv` 与 `last.pt`；
+3. 每个 epoch 结束写 `metrics.csv` 与 `last.pt`，并追加一条 TensorBoard 曲线（已装 tensorboard 时）；
 4. valid macro-AUC 提升时在内存中保存最优权重；连续 `early_stop_patience` 轮不提升则早停；
 5. 训练结束后把最优权重写成 `best.pt`。
 
@@ -530,6 +534,7 @@ python src/run_train.py --config configs/exp_short.yaml --seed 42 --tag short_ba
 配置文件: configs/default.yaml
 运行目录: outputs/20261027-101500_full_baseline
 设备: cuda | 随机种子: 42
+训练曲线: outputs/20261027-101500_full_baseline/tb | 查看方式: tensorboard --logdir outputs
 预训练权重: 已加载
 训练 study 数: 18513 | 验证 study 数: 859
 epoch  1/25 | lr 1.50e-04 | train_loss 0.4123 | valid_loss 0.3987 | macro_auc 0.7123 | macro_f1 0.3012
@@ -542,6 +547,43 @@ epoch  1/25 | lr 1.50e-04 | train_loss 0.4123 | valid_loss 0.3987 | macro_auc 0.
 - `train_loss` / `valid_loss` 是按 study 加权的平均 loss，不是逐图平均。
 - 默认 `warmup_epochs: 2`，所以第 1 轮学习率是 `lr/2`。
 - 预训练权重加载失败时会打印警告并改用随机初始化；`metadata.pretrained_loaded` 会如实记录。
+
+#### 查看训练曲线
+
+tensorboard 是**可选**依赖，不装也能完整训练与提交（默认链路不导入它）：
+
+```bash
+python -m pip install "tensorboard==2.20.0"
+tensorboard --logdir outputs --port 6006
+```
+
+`--logdir` 指到 `outputs`（run 目录的**上级**）即可，每个 run 的 `tb/` 会被识别成一个独立面板，面板名就是 run 目录名加 `/tb`。产物是 `outputs/<run>/tb/`，与 `config.yaml`、`metrics.csv`、`best.pt` 同属一个目录，整目录拷走即可复盘。
+
+记录的曲线：
+
+| 分组 | tag | 含义 |
+| --- | --- | --- |
+| `train` | `train/lr`、`train/loss` | 该轮实际使用的学习率、训练 loss |
+| `train`（分组时） | `train/head_lr` | 分类头该轮实际学习率；`train/lr` 记录骨干学习率。 |
+| `valid` | `valid/loss`、`valid/macro_auc`、`valid/macro_f1` | 与 `metrics.csv` 同源 |
+| `valid` | `valid/macro_precision`、`valid/macro_recall` | 按 `eval.threshold` 汇总的宏平均 |
+| `valid` | `valid/best_macro_auc` | 历史最优 macro-AUC，台阶状不回落，一眼看出最优权重停在哪轮 |
+| `valid/auc`、`valid/f1` | `class_1` … `class_10` | 逐类曲线，类别 ID 与赛题一致；互斥类（全阴/全阳）的 AUC 为 NaN 断点 |
+
+三个模式由 `train.tensorboard` 控制：`auto`（默认，装了才写，没装就跳过并在日志里说明）、`true`（必须写，缺包直接报错）、`false`（不写）。该字段不影响训练轨迹，续训时可随意改。
+
+续训时曲线接在原曲线之后（`global_step` 用真实 epoch 号），不会从 0 重新画。
+
+> 验证集只有几百个 study，逐类正样本可能只有个位数，曲线锯齿明显是样本量决定的，不代表训练不稳定。
+
+**AutoDL 等托管环境**：默认的 tensorboard 服务由容器 init（supervisord）拉起，`--logdir` 固定为 `/root/tf-logs`，且配置已不在磁盘上，改不动。此时不必重启服务，在它的 logdir 下挂一个指向 `outputs` 的符号链接即可（tensorboard 会跟随目录链接，靠自带的重扫机制自动发现新 run）：
+
+```bash
+ln -sfn /root/ChestX-MLC/outputs /root/tf-logs/chestx
+# 面板名会变成 chestx/<run名>/tb，无需重启服务
+```
+
+该链接位于容器内，实例重置后需要重新建立一次。
 
 #### 断点续训
 
@@ -557,7 +599,7 @@ python src/run_train.py --resume outputs/20261027-101500_full_baseline/last.pt
 
 - 复用原 run 目录，不新建目录；`train.log` **追加**写入，并插入 `===== 续训 ... =====` 分隔行。
 - 从 `last.pt` 恢复模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优权重、历史记录与早停计数，接着跑剩余 epoch。
-- 省略 `--config` 时，沿用 `last.pt` 里存档的配置；显式传 `--config` 时，只允许修改 `train.num_workers`、`eval.batch_studies`、`device` 和 `output`；仅 warmup 调度允许修改 `train.epochs`，cosine 调度必须保持原总轮数。其余差异会报错。续训配置另存为 `config_resume.yaml`，原 `config.yaml` 不动。
+- 省略 `--config` 时，沿用 `last.pt` 里存档的配置；显式传 `--config` 时，只允许修改 `train.num_workers`、`train.tensorboard`、`eval.batch_studies`、`device` 和 `output`；仅 warmup 调度允许修改 `train.epochs`，cosine 调度必须保持原总轮数。其余差异会报错。续训配置另存为 `config_resume.yaml`，原 `config.yaml` 不动。
 - 如果该 run 已跑满 `train.epochs`，不会重复训练，只重新导出 `best.pt`。
 - 训练被 Ctrl+C 中断时，最多丢失当前这一轮；用上面的 `--resume` 命令继续。
 - 新断点保存 Python、NumPy、PyTorch 和所用 CUDA / MPS 随机数状态；旧断点缺少状态时会警告。改变设备或 worker 数会影响随机序列；即使状态一致，GPU 算子仍可能存在数值差异。

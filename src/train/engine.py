@@ -20,6 +20,10 @@
   变好”，绝不能让 NaN 抢走最优权重。
 - 混合精度（AMP）只在 CUDA 上开启。GradScaler 在非 CUDA 设备上会被禁用，
   之后所有 scale / step / update 调用都等价于普通的优化器操作。
+
+曲线记录（TensorBoard）是可选的：`fit` 收一个 `writer`，给了就每个 epoch 写一次
+标量，`None` 就完全不碰。writer 的创建与关闭由 `run_train.py` 负责，本模块不
+导入 tensorboard，也就不会因为赛题环境没装这个包而崩。
 """
 
 from __future__ import annotations
@@ -36,7 +40,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
 from common.config import Config
-from common.metrics import macro_auc, macro_f1
+from common.metrics import macro_auc, macro_f1, per_class_report
 from model.losses import build_loss
 from model.network import aggregate_logits, set_frozen_backbone_eval
 
@@ -75,6 +79,31 @@ EpochEndHook = Callable[[TrainProgress, TrainRuntime], None]
 def _amp_enabled(config: Config, device: torch.device) -> bool:
     """项目只在 CUDA 上开混合精度：CPU / MPS 上没收益，还容易遇到算子不支持。"""
     return config.train.amp and device.type == "cuda"
+
+
+def _build_optimizer(model: nn.Module, config: Config) -> Optimizer:
+    """按对象身份划分分类头与其余参数；旧配置保持单组。"""
+    parameters = [p for p in model.parameters() if p.requires_grad]
+    if not parameters:
+        raise ValueError("模型没有可训练参数")
+    if config.train.head_lr is None:
+        groups = parameters
+    else:
+        getter = getattr(model, "get_classifier", None)
+        classifier = getter() if callable(getter) else None
+        if not isinstance(classifier, nn.Module):
+            raise ValueError("无法识别模型分类头")
+        head = [p for p in classifier.parameters() if p.requires_grad]
+        ids = {id(p) for p in head}
+        all_ids = {id(p) for p in parameters}
+        backbone = [p for p in parameters if id(p) not in ids]
+        if not head or not backbone or not ids <= all_ids:
+            raise ValueError("分类头和骨干必须各含模型中的可训练参数")
+        groups = [
+            {"params": backbone, "lr": config.train.lr},
+            {"params": head, "lr": config.train.head_lr},
+        ]
+    return torch.optim.AdamW(groups, lr=config.train.lr, weight_decay=config.train.weight_decay)
 
 
 def _build_scheduler(optimizer: Optimizer, config: Config) -> LambdaLR:
@@ -177,8 +206,18 @@ def evaluate(
     loader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
-) -> dict[str, float]:
-    """在带标签的数据集（也是 valid）上跑一遍，返回 loss 与按 study 计算的指标。"""
+    *,
+    with_per_class: bool = False,
+) -> dict[str, Any]:
+    """在带标签的数据集（也是 valid）上跑一遍，返回 loss 与按 study 计算的指标。
+
+    `with_per_class=True` 时额外返回 `per_class`（`common.metrics.per_class_report`
+    的逐类明细表），供 TensorBoard 画 10 条逐类曲线。默认关闭：这张表要跑 10 次
+    sklearn，只有真要画的时候才值得付这份开销。
+
+    `per_class` 与 `macro_auc` / `macro_f1` 同源（后两者内部就是拿这张表聚合的），
+    所以两条路径算出来的数不会互相矛盾。
+    """
     model.eval()
     use_amp = _amp_enabled(config, device)
     total_loss = 0.0
@@ -212,11 +251,50 @@ def evaluate(
         raise RuntimeError("验证集为空，无法计算指标")
     y_score = torch.sigmoid(torch.cat(logits_list)).numpy()
     y_true = torch.cat(labels_list).numpy()
-    return {
+    metrics: dict[str, Any] = {
         "loss": total_loss / total_studies,
         "macro_auc": macro_auc(y_true, y_score),
         "macro_f1": macro_f1(y_true, y_score, config.eval.threshold),
     }
+    if with_per_class:
+        metrics["per_class"] = per_class_report(y_true, y_score, config.eval.threshold)
+    return metrics
+
+
+def _log_epoch(
+    writer: Any,
+    epoch: int,
+    lr: float,
+    train_loss: float,
+    valid_metrics: dict[str, Any],
+    best_auc: float,
+    head_lr: float | None = None,
+) -> None:
+    """把这一轮的标量写进 TensorBoard，tag 与 `metrics.csv` 的列一一对应。
+
+    逐类曲线按 `valid/auc/class_<id>` 命名，class_<id> 用的是赛题类别 ID（1~10），
+    不是数组下标。`valid/best_macro_auc` 是截至本轮的历史最优值，用来直观看出
+    「最优权重停在哪一轮」——它是台阶状曲线，不下降。
+    """
+    writer.add_scalar("train/lr", lr, epoch)
+    if head_lr is not None:
+        writer.add_scalar("train/head_lr", head_lr, epoch)
+    writer.add_scalar("train/loss", train_loss, epoch)
+    writer.add_scalar("valid/loss", valid_metrics["loss"], epoch)
+    writer.add_scalar("valid/macro_auc", valid_metrics["macro_auc"], epoch)
+    writer.add_scalar("valid/macro_f1", valid_metrics["macro_f1"], epoch)
+    writer.add_scalar("valid/best_macro_auc", best_auc, epoch)
+
+    report = valid_metrics.get("per_class")
+    if report is None:
+        return
+    writer.add_scalar("valid/macro_precision", float(report["precision"].mean()), epoch)
+    writer.add_scalar("valid/macro_recall", float(report["recall"].mean()), epoch)
+    for row in report.itertuples(index=False):
+        writer.add_scalar(f"valid/auc/class_{row.class_id}", row.auc, epoch)
+        writer.add_scalar(f"valid/f1/class_{row.class_id}", row.f1, epoch)
+    # 每轮落一次盘：进程被 kill 时最多丢这一轮，不用等 FLUSH_SECS 自动刷新。
+    writer.flush()
 
 
 def fit(
@@ -231,6 +309,7 @@ def fit(
     scheduler_state: dict[str, Any] | None = None,
     scaler_state: dict[str, Any] | None = None,
     on_epoch_end: EpochEndHook | None = None,
+    writer: Any | None = None,
 ) -> dict[str, Any]:
     """完整训练流程：逐 epoch 训练 / 验证，按 valid macro-AUC 保留最优权重。
 
@@ -246,15 +325,12 @@ def fit(
     一起传进来，训练就从 `progress.epoch + 1` 接着跑，最优权重、历史记录和
     早停计数都沿用旧值。`on_epoch_end` 在调度器推进后调用，保存的状态可直接
     用于下一轮；旧版断点的调度器尚未推进，恢复时按已完成轮次补上一步。
+
+    `writer`（TensorBoard `SummaryWriter`）为 `None` 时不记录任何曲线；
+    给了就每个 epoch 写一次，`global_step` 用真实 epoch 号，所以续训的曲线
+    会自动接在旧曲线的后面，而不是从 0 重新画。
     """
-    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
-    if not trainable_parameters:
-        raise ValueError("模型没有可训练参数")
-    optimizer = torch.optim.AdamW(
-        trainable_parameters,
-        lr=config.train.lr,
-        weight_decay=config.train.weight_decay,
-    )
+    optimizer = _build_optimizer(model, config)
     scheduler = _build_scheduler(optimizer, config)
     scaler = torch.amp.GradScaler(device.type, enabled=_amp_enabled(config, device))
     # 先恢复优化器再恢复调度器：LambdaLR 的 last_epoch 决定下一轮的学习率。
@@ -278,10 +354,14 @@ def fit(
     for epoch in range(progress.epoch + 1, config.train.epochs + 1):
         # 学习率在训练这一步用的是“当前值”，所以先记下来再更新。
         lr = optimizer.param_groups[0]["lr"]
+        head_lr = optimizer.param_groups[1]["lr"] if config.train.head_lr is not None else None
         train_loss = train_one_epoch(
             config, model, train_loader, criterion, optimizer, scaler, device
         )
-        valid_metrics = evaluate(config, model, val_loader, criterion, device)
+        # 只有真要写曲线时才多算一遍逐类明细，默认路径的开销保持不变。
+        valid_metrics = evaluate(
+            config, model, val_loader, criterion, device, with_per_class=writer is not None
+        )
         auc = valid_metrics["macro_auc"]
 
         progress.history.append(
@@ -294,8 +374,11 @@ def fit(
                 "valid_macro_f1": valid_metrics["macro_f1"],
             }
         )
+        if head_lr is not None:
+            progress.history[-1]["head_lr"] = head_lr
+        lr_detail = f" | head_lr {head_lr:.2e}" if head_lr is not None else ""
         print(
-            f"epoch {epoch:2d}/{config.train.epochs} | lr {lr:.2e} | "
+            f"epoch {epoch:2d}/{config.train.epochs} | lr {lr:.2e}{lr_detail} | "
             f"train_loss {train_loss:.4f} | valid_loss {valid_metrics['loss']:.4f} | "
             f"macro_auc {auc:.4f} | macro_f1 {valid_metrics['macro_f1']:.4f}"
         )
@@ -307,7 +390,11 @@ def fit(
         if improved:
             progress.best_auc = auc
             progress.best_epoch = epoch
-            progress.best_metrics = valid_metrics
+            # per_class 是 DataFrame，只服务于曲线；checkpoint 的 best_metrics
+            # 只留标量，否则续训读回来会拿到一个无法比较的表格对象。
+            progress.best_metrics = {
+                key: value for key, value in valid_metrics.items() if key != "per_class"
+            }
             progress.best_state = _snapshot(model)
             progress.stale_epochs = 0
         else:
@@ -317,6 +404,9 @@ def fit(
         scheduler.step()
         if on_epoch_end is not None:
             on_epoch_end(progress, runtime)
+        if writer is not None:
+            # 曲线排在 checkpoint 之后：关键产物先落盘，曲线是次要的观测手段。
+            _log_epoch(writer, epoch, lr, train_loss, valid_metrics, progress.best_auc, head_lr)
 
         # early_stop_patience=0 表示关闭早停。早停也要先落盘再退出，
         # 否则最后一轮的指标和进度会丢。

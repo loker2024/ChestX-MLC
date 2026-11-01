@@ -20,6 +20,7 @@ from typing import Any, Union, get_args, get_origin, get_type_hints
 import yaml
 
 from common.constants import DEFAULT_IMAGE_SIZE, NUM_CLASSES
+from common.tracking import TENSORBOARD_MODES
 
 
 @dataclass(frozen=True)
@@ -185,6 +186,7 @@ class TrainConfig:
     epochs: int = 25
     batch_studies: int = 16  # 每个 batch 的检查数；图片数由各 study 实际张数决定
     lr: float = 3e-4
+    head_lr: float | None = None  # None 沿用单组；否则为分类头峰值学习率
     weight_decay: float = 0.01
     pos_weight: bool = False  # 按训练集类别频率给 BCE 的正样本加权；类别极不平衡时打开
     warmup_epochs: int = 2  # 前几个 epoch 线性升温到 lr
@@ -193,6 +195,7 @@ class TrainConfig:
     amp: bool = True  # 混合精度；仅 CUDA 上生效
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
     num_workers: int = 8
+    tensorboard: str = "auto"  # "auto"=装了 tensorboard 就写 run 目录下 tb/；"true"=必须写；"false"=关闭
     early_stop_patience: int = 5  # valid 指标连续多少个 epoch 不提升就停；0 表示关闭早停
     loss: str = "bce"  # "bce"=BCEWithLogitsLoss；"asl"=Asymmetric Loss（自带重加权）
     asl_gamma_pos: float = 0.0  # ASL 正样本聚焦指数；论文默认 0，即不衰减正样本
@@ -204,8 +207,10 @@ class TrainConfig:
             raise ValueError(f"train.epochs 必须 >= 1，当前为 {self.epochs}")
         if self.batch_studies < 1:
             raise ValueError(f"train.batch_studies 必须 >= 1，当前为 {self.batch_studies}")
-        if self.lr <= 0:
+        if not math.isfinite(self.lr) or self.lr <= 0:
             raise ValueError(f"train.lr 必须 > 0，当前为 {self.lr}")
+        if self.head_lr is not None and (not math.isfinite(self.head_lr) or self.head_lr <= 0):
+            raise ValueError("train.head_lr 必须是有限正数或 null")
         if self.weight_decay < 0:
             raise ValueError(f"train.weight_decay 必须 >= 0，当前为 {self.weight_decay}")
         if not 0 <= self.warmup_epochs < self.epochs:
@@ -217,7 +222,7 @@ class TrainConfig:
             raise ValueError(
                 f"train.lr_scheduler 只能是 'warmup' 或 'cosine'，当前为 {self.lr_scheduler!r}"
             )
-        if self.lr_min < 0:
+        if not math.isfinite(self.lr_min) or self.lr_min < 0:
             raise ValueError(f"train.lr_min 必须 >= 0，当前为 {self.lr_min}")
         if self.lr_min > self.lr:
             raise ValueError(
@@ -227,6 +232,12 @@ class TrainConfig:
             raise ValueError(f"train.grad_clip 必须 >= 0，当前为 {self.grad_clip}")
         if self.num_workers < 0:
             raise ValueError(f"train.num_workers 必须 >= 0，当前为 {self.num_workers}")
+        if self.tensorboard not in TENSORBOARD_MODES:
+            raise ValueError(
+                "train.tensorboard 只能是 "
+                + "、".join(sorted(TENSORBOARD_MODES))
+                + f"，当前为 {self.tensorboard!r}"
+            )
         if self.early_stop_patience < 0:
             raise ValueError(
                 f"train.early_stop_patience 必须 >= 0，当前为 {self.early_stop_patience}"

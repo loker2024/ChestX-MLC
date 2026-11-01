@@ -11,6 +11,20 @@
 ## 2026-11-01
 
 - `10:47`（修复）`CHANGELOG.md`：还原 `2026-10-31` 的 `10:58` 条目——该条目在 `8acd94b` 解决合并冲突时被 `19:48` 的两条从中割断，正文混入裸 `## 2026-10-30` 标题且丢失开引号；同时把 `19:48` 两条恢复为独立条目并按同日时间正序归位到 `19:03` 组之后。条目内容未改写。
+- `10:59`（新增）`src/common/tracking.py`：新增训练曲线记录器，提供 `build_writer(log_dir, mode)`、`TENSORBOARD_MODES`、`TENSORBOARD_DIR_NAME`、`FLUSH_SECS`；`auto` 模式在导入 `torch.utils.tensorboard` 失败时打印一行提示并返回 `None`，`true` 模式则抛 `ImportError`，`false` 直接不建目录。模块顶层不导入 tensorboard，赛题环境未装该包时默认链路零影响；flush 间隔由默认 120 秒收紧到 30 秒。
+- `10:59`（变更）`src/train/engine.py`：`evaluate` 增加关键字参数 `with_per_class`（默认 `False`，为 `True` 时额外返回 `per_class` 逐类明细，与 `macro_auc`/`macro_f1` 同源）；新增 `_log_epoch`，逐轮写入 `train/lr`、`train/loss`、`valid/loss`、`valid/macro_auc`、`valid/macro_f1`、`valid/best_macro_auc`、`valid/macro_precision`、`valid/macro_recall` 与 `valid/auc|f1/class_1..10` 共 28 个 tag 并 flush；`fit` 增加关键字参数 `writer`（默认 `None` 时行为不变），曲线写在 `on_epoch_end` 之后以保证 checkpoint 优先落盘；`best_metrics` 写入时剔除 `per_class`，避免 DataFrame 进入 checkpoint。
+- `10:59`（变更）`src/run_train.py`：`run_training` 在数据加载前按 `train.tensorboard` 创建 `run_dir/tb/` 的 writer 并打印查看方式，`fit` 外层加 `try/finally` 保证异常时也关闭 writer；`_validate_resume_config` 排除 `train.tensorboard`（纯观测开关，不影响训练轨迹，续训不拦）；模块 docstring 的 run 目录清单补 `tb/`。
+- `10:59`（变更）`src/common/config.py`：`TrainConfig` 新增 `tensorboard: str = "auto"` 及取值校验，允许值复用 `common.tracking.TENSORBOARD_MODES` 单一来源。
+- `10:59`（变更）`configs/default.yaml`：`train` 段新增 `tensorboard: auto` 及字段注释；不改动任何超参与冻结口径。
+- `10:59`（变更）`requirements.txt`：「图像与增强」与「测试」之间新增可选依赖注释段，给出 `tensorboard==2.20.0` 的安装方式，并说明默认链路不导入、不锁定进赛题依赖。
+- `10:59`（变更）`docs/manual.md`：§2.7 配置表补 `train.tensorboard` 一行；§3.3 产物表补 `tb/` 一行；§4.2 训练流程第 3 步与典型输出补曲线信息，新增「查看训练曲线」小节（安装命令、`--logdir outputs` 用法、28 个 tag 的分组表、三种模式、续训曲线接续、小样本锯齿提示、AutoDL 托管服务的符号链接接法）；断点续训允许修改的字段补 `train.tensorboard`。
+- `10:59`（新增）`tests/test_tensorboard.py`：新增 13 个用例，覆盖 `build_writer` 三模式与非法取值、`auto` 在缺包时不抛错并打印提示、`true` 缺包抛 `ImportError`、配置默认值/非法值/`to_dict` 往返、`fit` 写入 28 个 tag 且每 tag 轮数与 epoch 一致、逐类 tag 命名、`best_macro_auc` 单调不减、`evaluate` 逐类明细与 macro 指标同源；未装 tensorboard 时 4 个写入类用例自动 skip。
+- `10:59`（修复）`tests/test_resume.py`：`test_early_stop_checkpoint_scheduler_is_ready_for_next_epoch` 里 `evaluate` 的 mock 由 `lambda *args` 改为 `lambda *args, **kwargs`——`fit` 现在会传 `with_per_class` 关键字参数，原写法会抛 `TypeError`。
+- `11:10`（变更）远端训练环境（不涉及仓库文件）：`/root/ChestX-MLC/.venv` 安装 `tensorboard==2.20.0`；建立 `/root/tf-logs/chestx -> /root/ChestX-MLC/outputs` 符号链接，使 6007 端口上由容器 init（supervisord）托管、`--logdir` 固定为 `/root/tf-logs` 且配置已不在磁盘的 tensorboard 无需重启即可发现新 run（实测其自动重扫会跟随目录链接，面板名形如 `chestx/<run名>/tb`）。上述 10 个文件的改动已通过 rsync 同步到远端工作区，尚未提交；远端当前为无卡模式（`/dev/nvidia*` 不存在、`torch.cuda.is_available()` 为 False），且容器 cgroup `memory.max` 为 2 GB 而 `nproc` 为 96，模型级测试（含原生 `tests/test_engine.py`）在 CPU 下会 OOM，故远端只做了不建模型的 smoke 验证（28 个 tag 经 6007 的 `/data/plugin/scalars/tags` 全部读回，产物已清理）。
+- `11:12`（新增）`docs/train_plan21.md`、`configs/exp_C001a.yaml`、`configs/exp_C001b.yaml`、`configs/exp_C001c.yaml`、`configs/exp_C001d.yaml`：制定 C-001 四骨干低学习率和分类头差异学习率实验计划，提供四份完整独立配置；配置包含尚未支持的 `train.head_lr`，须先实现并验证分组训练，GPU 实验尚未执行。
+- `11:14`（新增）`tests/test_head_lr.py`：验证 C-001 四种骨干分类头分组、两组学习率调度、非法配置及续训行为。
+- `11:14`（变更）`src/common/config.py`、`src/train/engine.py`：新增可选 `train.head_lr`，按分类头与其余可训练参数建立 AdamW 参数组，两组使用相同比例的学习率调度并分别记录；旧配置保持单组，续训校验配置并恢复优化器状态。
+- `11:14`（变更）`docs/manual.md`、`docs/train_plan21.md`、`configs/exp_C001a.yaml`、`configs/exp_C001b.yaml`、`configs/exp_C001c.yaml`、`configs/exp_C001d.yaml`：说明分组学习率及使用条件，更新计划与配置状态；GPU 训练、权重与数据核验未执行。
 
 ## 2026-10-31
 

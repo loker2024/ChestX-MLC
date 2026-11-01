@@ -130,7 +130,13 @@ def test_early_stop_checkpoint_scheduler_is_ready_for_next_epoch(config_path: Pa
     train_loader, val_loader = _loaders(config)
     model = build_model(config)
     captured = {}
-    monkeypatch.setattr(training_engine, "evaluate", lambda *args: {"loss": 1.0, "macro_auc": 0.5, "macro_f1": 0.5})
+    # 用 **kwargs 收尾：fit 会给 evaluate 传 with_per_class 等关键字参数，
+    # mock 若只接位置参数，签名一变就会 TypeError。
+    monkeypatch.setattr(
+        training_engine,
+        "evaluate",
+        lambda *args, **kwargs: {"loss": 1.0, "macro_auc": 0.5, "macro_f1": 0.5},
+    )
 
     def capture(progress, runtime) -> None:
         captured.update(progress=progress, optimizer=runtime.optimizer.state_dict(), scheduler=runtime.scheduler.state_dict())
