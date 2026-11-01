@@ -1,5 +1,5 @@
 # C-003-a：384×384 分辨率对照，完整独立配置，不使用 _base。
-# seed=42；暂用 lr=0.0003，须根据 train_plan23 的 C-002 判读统一确认。
+# seed=42；训练口径对齐 C-002-b（12 轮、patience 2、峰值 lr=0.00015）。
 # 正样本权重指数 1.0 保持现有 BCE 基线；不使用平方根权重。
 data:
   train:
@@ -40,7 +40,7 @@ model:
 train:
   epochs: 12
   batch_studies: 16
-  lr: 0.0003
+  lr: 0.00015
   head_lr: null
   weight_decay: 0.01
   pos_weight: true
@@ -52,7 +52,7 @@ train:
   grad_clip: 5.0
   num_workers: 16
   tensorboard: auto
-  early_stop_patience: 4
+  early_stop_patience: 2
   loss: bce
   asl_gamma_pos: 0.0
   asl_gamma_neg: 4.0

@@ -14,11 +14,11 @@
 | C-005-c | `configs/exp_C005c.yaml` | 0.8 | 0.2 | 候选 |
 | C-005-d | `configs/exp_C005d.yaml` | 0.9 | 0.1 | 候选 |
 
-四份配置完整展开、不使用 `_base`，编号与训练 tag、预测文件一一对应。按当前配置加载器展开后，各组与 A-001 仅 `model.frontal_weight` 不同；四组间也仅此字段不同。此实验不叠加 C-004 的平方根权重，固定 `train.pos_weight_power=1.0`，避免改变两个变量。
+四份配置完整展开、不使用 `_base`，编号与训练 tag、预测文件一一对应。按当前配置加载器展开后，各组与 C-002-b 仅 `model.frontal_weight` 与 `train.early_stop_patience` 不同（后者是 2026-11-01 统一训练口径的结果）；四组间仅 `model.frontal_weight` 不同。此实验不叠加 C-004 的平方根权重，固定 `train.pos_weight_power=1.0`，避免改变两个变量。
 
-固定项为：原始 train/valid、无重划分、320×320 letterbox、ImageNet 归一化、训练增强保持代码现状、无水平翻转；ConvNeXt-Tiny `fb_in1k` ImageNet-1k 预训练、全量微调、标准分类头、dropout 0；`view_weighted` logits 聚合；BCE + pos_weight、AdamW、统一 lr=3e-4、weight_decay=0.01、batch=16 studies；8 epoch 上限、patience=2、warmup=2、cosine、lr_min=1e-5、AMP、grad_clip=5。实际停止轮数可能因早停不同。
+固定项为：原始 train/valid、无重划分、320×320 letterbox、ImageNet 归一化、训练增强保持代码现状、无水平翻转；ConvNeXt-Tiny `fb_in1k` ImageNet-1k 预训练、全量微调、标准分类头、dropout 0；`view_weighted` logits 聚合；BCE + pos_weight、AdamW、统一 lr=0.00015、weight_decay=0.01、batch=16 studies；12 epoch 上限、patience=2、warmup=2、cosine、lr_min=1e-5、AMP、grad_clip=5。实际停止轮数可能因早停不同。
 
-本计划沿用 A-001 的 8 轮口径，与 C-002 / C-003 的 12 轮口径不同；不得把这些实验之间的差异单独归因于正侧位权重。C-002 选择的学习率不自动覆盖本实验。
+训练口径于 2026-11-01 统一为 C-002-b 口径（12 epoch 上限、patience 2、lr=0.00015），四组与 C-002-b 仅 `model.frontal_weight` 与 `train.early_stop_patience` 不同。A-001 的 8 轮 / 3e-4 只作历史参考；不得把这些实验之间的差异单独归因于正侧位权重。
 
 ## 聚合规则与研究边界
 
@@ -39,7 +39,7 @@ study_probability = sigmoid(study_logits)
 2. 固定原始 train/valid，核验患者、study、图像索引、标签和数据版本哈希，确认无患者泄漏；核对 `Study_id -> Subject_id` 和标签与 A-001 的 valid 一致。
 3. 核验 `convnext_tiny.fb_in1k` 权重来源、许可、revision 和 SHA-256；四组使用同一文件，并尽量核对与 A-001 相同。启动日志及每个 `best.pt` 的 `metadata.pretrained_loaded` 均须确认预训练加载成功，否则该 run 无效。
 4. 统计 train/valid 的 study 总数、仅正位、仅侧位、正侧位均有且无未知视角、含未知视角的数量及比例。四种类别按顺序定义为互斥：先判断是否含未知，再判断仅正位、仅侧位、同时正侧位。该统计用于解释有效作用范围，不作为修改方案或结果门槛。
-5. 在本机运行下列检查。配置检查将候选权重恢复为 0.7 后，完整展开字典必须与 A-001 相等；训练环境还需核验真实运行配置、代码和数据。测试通过只表明本地验证，不表示 GPU 实验完成。
+5. 在本机运行下列检查。配置检查将候选权重恢复为 0.7、`train.early_stop_patience` 恢复为 C-002-b 的 4 后，完整展开字典必须与 C-002-b 相等；训练环境还需核验真实运行配置、代码和数据。测试通过只表明本地验证，不表示 GPU 实验完成。
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -48,13 +48,14 @@ from pathlib import Path
 import yaml
 sys.path.insert(0, str(Path('src').resolve()))
 from common.config import load_config
-base = load_config('configs/exp_A001.yaml').to_dict()
+base = load_config('configs/exp_C002b.yaml').to_dict()
 for suffix, weight in [('a', 0.5), ('b', 0.6), ('c', 0.8), ('d', 0.9)]:
     path = Path(f'configs/exp_C005{suffix}.yaml')
     assert '_base' not in yaml.safe_load(path.read_text(encoding='utf-8'))
     candidate = load_config(path).to_dict()
     assert candidate['model']['frontal_weight'] == weight
     candidate['model']['frontal_weight'] = 0.7
+    candidate['train']['early_stop_patience'] = base['train']['early_stop_patience']
     assert candidate == base, f'{path} 存在其他配置差异'
     print(f'C-005-{suffix}: {weight} / {1-weight:.1f}')
 PY
@@ -75,7 +76,7 @@ HF_HUB_OFFLINE=1 python -u src/run_train.py --config configs/exp_C005d.yaml --se
 
 各组保留 `config.yaml`、`best.pt`、`last.pt`、`metrics.csv`、`train.log` 和可用的 `tb/`；记录真实运行目录、设备、显存峰值、开始结束时间、实际 epoch、每轮 lr 和耗时、最佳 epoch 与停止原因。OOM、数值异常或预训练未加载时记录原因，失败 run 不计入正式比较。
 
-最多 4×8=32 个 epoch；借用历史 A-001 约 5.7 分钟/轮粗估，跑满约 **3.0 小时**，不含启动和评估；早停、硬件及负载会改变实际时间。计划不包含额外 seed 或 A-001 重训。
+最多 4×12=48 个 epoch；借用历史 A-001 约 5.7 分钟/轮粗估，跑满约 **4.6 小时**，不含启动和评估；早停、硬件及负载会改变实际时间。计划不包含额外 seed 或 A-001 重训。
 
 ## 验证集评估
 

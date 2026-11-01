@@ -1,5 +1,6 @@
 # C-006-a：brightness=0.05；完整独立配置，不使用 _base。
 # A-001 展开口径只改 image.brightness；seed=42。
+# 训练口径统一到 C-002-b：12 轮、patience 2、峰值 lr=0.00015。
 data:
   train:
     csv: data/train.csv
@@ -39,9 +40,9 @@ model:
   xrv_cache_dir: null
   xrv_sha256: null
 train:
-  epochs: 8
+  epochs: 12
   batch_studies: 16
-  lr: 0.0003
+  lr: 0.00015
   head_lr: null
   weight_decay: 0.01
   pos_weight: true

@@ -16,14 +16,14 @@
 
 所有 YAML 独立完整，不含 `_base`；编号与 tag、预测文件一一对应。训练图像保持原有增强顺序：letterbox → RandomAffine（旋转 ±7°、平移 5%、缩放 0.9–1.1）→ ColorJitter → 归一化；无水平翻转。每张图独立抽样，同一 study 的多张图不强制共享扰动。增强仅用于训练，valid/test 使用确定性预处理。
 
-固定原始 train/valid，不重划分；320×320、ImageNet 归一化、ConvNeXt-Tiny `fb_in1k` 预训练、标准头、全量微调、`view_weighted` logits 聚合正侧位 0.7/0.3；BCE + pos_weight、`pos_weight_power=1.0`、AdamW、lr=3e-4、weight_decay=0.01、batch 16 studies、seed 42、8 epoch 上限、patience 2、warmup 2、cosine、lr_min=1e-5、AMP。固定的是上限与早停规则，实际轮数允许不同。C-004 的平方根权重和 C-005 的聚合权重不叠加；本计划也不自动采用 C-002 / C-003 的 12 轮口径。
+固定原始 train/valid，不重划分；320×320、ImageNet 归一化、ConvNeXt-Tiny `fb_in1k` 预训练、标准头、全量微调、`view_weighted` logits 聚合正侧位 0.7/0.3；BCE + pos_weight、`pos_weight_power=1.0`、AdamW、lr=0.00015、weight_decay=0.01、batch 16 studies、seed 42、12 epoch 上限、patience 2、warmup 2、cosine、lr_min=1e-5、AMP。固定的是上限与早停规则，实际轮数允许不同。C-004 的平方根权重和 C-005 的聚合权重不叠加；训练口径已于 2026-11-01 统一为 C-002-b 口径（12 epoch 上限、patience 2、lr=0.00015）。
 
 ## 开始前核验
 
 1. 记录代码 HEAD、`git status --short`、未提交 diff、依赖版本、设备和 GPU 负载；四组保持同一代码和环境。由于 A-001 是历史运行，需核验其代码、日志、数据加载、增强、loss、优化器与调度。新代码默认亮度和对比度各为 0.15，且本机测试固定随机种子下输出与原流程一致；这不能替代历史运行代码及数据来源核验。若有不可核验差异，只能作历史参考，不能严格归因。
 2. 检查原始 train/valid 的患者、study、标签、图像索引和数据版本哈希，确认无患者泄漏。核验 A-001 预测对应的 `Study_id -> Subject_id` 与标签一致。
 3. 核验 `convnext_tiny.fb_in1k` 预训练文件的来源、许可、revision 与 SHA-256；四组统一使用同一文件并核对 A-001 的对应记录。启动日志与 best.pt 的 `metadata.pretrained_loaded` 均须确认加载成功；失败 run 不进入正式比较。
-4. 本机核验四个配置除指定增强字段外与 A-001 展开配置一致；运行配置、增强及回归测试：
+4. 本机核验四个配置除指定增强字段与 `train.early_stop_patience` 外与 C-002-b 展开配置一致；运行配置、增强及回归测试：
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -32,13 +32,14 @@ from pathlib import Path
 import yaml
 sys.path.insert(0, str(Path('src').resolve()))
 from common.config import load_config
-base = load_config('configs/exp_A001.yaml').to_dict()
+base = load_config('configs/exp_C002b.yaml').to_dict()
 for suffix, field, value in [('a','brightness',0.05), ('b','brightness',0.25), ('c','contrast',0.05), ('d','contrast',0.25)]:
     path = Path(f'configs/exp_C006{suffix}.yaml')
     assert '_base' not in yaml.safe_load(path.read_text(encoding='utf-8'))
     candidate = load_config(path).to_dict()
     assert candidate['image'][field] == value
     candidate['image'][field] = base['image'][field]
+    candidate['train']['early_stop_patience'] = base['train']['early_stop_patience']
     assert candidate == base, f'{path} 存在其他配置差异'
     print(f'C-006-{suffix}: image.{field}={value}')
 PY
@@ -59,7 +60,7 @@ HF_HUB_OFFLINE=1 python -u src/run_train.py --config configs/exp_C006d.yaml --se
 
 每组保留 `config.yaml`、`best.pt`、`last.pt`、`metrics.csv`、`train.log` 和可用的 `tb/`；记录设备、实际运行目录、开始结束时间、显存峰值、每轮 lr / 耗时、最佳 epoch 与停止原因。预训练未加载、OOM 或数值异常先记录并排查，失败 run 不进入正式比较。
 
-四组最多 32 个 epoch；按历史 A-001 约 5.7 分钟/轮粗估跑满约 3.0 小时，不含启动和评估。实际由设备、负载和早停决定。计划不要求额外 seed 或重训 A-001。
+四组最多 48 个 epoch；按历史 A-001 约 5.7 分钟/轮粗估跑满约 4.6 小时，不含启动和评估。实际由设备、负载和早停决定。计划不要求额外 seed 或重训 A-001。
 
 ## 验证集评估
 

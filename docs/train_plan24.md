@@ -11,16 +11,16 @@
 | A-001 | 历史参考 | `configs/exp_A001.yaml` / 历史运行配置 | 42 | 1.0（旧配置未写入时的兼容默认值） |
 | C-004 | 平方根权重候选 | `configs/exp_C004.yaml` | 42 | 0.5 |
 
-C-004 配置完整展开，不含 `_base`。按当前代码展开后，除 `train.pos_weight_power` 外与 A-001 配置完全一致。固定 320×320 letterbox、ImageNet 归一化、无水平翻转、ConvNeXt-Tiny ImageNet-1k 预训练、全量微调和标准头；正侧位 logits 聚合 0.7/0.3；BCE + pos_weight、AdamW、lr=3e-4、weight_decay=0.01、batch 16 studies、8 epoch 上限、patience 2、warmup 2、cosine、lr_min=1e-5、AMP。早停规则相同，但实际轮数可以不同。
+C-004 配置完整展开，不含 `_base`。按当前代码展开后，除 `train.pos_weight_power` 外与 C-002-b 配置完全一致。固定 320×320 letterbox、ImageNet 归一化、无水平翻转、ConvNeXt-Tiny ImageNet-1k 预训练、全量微调和标准头；正侧位 logits 聚合 0.7/0.3；BCE + pos_weight、AdamW、lr=0.00015、weight_decay=0.01、batch 16 studies、12 epoch 上限、patience 2、warmup 2、cosine、lr_min=1e-5、AMP。实际轮数可以不同。
 
-这是按 A-001 原训练口径直接检验类别权重，与 C-002 的 12 轮学习率计划、C-003 的 384 分辨率计划并行作为不同问题；C-002 的结果不会自动覆盖本配置。A-001 对应的 valid Macro-AUC 0.8038 是历史结果，不能预先当作 C-004 的结果。
+训练口径于 2026-11-01 统一：`train.epochs=12`、`train.early_stop_patience=2`、`train.lr=0.00015`（与 C-002-b 相同），因此 C-004 不再沿用 A-001 的 8 轮 / patience 2 / 3e-4 口径。类别权重之外的干净对照是 320 分辨率下的 C-002-b（其 patience 为 4），A-001 的 0.8038 只作历史参考，不能作为同口径基线直接相减。
 
 ## 训练前核验
 
 1. 在仓库根目录记录 `git rev-parse HEAD`、`git status --short`、相关未提交 diff、依赖版本、设备以及 GPU 占用，保留 C-004 训练的代码快照。A-001 是历史运行，尤其应对照其日志、记录和历史代码，检查数据加载、增强、损失、优化器及调度等路径是否变化；新增指数参数本身为预期变化。无法核实历史差异时，比较只能称历史参考，不能严格归因。
 2. 固定原始 train/valid，不重划分；核对患者、study、标签、图像索引和数据版本，保留哈希，确认无患者泄漏。检查 `Study_id -> Subject_id`、标签与 A-001 验证集一致。
 3. 核对 `convnext_tiny.fb_in1k` 预训练文件来源、许可、revision 与 SHA-256 是否同 A-001；核对历史 A-001 日志、运行配置、权重来源和训练设备。训练日志及 C-004 的 best.pt 中 `metadata.pretrained_loaded` 必须表明预训练加载成功，否则该 run 无效。
-4. 运行以下配置验证，预期只输出 `train.pos_weight_power: 1.0 -> 0.5`，失败则先排查；不得把该本地验证当作 GPU 结果。
+4. 运行以下配置验证，预期只输出 `train.pos_weight_power: 1.0 -> 0.5`（比对基准为同口径的 C-002-b，不再是 A-001），失败则先排查；不得把该本地验证当作 GPU 结果。
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path('src').resolve()))
 from common.config import load_config
-base = load_config('configs/exp_A001.yaml').to_dict()
+base = load_config('configs/exp_C002b.yaml').to_dict()
 candidate = load_config('configs/exp_C004.yaml').to_dict()
 assert base['train']['pos_weight_power'] == 1.0
 assert candidate['train']['pos_weight_power'] == 0.5
@@ -50,7 +50,7 @@ HF_HUB_OFFLINE=1 python -u src/run_train.py --config configs/exp_C004.yaml --see
 
 记录真实运行目录、启动和结束时间、GPU 型号、显存峰值、每轮学习率/耗时、最优 epoch 和早停原因。保留 `config.yaml`、`best.pt`、`last.pt`、`metrics.csv`、`train.log` 和可用的 `tb/`。预训练未加载、OOM 或数值异常时排查并记录，失败 run 不进入正式比较。
 
-预算：最多 8 轮；参考历史 A-001 每轮约 5.7 分钟，跑满约 46 分钟，不含评估和启动，实际以当前设备为准。
+预算：最多 12 轮；参考历史 A-001 每轮约 5.7 分钟，跑满约 70 分钟，不含评估和启动，实际以当前设备为准。
 
 ## 评估与产物
 
