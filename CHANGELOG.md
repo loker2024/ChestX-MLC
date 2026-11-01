@@ -9,7 +9,6 @@
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
 ## 2026-11-01
-
 - `10:47`（修复）`CHANGELOG.md`：还原 `2026-10-31` 的 `10:58` 条目——该条目在 `8acd94b` 解决合并冲突时被 `19:48` 的两条从中割断，正文混入裸 `## 2026-10-30` 标题且丢失开引号；同时把 `19:48` 两条恢复为独立条目并按同日时间正序归位到 `19:03` 组之后。条目内容未改写。
 - `10:59`（新增）`src/common/tracking.py`：新增训练曲线记录器，提供 `build_writer(log_dir, mode)`、`TENSORBOARD_MODES`、`TENSORBOARD_DIR_NAME`、`FLUSH_SECS`；`auto` 模式在导入 `torch.utils.tensorboard` 失败时打印一行提示并返回 `None`，`true` 模式则抛 `ImportError`，`false` 直接不建目录。模块顶层不导入 tensorboard，赛题环境未装该包时默认链路零影响；flush 间隔由默认 120 秒收紧到 30 秒。
 - `10:59`（变更）`src/train/engine.py`：`evaluate` 增加关键字参数 `with_per_class`（默认 `False`，为 `True` 时额外返回 `per_class` 逐类明细，与 `macro_auc`/`macro_f1` 同源）；新增 `_log_epoch`，逐轮写入 `train/lr`、`train/loss`、`valid/loss`、`valid/macro_auc`、`valid/macro_f1`、`valid/best_macro_auc`、`valid/macro_precision`、`valid/macro_recall` 与 `valid/auc|f1/class_1..10` 共 28 个 tag 并 flush；`fit` 增加关键字参数 `writer`（默认 `None` 时行为不变），曲线写在 `on_epoch_end` 之后以保证 checkpoint 优先落盘；`best_metrics` 写入时剔除 `per_class`，避免 DataFrame 进入 checkpoint。
@@ -29,8 +28,18 @@
 - `13:17`（修复）`CHANGELOG.md`：将 11:20 条目移至 11:14 条目之后，恢复同日时间顺序。
 - `13:17`（新增）`docs/train_plan22.md`、`configs/exp_C002a.yaml`、`configs/exp_C002b.yaml`、`configs/exp_C002c.yaml`、`configs/exp_C002d.yaml`：制定四骨干统一低学习率 C-002 计划，提供四份独立完整配置，说明与 C-001 的对照口径；未执行 GPU 训练。
 - `13:31`（变更）`docs/train_plan22.md`、`configs/exp_C002a.yaml`、`configs/exp_C002b.yaml`、`configs/exp_C002c.yaml`、`configs/exp_C002d.yaml`：按要求将 C-002 调整为 ConvNeXt-Tiny 的统一学习率 3e-4 与 1.5e-4 双 seed 配对实验，保持完整独立配置；原四骨干方案暂不执行，GPU 训练未执行。
-
+- `13:44`（新增）远端训练环境（不涉及仓库文件）：C-001 四组串行训练全部结束，`outputs/20261101-114223_C-001-a`、`20261101-121402_C-001-b`、`20261101-124710_C-001-c`、`20261101-131708_C-001-d` 各留存 `config.yaml` / `best.pt` / `last.pt` / `metrics.csv` / `train.log` / `tb/`；四组均打印「预训练权重: 已加载」且 `best.pt` 的 `metadata.pretrained_loaded` 为 `True`，可训练参数 27,827,818 / 7,715,084 / 22,166,226 / 6,964,106。四组全部在 best epoch 3 达峰、epoch 7 触发 `patience 4` 早停，耗时 31m33s / 33m01s / 29m52s / 27m04s。
 - `13:48`（新增）`docs/train_plan23.md`：制定 C-003 ConvNeXt-Tiny 320→384 分辨率双 seed 对照计划；规定 C-002 学习率选择与对照复用条件、独立配置生成步骤、固定 batch 与显存失败处理、训练/评估命令、配对统计和耗时判读。同步记录于 `CHANGELOG.md`；本次仅编写计划，C-003 配置、GPU 训练及评估均未执行。
+- `13:50`（变更）远端训练环境（不涉及仓库文件）：按计划串行启动 C-002 四组训练（`run_C002.sh`，HEAD `c1f22ca`）；C-002-a 于 `13:50:05` 启动、预训练加载成功、首轮 macro-AUC 0.7727。启动前终止了 13:41 遗留的 `/tmp/diag.py` 分析进程（其 stdout 为已断开的 ssh 管道、无产物落盘，占用 1 核 CPU）。
+- `13:55`（新增）`outputs/predictions/valid/C-001-{a,b,c,d}.csv`、`outputs/eval_reports/C-001-{a,b,c,d}.txt`（远端产物，不入库）：C-001 四组各用自身运行目录的 `config.yaml` + `best.pt` 在 valid 859 studies 上重算。valid macro-AUC / F1@0.5 为 0.7919 / 0.4191、0.7774 / 0.3996、0.7807 / 0.4055、0.7849 / 0.4049，相对 A-001（0.8038 / 0.4255）的 ΔAUC 为 −0.0119 / −0.0264 / −0.0231 / −0.0189，均未过 0.8088 方向性门；阈值曲线峰位均在 0.5–0.6。
+- `13:55`（新增）`src/common/config.py`、`src/model/losses.py`、`configs/default.yaml`、`configs/exp_pos_weight_sqrt.yaml`、`docs/manual.md`、`tests/test_pos_weight_power.py`：新增 BCE 正样本权重指数 `train.pos_weight_power`，默认 1.0 保持原公式，支持 0.5 平方根权重，新增单变量示例与配置、边界和续训验证；未执行 GPU 训练。
+- `13:56`（新增）`configs/exp_C003a.yaml`、`configs/exp_C003b.yaml`：新增不继承的完整 384 分辨率双 seed 配置，暂定学习率 3e-4，正样本权重指数固定 1.0；（变更）`docs/train_plan23.md`：同步配置状态、C-002 判读后的学习率确认及训练前核验。未执行 GPU 训练。
+- `13:58`（新增）`docs/train_plan24.md`、`configs/exp_C004.yaml`：制定 C-004 平方根 BCE 类别权重单变量实验，创建不继承的完整配置，记录 A-001 对照资格、训练评估与判读边界；GPU 训练和评估未执行。
+- `14:01`（新增）`docs/train_plan25.md`、`configs/exp_C005a.yaml`、`configs/exp_C005b.yaml`、`configs/exp_C005c.yaml`、`configs/exp_C005d.yaml`：制定 C-005 正侧位权重 0.5、0.6、0.8、0.9 四组实验，提供完整独立配置及训练、对照和判读方案；GPU 训练及评估未执行。
+- `14:04`（新增）`outputs/analysis_c001_fusion.py`（远端产物，不入库）：C-001 融合补充价值分析脚本。先按 A-FUSE-1 公式重算四模型等权基线得 0.8116 / 0.4416（与记录值一致），再把每个候选作等权第五成员；结果 ΔAUC 为 −0.0004 / +0.0003 / +0.0005 / −0.0007，按 `Subject_id` 整簇重采样的配对 bootstrap（2000 次、种子 2026）区间全部跨 0 → 四组对现有融合无补充价值。
+- `14:06`（变更）`docs/train_plan21.md`、`docs/training_log.md`、`docs/experiments.md`：回填 C-001 执行记录——计划文档改写状态行并新增「执行记录」章节（四组运行表、早峰现象、阈值曲线、融合五模型对照、判读与未执行项）；训练记录新增 C-001 章节（四组逐轮指标表、阈值曲线、逐类 AUC 对照、融合 bootstrap、结论）与汇总表四行及说明；调优记录在实验矩阵补四行，并在「执行与结果」新增 C-001 小节、在冻结结论第 2 条补一句「C-001 不构成骨干切换依据」。
+- `14:07`（新增）`docs/train_plan26.md`、`configs/exp_C006a.yaml`、`configs/exp_C006b.yaml`、`configs/exp_C006c.yaml`、`configs/exp_C006d.yaml`：制定 C-006 亮度和对比度单变量四组实验，提供完整独立配置、训练评估与判读方案；GPU 训练及评估未执行。
+- `14:07`（变更）`src/common/config.py`、`src/data/transforms.py`、`configs/default.yaml`、`docs/manual.md`；（新增）`tests/test_augmentation_config.py`：将训练亮度与对比度幅度配置化，默认均为 0.15，兼容既有行为并验证 16 位输入、非法值及续训边界。
 
 ## 2026-10-31
 

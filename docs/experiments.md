@@ -70,6 +70,10 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | A-009-r2 | `A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42` | `configs/exp_A009.yaml`（`_base: exp_A001.yaml`）+ `src/run_train.py --init-from` 首轮 `best.pt` | 10（早停 4，实际 5） | 是 | A-009 的二轮 warm start 对照：以首轮 A-009 `best.pt`（epoch 10 权重）为初始权重、按 A-009 同配置重训 10 轮；已完成（0.7764 / 0.4117，未过 0.8088 门，低于首轮 0.7799 / 0.4101） |
 | A-001(s216) | `A-001_convnext_tiny_s216` | `configs/exp_A001_seed216.yaml`（`_base: exp_A001.yaml`） | 12（早停 4，实际 10） | 是 | A-001 的 seed 216 复核 + 预算/正则三项覆盖：`seed` 42 → 216、`train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，其余口径逐字段不变；已完成（0.7947 / 0.4235，未过 0.8088 门） |
 | A-FUSE-1 | `test_fuse4_prob_w1111`（推理融合，无新训练） | `src/run_ensemble.py --fusion probability`，四模型等权 1:1:1:1（A-001 / A-004-b / RUN-009-A / A-001-D） | — | — | 既有 A 组 `best.pt` 的 valid 概率融合选型与提交通道：手动 9 组 + 6 模型权重网格 249 组，最终四模型等权融合 valid 0.8116 / F1@0.5 0.4416（+0.0078 vs A-001，过 0.8088 门），产出 test 提交文件；排除 B-001 / RUN-008-D |
+| C-001-a | `C-001-a` | `configs/exp_C001a.yaml`（完整展开） | 12（早停 4，实际 7） | 是 | 四骨干低学习率对照之一：ConvNeXt-Tiny `fb_in1k`，骨干 `train.lr=5e-5` / 分类头 `train.head_lr=1.5e-4`；已完成（0.7919 / 0.4191，未过 0.8088 门） |
+| C-001-b | `C-001-b` | `configs/exp_C001b.yaml`（完整展开） | 12（早停 4，实际 7） | 是 | 同 C-001-a 口径，骨干换 EfficientNet-B2 `ra_in1k`（唯一变量）；已完成（0.7774 / 0.3996，未过 0.8088 门） |
+| C-001-c | `C-001-c` | `configs/exp_C001c.yaml`（完整展开） | 12（早停 4，实际 7） | 是 | 同 C-001-a 口径，骨干换 EfficientNetV2-S RW `ra2_in1k`（唯一变量）；已完成（0.7807 / 0.4055，未过 0.8088 门） |
+| C-001-d | `C-001-d` | `configs/exp_C001d.yaml`（完整展开） | 12（早停 4，实际 7） | 是 | 同 C-001-a 口径，骨干换 DenseNet-121 `ra_in1k`（唯一变量）；已完成（0.7849 / 0.4049，未过 0.8088 门） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -441,6 +445,16 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：融合增益未做配对 bootstrap 显著性检验；权重网格与选型都在同一份 valid 上做，top1 数字不是无偏估计；test 侧只有提交文件、无标签，融合在 test 上的增益无法验证；四模型融合推理成本（test 1414 studies 约 112 秒）随模型数线性增加。
 - 产物：`outputs/ensemble/test_fuse4/submission.csv`（14,140 行 = 1414 studies × 10 类，概率区间 0.0019–0.9955，UTF-8），`outputs/eval_reports/` 下不另存。
 
+**C-001：四骨干低学习率 + 分类头差异学习率对照**（配置 `configs/exp_C001{a,b,c,d}.yaml`，产物
+`outputs/20261101-114223_C-001-a` 等四组，2026-11-01，计划见 [train_plan21.md](train_plan21.md)）
+
+- 设计：四份配置逐字段一致，唯一变量是 `model.backbone`（ConvNeXt-Tiny `fb_in1k` / EfficientNet-B2 `ra_in1k` / EfficientNetV2-S RW `ra2_in1k` / DenseNet-121 `ra_in1k`）；骨干峰值 `train.lr=5e-5`、分类头 `train.head_lr=1.5e-4`，12 轮上限、patience 4、seed 42 串行独占 V100。
+- 结果：四组**全部在 best epoch 3 达峰、epoch 7 触发早停**，无一跑满 12 轮。C-001-a 0.7919 / 0.4191（31m33s）、C-001-b 0.7774 / 0.3996（33m01s）、C-001-c 0.7807 / 0.4055（29m52s）、C-001-d 0.7849 / 0.4049（27m04s）。
+- 对比 A-001（0.8038 / 0.4255）：ΔAUC **−0.0119 / −0.0264 / −0.0231 / −0.0189**，距 0.8088 方向性门 −0.0169 / −0.0314 / −0.0281 / −0.0239，**四组均未过门**。注意 A-001 与 C-001 之间同时改了学习率方案、轮数与 patience，差值不能单变量归因于骨干。
+- 逐类：C-001-a 3 升 7 降（class8 +0.0185）、C-001-b 1 升 9 降、C-001-c 0 升 10 降、C-001-d 1 升 9 降（class8 +0.0162）；降幅集中在 class1（support 24）、class4、class6、class7，无单类崩掉。
+- 融合补充价值：按 A-FUSE-1 公式重算基线得 0.8116 / 0.4416（与记录一致），四个候选作等权第五成员后 ΔAUC 为 −0.0004 / +0.0003 / +0.0005 / −0.0007，患者整簇 bootstrap（2000 次、种子 2026）区间全部跨 0。
+- 判读：**方向否定**——分层低学习率没有换来更长训练窗口，反而把峰值压在 warmup 结束的第 3 轮，epoch 4 起 valid_loss 单调反弹（C-001-c 0.9331 → 1.5712）。C-001 不产生提交候选，不改默认骨干与学习率；四组同受早峰压制，本轮不能判定骨干绝对优劣。未执行：第二 seed、逐类 bootstrap、test 推理与 T4 耗时自检、DenseNet-121 权重 SHA-256 单独记录。
+
 ## 冻结结论
 
 1. **提交格式**：`run_infer.py` 默认输出全部 10 类概率，不做阈值过滤——赛题的
@@ -453,7 +467,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
    对照，尚不能判断骨干优势是否在第二个 seed 复现；RUN-008 的 ConvNeXt-Tiny 在 6 轮
    预算下 0.8008 超过 +0.005 门，但预算与 RUN-007-A 不同且单 seed，同口径复核前
    不切换；A-001（2026-10-30，seed 42、epoch 8、早停 2）复现 0.8038，
-   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）与 A-005 的 CSRA 分类头（0.7936 vs 同一配对基线 0.8022）与 A-007 的 ConvNeXt-Small + `fb_in22k_ft_in1k` 骨干/权重（0.7903 vs A-001 0.8038）也未带来 AUC 增益，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
+   与 RUN008-C 同量级、差异混杂，仍不切换；A-001-a（训练随机水平翻转，AUC 0.7960）、A-001-C（冻结骨干，0.7264）与 A-004 系列（dropout + weight_decay 组合 0.7988、单 dropout 0.7944、单 weight_decay 0.7999）、A-006 的 ML-Decoder 分类头（0.7900 vs 同版本重训标准头 0.8022）与 A-005 的 CSRA 分类头（0.7936 vs 同一配对基线 0.8022）与 A-007 的 ConvNeXt-Small + `fb_in22k_ft_in1k` 骨干/权重（0.7903 vs A-001 0.8038）也未带来 AUC 增益；C-001 的四种骨干在骨干 5e-5 / 头 1.5e-4 下全部于 epoch 3 达峰、valid macro-AUC 0.7774–0.7919、均未过门，同样不构成切换依据，默认 `image.hflip: false`、`freeze_backbone: false` 与训练超参保持不变）；
    实验配置一律用 `_base` 继承它，不在实验文件里复制超参。
    在对比表出来之前不无依据地改默认值，要改必须先附 `run_compare.py` 的结果；`train.pos_weight` 的 AUC 未达原增益门，但 F1@0.5 显著提高，现按要求设为 `true`；`train.lr_scheduler` 经 RUN-003-A 复核无 AUC 增益，现按要求改为 `cosine`。
 3. **复现口径**：默认 seed 为 42，seed 复核另有 2026；指标统一由 `run_compare.py` 在同一份 valid 上重算，
