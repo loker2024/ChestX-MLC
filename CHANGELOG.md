@@ -54,6 +54,8 @@
 - `17:45`（新增）远端训练环境（不涉及仓库文件）：C-002 补充两组串行完成——`outputs/20261101-162622_C-002-b-EXTRA`（7/8 轮、best 5、0.7958 / 0.4431、31m57s、16:26:17–16:58:14）、`outputs/20261101-165819_C-002-e`（9/12 轮、best 7、0.7844 / 0.4132、39m38s、16:58:14–17:37:52），两组均按 `patience 2` 早停、`HF_HUB_OFFLINE=1` 加载 `convnext_tiny.fb_in1k` 成功；评测写入 `outputs/eval_reports/C-002-b-EXTRA.txt`、`outputs/eval_reports/C-002-e.txt` 与 `outputs/predictions/valid/C-002-{b-EXTRA,e}.csv`。判读：短预算组 AUC 与 C-002-b 差 −0.0018（落在 seed 噪声内）、耗时省 3m51s，F1 抬升 +0.0182 主要来自 best.pt 落在 AUC 仅差 0.00005 的第 5 轮（选点效应），且 `epochs` 12→8 会缩短 cosine 周期，**不构成纯 patience 对照**；上扫组 6e-4 从 epoch 1 即退化，比 C-002-a 低 0.0118、F1 低 0.0086 → **学习率合理区间为 1.5e-4–3e-4，3e-4 为上界**。驱动脚本 `run_C002rest.sh` 置于远端仓库根，不入库。
 - `17:45`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan22.md`：回填 C-002 补充两组执行记录——训练记录在 C-002 章节追加「补充两组」小节（改动对照表、两张逐轮表、阈值曲线、逐类 AUC 与五条判读，并把「未执行」清单改写为含「仅改 patience 的严格对照」）；调优记录实验矩阵补 `C-002-b-EXTRA`、`C-002-e` 两行，C-002 执行小节补一段结论；计划 22 第 6 节末尾补一段，引用补充两组结果并说明其支持「不切换学习率」的结论。
 
+- `19:40`（变更）`AGENTS.md`：新增「实验记录与实验表格」章节，把「填写实验记录必须同步填写实验表格 `~/Desktop/loker_exp.xlsx`」定为仓库规约。写明四个 sheet 的系列归属（`Sheet1`/RUN、`A系列实验`/`B系列实验`/`C系列实验`）、列布局与合并规则、性能/参数/分析三列的内容口径，以及保格式的修改方式（直接改 OOXML 并同步 `sharedStrings` 的 `count`/`uniqueCount`，禁用 openpyxl 整本重存）与写后校验链；同时明确表格在仓库外、不得提交进 Git。本条为规则文档化，未改动任何代码与实验产物。
+
 ## 2026-10-31
 
 - `00:03`（新增）`docs/train_plan12.md`：制定 B 组 TorchXRayVision 医学预训练 DenseNet-121 独立研究计划，记录输入适配、权重和数据核验、赛题边界及评估要求；尚未实施或训练。

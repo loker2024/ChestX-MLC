@@ -59,6 +59,16 @@ Python 使用四空格缩进，公开函数添加类型注解；模块、函数�
 
 优先验证标签映射、同次检查多图聚合、患者划分无泄漏及 CSV 字段与概率范围。使用小型合成数据测试，禁止提交真实影像。模型变更报告随机种子、数据划分、设备、Macro-AUC 与 Macro-F1；未执行的验证须明确说明。
 
+## 实验记录与实验表格
+
+每次填写实验记录（`docs/training_log.md` 的章节、`docs/experiments.md` 的实验矩阵与执行小节、`docs/train_planNN.md` 的执行记录），都必须同步填写实验表格 `~/Desktop/loker_exp.xlsx`，不得只改文档。表格位于仓库外，**禁止提交进 Git**。
+
+- sheet 归属：`Sheet1` 放 RUN 系列，`A系列实验` 放 A 系列与 A-FUSE，`B系列实验` 放 B 系列，`C系列实验` 放 C 系列。
+- 列布局：A:B「实验名称」、C:D「实验性能」、E:G「实验参数」为合并单元格，H「实验分析」独立；标题在第 1 行，表头在第 3 行，数据行从第 4 行起。
+- 内容口径：性能列写「验证集 Study 级 Macro-AUC / Macro-F1」并带最好轮次与耗时，参数列写配置路径与关键超参，分析列写相对基线的判读（Δ、门限、是否通过），不只堆数字。
+- 修改方式：直接编辑 OOXML——重写 `xl/worksheets/sheetN.xml`，向 `xl/sharedStrings.xml` 追加字符串并同步 `count` / `uniqueCount`，其余 zip 条目原样保留；**不得用 openpyxl 整本重存**，否则会丢失 WPS 命名空间、合并单元格与行高。新增行沿用邻行样式。
+- 写后校验：备份原表，`xmllint --noout` 检查 XML，比对 zip 条目确认只有目标条目变化，再用 Excel 只读打开确认无修复提示。
+
 ## 提交与 Pull Request
 
 历史提交采用 `类型: 中文说明`，例如 `docs: 新增贡献指南`、`chore: 初始化仓库`。保持单次提交主题集中。
