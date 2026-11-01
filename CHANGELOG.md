@@ -21,11 +21,16 @@
 - `10:59`（新增）`tests/test_tensorboard.py`：新增 13 个用例，覆盖 `build_writer` 三模式与非法取值、`auto` 在缺包时不抛错并打印提示、`true` 缺包抛 `ImportError`、配置默认值/非法值/`to_dict` 往返、`fit` 写入 28 个 tag 且每 tag 轮数与 epoch 一致、逐类 tag 命名、`best_macro_auc` 单调不减、`evaluate` 逐类明细与 macro 指标同源；未装 tensorboard 时 4 个写入类用例自动 skip。
 - `10:59`（修复）`tests/test_resume.py`：`test_early_stop_checkpoint_scheduler_is_ready_for_next_epoch` 里 `evaluate` 的 mock 由 `lambda *args` 改为 `lambda *args, **kwargs`——`fit` 现在会传 `with_per_class` 关键字参数，原写法会抛 `TypeError`。
 - `11:10`（变更）远端训练环境（不涉及仓库文件）：`/root/ChestX-MLC/.venv` 安装 `tensorboard==2.20.0`；建立 `/root/tf-logs/chestx -> /root/ChestX-MLC/outputs` 符号链接，使 6007 端口上由容器 init（supervisord）托管、`--logdir` 固定为 `/root/tf-logs` 且配置已不在磁盘的 tensorboard 无需重启即可发现新 run（实测其自动重扫会跟随目录链接，面板名形如 `chestx/<run名>/tb`）。远端当前为无卡模式（`/dev/nvidia*` 不存在、`torch.cuda.is_available()` 为 False），且容器 cgroup `memory.max` 为 2 GB 而 `nproc` 为 96，模型级测试（含原生 `tests/test_engine.py`）在 CPU 下会 OOM，故远端只做了不建模型的 smoke 验证（28 个 tag 经 6007 的 `/data/plugin/scalars/tags` 全部读回，产物已清理）。
-- `11:20`（变更）远端训练环境（不涉及仓库文件）：远端仓库接入方式由 rsync 临时同步改为分支跟踪——`/root/ChestX-MLC` 从 `exp/A-FUSE-1` 切到 `loker` 并快进至 `4076647`，工作区干净；tensorboard 依赖与 `/root/tf-logs/chestx` 符号链接保持有效（实例重置后需重建链接）。
 - `11:12`（新增）`docs/train_plan21.md`、`configs/exp_C001a.yaml`、`configs/exp_C001b.yaml`、`configs/exp_C001c.yaml`、`configs/exp_C001d.yaml`：制定 C-001 四骨干低学习率和分类头差异学习率实验计划，提供四份完整独立配置；配置包含尚未支持的 `train.head_lr`，须先实现并验证分组训练，GPU 实验尚未执行。
 - `11:14`（新增）`tests/test_head_lr.py`：验证 C-001 四种骨干分类头分组、两组学习率调度、非法配置及续训行为。
 - `11:14`（变更）`src/common/config.py`、`src/train/engine.py`：新增可选 `train.head_lr`，按分类头与其余可训练参数建立 AdamW 参数组，两组使用相同比例的学习率调度并分别记录；旧配置保持单组，续训校验配置并恢复优化器状态。
 - `11:14`（变更）`docs/manual.md`、`docs/train_plan21.md`、`configs/exp_C001a.yaml`、`configs/exp_C001b.yaml`、`configs/exp_C001c.yaml`、`configs/exp_C001d.yaml`：说明分组学习率及使用条件，更新计划与配置状态；GPU 训练、权重与数据核验未执行。
+- `11:20`（变更）远端训练环境（不涉及仓库文件）：远端仓库接入方式由 rsync 临时同步改为分支跟踪——`/root/ChestX-MLC` 从 `exp/A-FUSE-1` 切到 `loker` 并快进至 `4076647`，工作区干净；tensorboard 依赖与 `/root/tf-logs/chestx` 符号链接保持有效（实例重置后需重建链接）。
+- `13:17`（修复）`CHANGELOG.md`：将 11:20 条目移至 11:14 条目之后，恢复同日时间顺序。
+- `13:17`（新增）`docs/train_plan22.md`、`configs/exp_C002a.yaml`、`configs/exp_C002b.yaml`、`configs/exp_C002c.yaml`、`configs/exp_C002d.yaml`：制定四骨干统一低学习率 C-002 计划，提供四份独立完整配置，说明与 C-001 的对照口径；未执行 GPU 训练。
+- `13:31`（变更）`docs/train_plan22.md`、`configs/exp_C002a.yaml`、`configs/exp_C002b.yaml`、`configs/exp_C002c.yaml`、`configs/exp_C002d.yaml`：按要求将 C-002 调整为 ConvNeXt-Tiny 的统一学习率 3e-4 与 1.5e-4 双 seed 配对实验，保持完整独立配置；原四骨干方案暂不执行，GPU 训练未执行。
+
+- `13:48`（新增）`docs/train_plan23.md`：制定 C-003 ConvNeXt-Tiny 320→384 分辨率双 seed 对照计划；规定 C-002 学习率选择与对照复用条件、独立配置生成步骤、固定 batch 与显存失败处理、训练/评估命令、配对统计和耗时判读。同步记录于 `CHANGELOG.md`；本次仅编写计划，C-003 配置、GPU 训练及评估均未执行。
 
 ## 2026-10-31
 
