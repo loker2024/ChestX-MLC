@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,7 @@ from common.constants import CLASS_IDS, CSV_ENCODING
 from common.metrics import macro_auc, macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
 from data.dataset import build_loader
+from data.resplit import checkpoint_manifest_path
 from infer.predict import load_checkpoint_model, predict_loader
 
 
@@ -84,7 +86,8 @@ def evaluate_run(
         if raw_config is None
         else config_from_dict(raw_config)
     )
-    loader = build_loader(config, "valid", pin_memory=device.type == "cuda")
+    manifest_path = checkpoint_manifest_path(config, checkpoint, run_dir / "best.pt")
+    loader = build_loader(config, "valid", pin_memory=device.type == "cuda", manifest_path=manifest_path)
     model = load_checkpoint_model(config, run_dir / "best.pt", device)
     predictions = predict_loader(model, loader, device, config)
 
@@ -109,6 +112,10 @@ def evaluate_run(
         "pretrained": _yes_no(metadata.get("pretrained_loaded")),
         "train_device": metadata.get("device", "未知"),
         "valid_studies": len(y_true),
+        "valid_ids_sha256": hashlib.sha256("\n".join(sorted(
+            f"{r.study_id}\t{r.subject_id}\t{r.labels.tolist()}\t"
+            f"{[p.stem for p in r.image_paths]}\t{r.views}"
+            for r in loader.dataset.records)).encode()).hexdigest(),
         "macro_auc": macro_auc(y_true, y_score),
     }
     # 阈值是浮点数，列名写成 f1@0.3 这种形式，贴进 Markdown 一眼能看懂。
@@ -196,6 +203,8 @@ def main(argv: list[str] | None = None) -> None:
         )
         print(f"  macro-AUC {row['macro_auc']:.4f} | {f1_text}")
 
+    if len({row["valid_ids_sha256"] for row in rows}) > 1:
+        raise ValueError("各 run 的验证 study、患者、标签或影像 ID 不一致，不能直接比较")
     table = pd.DataFrame(rows)
     csv_path, md_path = write_summary(
         table, pd.concat(reports, ignore_index=True), Path(args.out), thresholds, device

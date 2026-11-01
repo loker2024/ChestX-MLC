@@ -100,7 +100,8 @@ def collate_studies(batch: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def build_loader(
-    cfg: Config, split: str, train: bool = False, pin_memory: bool = False
+    cfg: Config, split: str, train: bool = False, pin_memory: bool = False,
+    manifest_path: str | Path | None = None,
 ) -> DataLoader:
     """按配置构建某个 split 的 DataLoader。
 
@@ -134,7 +135,11 @@ def build_loader(
         )
         batch_size = cfg.eval.batch_studies
 
-    records = read_split(split_cfg.csv, split_cfg.images, labeled=split != "test")
+    if cfg.data.resplit.enabled and split in {"train", "valid"}:
+        from data.resplit import load_resplit_records
+        records = load_resplit_records(cfg, split, manifest_path)
+    else:
+        records = read_split(split_cfg.csv, split_cfg.images, labeled=split != "test")
     return DataLoader(
         StudyDataset(records, loader_transform, preserve_mode=cfg.image.normalize == "xrv"),
         batch_size=batch_size,

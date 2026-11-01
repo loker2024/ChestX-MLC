@@ -9,7 +9,7 @@
 - 样本单位：study（一次检查）。训练集中一个 study 含 1–7 张图，同一 study 的图片共享同一标签。
 - 标注格式：CSV 一行一张图，`Predict_class` 为分号分隔的类别 ID（如 `7;6;9`）；类别 ID 取 1–10，对应数组下标 0–9；类别 10 在数据中不与其他类别共现。
 - ID 规则：`Subject_id`、`Study_id`、`Dicom_id` 均带前导零，读取与写出全程使用字符串。
-- 数据划分：官方 train/valid 已按患者划分且无重叠，直接沿用；valid 只用于选型与早停。
+- 数据划分：默认直接沿用官方 train/valid；可选合并后按患者随机重划分，新的 valid 用于选型与早停，划分清单与 checkpoint 绑定。
 - 部署约束：模型总分 ≤500MB、单图端到端 ≤100ms（T4 16GB），默认 ResNet-18 + 320px 输入。
 - 聚合口径：逐图 forward 得到 logits，默认同一 study 内按图片取均值；可选正侧位分组均值加权，未知视角或单视角回退全图均值。聚合空间由 `model.aggregation` 决定：`mean` / `view_weighted` 在 logits 空间聚合后 sigmoid（G0），`view_weighted_probability` 先逐图 sigmoid、在概率空间加权后经 logit 变换回 logits（G1）。训练损失、验证指标、推理提交与耗时自检使用同一口径。
 

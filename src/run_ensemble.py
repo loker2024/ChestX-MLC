@@ -15,6 +15,7 @@ from common.constants import CLASS_IDS
 from common.metrics import macro_auc, macro_f1, macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
 from data.dataset import build_loader
+from data.resplit import checkpoint_manifest_path
 from infer.ensemble import fuse_prediction_frames, normalize_weights
 from infer.predict import load_checkpoint_model, predict_loader, predict_loader_logits, validate_submission_model
 from infer.submission import build_submission_frame, validate_submission, write_submission
@@ -170,7 +171,9 @@ def main(argv: list[str] | None = None) -> None:
     prediction_frames = []
     loaders = []
     for checkpoint_path, config in zip(checkpoint_paths, configs):
-        loader = build_loader(config, args.split, pin_memory=device.type == "cuda")
+        checkpoint = load_checkpoint(checkpoint_path, map_location="cpu")
+        manifest_path = checkpoint_manifest_path(config, checkpoint, checkpoint_path) if args.split != "test" else None
+        loader = build_loader(config, args.split, pin_memory=device.type == "cuda", manifest_path=manifest_path)
         loaders.append(loader)
         model = load_checkpoint_model(config, checkpoint_path, device)
         if args.fusion == "logit":

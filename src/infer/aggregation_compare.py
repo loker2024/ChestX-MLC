@@ -66,6 +66,7 @@ from common.constants import CLASS_IDS, CSV_ENCODING, NUM_CLASSES
 from common.metrics import macro_auc, macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
 from data.dataset import build_loader
+from data.resplit import checkpoint_manifest_path
 from infer.predict import load_checkpoint_model, predict_loader
 from model.network import aggregate_logits
 
@@ -333,7 +334,9 @@ def export_run(
         )
 
     torch_device = resolve_device(device)
-    loader = build_loader(config, "valid", train=False, pin_memory=torch_device.type == "cuda")
+    manifest_path = checkpoint_manifest_path(config, checkpoint, checkpoint_path)
+    loader = build_loader(config, "valid", train=False, pin_memory=torch_device.type == "cuda",
+                          manifest_path=manifest_path)
     records = loader.dataset.records
     if not records:
         raise RuntimeError("valid 集为空，无法导出逐图 logits")

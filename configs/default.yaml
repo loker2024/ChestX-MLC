@@ -17,6 +17,10 @@ data:
   valid:
     csv: data/valid.csv
     images: data/images/valid
+  resplit:
+    enabled: false          # 合并 train/valid 后按患者随机划分
+    valid_fraction: 0.1     # 新验证集占合并患者数的比例
+    seed: 42                # 划分种子，独立于训练 seed
   test:
     csv: data/test.csv        # test.csv 没有 Predict_class 列
     images: data/images/test

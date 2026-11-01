@@ -22,6 +22,8 @@ import numpy as np
 import pandas as pd
 
 from common.config import load_config
+from common.checkpoint import load_checkpoint
+from data.resplit import checkpoint_manifest_path
 from common.constants import CLASS_IDS
 from common.metrics import macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
@@ -76,7 +78,9 @@ def main(argv: list[str] | None = None) -> None:
     config = load_config(args.config)
     device = resolve_device(config.device)
 
-    loader = build_loader(config, args.split, pin_memory=device.type == "cuda")
+    checkpoint = load_checkpoint(args.checkpoint, map_location="cpu")
+    manifest_path = checkpoint_manifest_path(config, checkpoint, args.checkpoint)
+    loader = build_loader(config, args.split, pin_memory=device.type == "cuda", manifest_path=manifest_path)
     model = load_checkpoint_model(config, args.checkpoint, device)
     predictions = predict_loader(model, loader, device, config)
 

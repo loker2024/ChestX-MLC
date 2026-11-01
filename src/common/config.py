@@ -31,12 +31,27 @@ class SplitConfig:
 
 
 @dataclass(frozen=True)
+class ResplitConfig:
+    """合并标注数据后按患者重新划分，默认关闭。"""
+    enabled: bool = False
+    valid_fraction: float = 0.1
+    seed: int = 42
+
+    def __post_init__(self) -> None:
+        if not 0.0 < self.valid_fraction < 1.0:
+            raise ValueError("data.resplit.valid_fraction 必须在 (0, 1) 内")
+        if self.seed < 0:
+            raise ValueError("data.resplit.seed 必须是非负整数")
+
+
+@dataclass(frozen=True)
 class DataConfig:
     """三份数据划分。字段名与 YAML 里的 train / valid / test 一一对应。"""
 
     train: SplitConfig
     valid: SplitConfig
     test: SplitConfig
+    resplit: ResplitConfig = field(default_factory=ResplitConfig)
 
 
 @dataclass(frozen=True)

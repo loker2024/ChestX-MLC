@@ -775,3 +775,30 @@ python -m pytest
 ### 可选 ML-Decoder 思路分类头
 
 `configs/exp_ml_decoder.yaml` 在 A-001 基础上使用单层类别查询交叉注意力头；它是 ML-Decoder 的轻量变体，不是作者完整配置的复现。当前仅支持 ConvNeXt-Tiny `fb_in1k`、全量微调、dropout 为 0。结构与实验边界分别见 [实现说明](ml_decoder_implementation.md) 和 [训练计划 16](train_plan16.md)。
+
+### 可选：合并官方训练集和验证集后重划分
+
+仅在训练策略已经确定、需要调整最终训练数据时使用。默认关闭，原配置的官方划分保持不变。创建继承现有配置的实验配置，例如：
+
+```yaml
+_base: exp_A001.yaml
+data:
+  resplit:
+    enabled: true
+    valid_fraction: 0.1
+    seed: 42
+```
+
+执行 `python src/run_train.py --config configs/exp_resplit.yaml --seed 42`。程序合并两个带标签数据源，按 `Subject_id` 随机选择 `ceil(患者数 × valid_fraction)` 位患者作为新验证集；同一患者的所有 study 和图片都在同一侧。划分种子独立于训练种子；两次运行需固定数据、划分配置和 seed 才能使用同一划分。比例按患者数计，不保证 study 或图片比例相同，也不保证类别分层。
+
+运行目录的 `split_manifest.json` 保存来源、study、患者、图片 ID、标签、视角和划分，`best.pt` / `last.pt` 保存清单 SHA-256。训练日志打印新验证集各类正负数量及 AUC 无定义的类别；当前 Macro-AUC 会跳过无定义类别。续训使用 `python src/run_train.py --resume outputs/<run>`，清单缺失或与数据不一致时终止。清单校验标注及图片 ID，不对图片文件内容计算哈希。
+
+评估时保留 checkpoint 同目录的清单，并传入相同重划分配置：
+
+```bash
+python src/run_eval.py --config configs/exp_resplit.yaml --checkpoint outputs/<run>/best.pt
+python src/run_compare.py --runs outputs/<run_a> outputs/<run_b>
+python src/run_ensemble.py --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/best.pt --split valid --out outputs/ensemble_valid
+```
+
+对比和融合需要相同验证样本；不同划分不可直接比较。原官方 valid 有样本已参与训练，不能再作为该模型的独立验证集；新验证指标与历史官方 valid 指标也不是同一数据口径。清单需要随权重一起保存和迁移，test 推理和提交口径不变。

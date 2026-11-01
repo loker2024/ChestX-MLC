@@ -40,6 +40,7 @@ from common.config import Config, config_from_dict, load_config
 from common.constants import CSV_ENCODING
 from common.utils import make_run_dir, resolve_device, seed_everything
 from data.dataset import build_loader
+from data.resplit import MANIFEST_NAME, prepare_resplit, manifest_digest, checkpoint_manifest_path
 from model.network import build_model
 from train.engine import TrainProgress, TrainRuntime, fit
 
@@ -249,11 +250,14 @@ def _save_last_checkpoint(
     pretrained_loaded: bool,
     previous_metadata: dict[str, Any] | None = None,
     extra_metadata: dict[str, Any] | None = None,
+    split_digest: str | None = None,
 ) -> None:
     """保存可续训的完整状态：权重 + 优化器/调度器/AMP + 进度与最优快照。"""
     metadata = _checkpoint_metadata(model, config, device, pretrained_loaded, previous_metadata)
     if extra_metadata is not None:
         metadata.update(extra_metadata)
+    if split_digest:
+        metadata["split_manifest_sha256"] = split_digest
     save_checkpoint(
         path,
         model,
@@ -295,8 +299,21 @@ def run_training(
     if checkpoint is not None:
         _validate_resume_config(config, config_from_dict(checkpoint["config"]))
     pin_memory = device.type == "cuda"
-    train_loader = build_loader(config, "train", train=True, pin_memory=pin_memory)
-    val_loader = build_loader(config, "valid", pin_memory=pin_memory)
+    manifest_path = run_dir / MANIFEST_NAME if config.data.resplit.enabled else None
+    split_digest = None
+    if manifest_path is not None:
+        prepare_resplit(config, manifest_path, resume=checkpoint is not None)
+        split_digest = manifest_digest(manifest_path)
+        if checkpoint is not None:
+            checkpoint_manifest_path(config, checkpoint, run_dir / "last.pt")
+    train_loader = build_loader(config, "train", train=True, pin_memory=pin_memory, manifest_path=manifest_path)
+    val_loader = build_loader(config, "valid", pin_memory=pin_memory, manifest_path=manifest_path)
+    if manifest_path is not None:
+        labels = np.stack([record.labels for record in val_loader.dataset.records])
+        for i, positives in enumerate(labels.sum(axis=0), 1):
+            negative = len(labels) - int(positives)
+            print(f"验证集类别 {i}: 正 {int(positives)} / 负 {negative}" +
+                  ("（AUC 无定义）" if positives == 0 or negative == 0 else ""))
     print(f"训练 study 数: {len(train_loader.dataset)} | 验证 study 数: {len(val_loader.dataset)}")
 
     # 续训或 warm start 时权重马上会被覆盖，构建模型不必再加载（或联网下载）预训练权重。
@@ -371,6 +388,7 @@ def run_training(
             pretrained_loaded,
             checkpoint.get("metadata") if checkpoint is not None else None,
             extra_metadata=warm_metadata,
+            split_digest=split_digest,
         )
 
     result = fit(
@@ -396,10 +414,13 @@ def run_training(
         metrics=result["best_metrics"],
         config=config,
         seed=config.seed,
-        metadata=_merge_metadata(
-            _checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None),
-            warm_metadata,
-        ),
+        metadata={
+            **_merge_metadata(
+                _checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None),
+                warm_metadata,
+            ),
+            **({"split_manifest_sha256": split_digest} if split_digest else {}),
+        },
     )
     print(f"最优权重已保存: {checkpoint_path}")
     return result

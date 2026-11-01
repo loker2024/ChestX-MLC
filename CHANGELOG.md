@@ -119,6 +119,10 @@
 - `19:48`（变更）远端训练环境（不涉及仓库文件）：A-008（A-001 的聚合空间对照，概率空间 G1）在 autodl V100-SXM2-32G 上完成训练与评估——19:06:29 启动、第 7 轮早停（best epoch 5，32m19s），valid macro-AUC **0.7974** / F1@0.5 **0.4197**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0064 / F1@0.5 −0.0058，距 0.8088 门差 −0.0114 → 未过门，概率空间聚合训练方向否定，默认聚合保持 `view_weighted`。产物 `outputs/20261031-190629_A-008_convnext_tiny_g1_s42/`、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv`。
 - `19:48`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan18.md`：回填 A-008 实测（配置差异、命令、环境、7 轮逐轮、与 A-001 判读）；experiments 矩阵新增 A-008 行；train_plan18 状态行改为已完成。
 
+- `20:35`（新增）`src/data/resplit.py`、`tests/test_resplit.py`、`docs/superpowers/plans/2026-10-31-patient-resplit.md`：支持患者级重划分清单、数据一致性和 checkpoint SHA-256 校验，覆盖合成数据测试及实现计划。
+- `20:35`（变更）`src/common/config.py`、`src/data/dataset.py`、`src/run_train.py`、`src/run_eval.py`、`src/run_compare.py`、`src/run_ensemble.py`、`src/infer/aggregation_compare.py`、`configs/default.yaml`：新增默认关闭的 train/valid 合并重划分，接入续训与评估，检查验证集可比性并提示退化类别。
+- `20:35`（变更）`docs/architecture.md`、`docs/manual.md`：记录划分规则、运行命令、清单保存和评估边界；当前分支未发现 clean-mask 相关代码或跟踪文件。
+
 - `20:44`（新增）`configs/exp_A009.yaml`、`docs/train_plan19.md`：新增 A-009 优化超参联合放大对照（相对 A-001 只覆盖 `train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余逐字段继承），并记录该组的判读门（0.8088）、执行命令、实现口径与「四项同改不可拆单项」的限制；训练已启动，实测待回填。
 
 - `20:45`（变更）`docs/training_log.md`、`docs/experiments.md`、`docs/train_plan19.md`：回填 A-009 实测——2026-10-31 19:49:52 启动、10/10 轮跑满（best epoch 10，43m35s），valid macro-AUC **0.7799** / F1@0.5 **0.4101**；相对 A-001（0.8038 / 0.4255）差 AUC −0.0239 / F1@0.5 −0.0154，距 0.8088 门差 −0.0289 → 未过门；valid_loss 在 ep6 触底 0.9384 后反弹到 ep10 1.0955，收敛整体右移；配对 bootstrap（859 studies × 2,000 次）ΔAUC（A-001 − A-009）95% CI [+0.0121, +0.0360] P=1.000、ΔF1@0.5 95% CI [+0.0027, +0.0285] P=0.991，差距不是 valid 内采样噪声；四项同改不可单变量归因，方向否定、默认超参不变，不补 seed 2026。
