@@ -1,6 +1,6 @@
 # 训练计划 23：C-003 ConvNeXt-Tiny 输入分辨率对照
 
-**状态：仅完成计划；C-003 配置尚未创建，GPU 训练、显存测试与评估均未执行。**
+**状态：两份独立配置已准备，暂用 3e-4；须完成 C-002 判读后确认学习率。GPU 训练、显存测试与评估均未执行。**
 
 **目标：** 在学习率与其他训练条件固定后，检验输入从 320×320 提升至 384×384，是否改善 study 级 Macro-AUC，并记录计算代价。
 
@@ -28,8 +28,8 @@
 
 | 实验 / tag | 分辨率 | seed | 配置 | 同 seed 的 320 对照 |
 | --- | --- | --- | --- | --- |
-| C-003-a | 384×384 | 42 | configs/exp_C003a.yaml（执行阶段创建） | 选 3e-4 时 C-002-a；选 1.5e-4 时 C-002-b |
-| C-003-b | 384×384 | 2026 | configs/exp_C003b.yaml（执行阶段创建） | 选 3e-4 时 C-002-c；选 1.5e-4 时 C-002-d |
+| C-003-a | 384×384 | 42 | configs/exp_C003a.yaml（已准备） | 选 3e-4 时 C-002-a；选 1.5e-4 时 C-002-b |
+| C-003-b | 384×384 | 2026 | configs/exp_C003b.yaml（已准备） | 选 3e-4 时 C-002-c；选 1.5e-4 时 C-002-d |
 
 复用的 320 run 保留 C-002 编号，不改名、不复制成新的训练结果。C-003 两组统一采用选定学习率，每对仅 image.size 不同。
 
@@ -51,52 +51,15 @@
 
 固定的是最大预算和早停规则；实际停止轮数可能不同。不得为 384 临时增加轮数、改变 cosine 周期、启用 TTA 或从 320 的 best.pt 热启动。两组均从原始预训练权重开始；同 seed 不保证不同分辨率的训练随机轨迹完全相同。
 
-## 4. 执行阶段创建配置与核验
+## 4. 配置准备与训练前核验
 
-本轮只修改 docs/train_plan23.md 和 CHANGELOG.md。后续执行时创建两个 YAML；不修改 default.yaml、A-001 或 C-002 配置。
+两份 YAML 为完整独立配置，不使用 `_base`，当前 `train.lr=0.0003`、`train.pos_weight_power=1.0`。它们尚未通过 C-002 结果确认；若第 2 节最终选择 1.5e-4，训练前将两份配置的 `train.lr` 同步改为 `0.00015` 并记录变更。不得在 C-002 判读之前启动 C-003。
 
-- [ ] 在仓库根目录激活项目 .venv。把两个有效 320 对照的实际运行目录分别写入环境变量 RUN_320_S42、RUN_320_S2026；目录必须满足上一节复用条件。
-- [ ] 以下命令从实际运行配置展开后生成独立 YAML，避免继承链变化。它仅创建配置，不训练；目标已存在时拒绝覆盖。
-
-```bash
-python - <<'PY'
-import os
-import sys
-from pathlib import Path
-import yaml
-sys.path.insert(0, str(Path('src').resolve()))
-from common.config import load_config
-
-items = [('RUN_320_S42', 42, 'configs/exp_C003a.yaml'),
-         ('RUN_320_S2026', 2026, 'configs/exp_C003b.yaml')]
-pairs = []
-for variable, seed, target in items:
-    source = Path(os.environ[variable]) / 'config.yaml'
-    cfg = load_config(source).to_dict()
-    assert cfg['seed'] == seed and cfg['image']['size'] == 320
-    assert cfg['train']['lr'] in (0.0003, 0.00015)
-    assert cfg['train']['epochs'] == 12
-    assert cfg['train']['early_stop_patience'] == 4
-    assert cfg['train']['batch_studies'] == 16
-    assert not Path(target).exists(), target
-    pairs.append((cfg, target))
-left, right = (cfg.copy() for cfg, _ in pairs)
-left.pop('seed')
-right.pop('seed')
-assert left == right, '两个对照除 seed 外必须相同'
-for cfg, target in pairs:
-    cfg['image']['size'] = 384
-    with Path(target).open('x', encoding='utf-8') as handle:
-        yaml.safe_dump(cfg, handle, allow_unicode=True, sort_keys=False)
-    load_config(target)
-    print(target)
-PY
-```
-
-- [ ] 使用 load_config(...).to_dict() 对比每个新 YAML 与对应真实 320 配置；把候选 image.size 临时恢复 320 后，整个字典必须相等。另逐项核验第 3 节固定值；只有上述断言不足以替代完整配置检查。
+- [ ] 在仓库根目录激活项目 .venv。将两个有效 320 对照的实际运行目录分别写入环境变量 RUN_320_S42、RUN_320_S2026；目录必须满足第 2 节复用条件。
+- [ ] 使用 `load_config(...).to_dict()` 对比每个 C-003 YAML 与对应真实 320 运行配置；把候选的 `image.size` 临时恢复为 320 后，整个字典必须相等。逐项核验第 3 节固定值；包含新增配置项时，以实际运行时展开结果和代码版本为准。
 - [ ] 记录代码 HEAD、工作区 diff、依赖、数据索引及预训练文件哈希，确认 C-003 编号未被其他运行占用。
 - [ ] 执行 `.venv/bin/python -m pytest tests/test_config.py tests/test_dataset.py tests/test_model.py -q` 和 `git diff --check`。这些检查只说明本地配置及链路通过，不是 GPU 显存或收益证据。
-- [ ] 配置创建及后续执行记录同步写入 CHANGELOG.md；不自动提交或推送其他工作区改动。
+- [ ] 若后续调整配置，连同执行记录同步写入 CHANGELOG.md；不自动提交或推送其他工作区改动。
 
 ## 5. 显存检查与失败处理
 
@@ -109,7 +72,7 @@ batch 的单位是 study，一批实际图片数可变，不能只用 16 张随�
 
 ## 6. 正式训练与产物
 
-以下为未来训练命令；须先完成 C-002 判读、配置创建与显存检查，再在训练环境串行执行：
+以下为未来训练命令；须先完成 C-002 判读、配置确认与显存检查，再在训练环境串行执行：
 
 ```bash
 HF_HUB_OFFLINE=1 python -u src/run_train.py --config configs/exp_C003a.yaml --seed 42 --tag C-003-a
