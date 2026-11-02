@@ -1,0 +1,69 @@
+# D-004-a：D-002-a 口径，复核 C-005-c 的正位权重 0.8；训练 seed 42。
+# 独立完整配置；timm 架构不读取 xrv_weights。
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+  resplit:
+    enabled: false
+    valid_fraction: 0.1
+    seed: 42
+image:
+  size: 320
+  letterbox: true
+  normalize: imagenet
+  hflip: false
+  in_channels: 3
+  xrv_maxval: 255
+  brightness: 0.15
+  contrast: 0.15
+model:
+  backbone: convnext_tiny.fb_in1k
+  pretrained: true
+  num_classes: 10
+  dropout: 0.0
+  head: standard
+  csra_residual_weight: 0.4
+  csra_temperature: 1.0
+  freeze_backbone: false
+  aggregation: view_weighted
+  frontal_weight: 0.8
+  arch: timm
+  xrv_weights: densenet121-res224-all
+  xrv_cache_dir: null
+  xrv_sha256: null
+train:
+  ema_enabled: true
+  ema_decay: 0.999
+  epochs: 8
+  batch_studies: 16
+  lr: 0.0003
+  head_lr: null
+  weight_decay: 0.01
+  pos_weight: true
+  pos_weight_power: 1.0
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 1.0e-05
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  tensorboard: auto
+  early_stop_patience: 2
+  loss: bce
+  asl_gamma_pos: 0.0
+  asl_gamma_neg: 4.0
+  asl_clip: 0.05
+eval:
+  batch_studies: 32
+  threshold: 0.5
+output:
+  run_dir: outputs
+seed: 42
+device: auto

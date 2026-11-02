@@ -33,6 +33,12 @@
 - `17:13`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，不提交）：`D系列实验` sheet 追加 6 行（5→11 行）——D-002-a、D-002-a-EMA、D-002-b、D-002-b-EMA、D-003-a、D-003-b，EMA 按用户要求独立成组并以 `-EMA` 结尾。改法沿用 OOXML 直编：`xl/worksheets/sheet6.xml` 重写数据行（A/B、C/D、E:G 合并，A/C/E/H 用 s=15、B/D 用 s=4、F 用 s=3，行高 240 customHeight，`dimension` 改为 A1:H11，`mergeCells` 7→25），`xl/sharedStrings.xml` 追加 24 条（`count` 306→330 / `uniqueCount` 298→322，索引 298→321），其余 zip 条目逐字节不变。校验：备份 `/tmp/loker_exp.bak-171042.xlsx` → 全条目 XML 解析通过 → 变更条目仅 `sheet6.xml` 与 `sharedStrings.xml` → Excel 只读打开读回第 6/7/9/11 行，6 个 sheet 齐全、无修复提示。
 - `17:14`（新增）`outputs/experiments/D-002-a/`、`outputs/experiments/D-002-b/`、`outputs/experiments/D-003-a/`、`outputs/experiments/D-003-b/`、`outputs/experiments/_aborted/20261101-225624_C-006-d/`、`outputs/predictions/valid/D-002-{a,b}{,-EMA}.csv`、`outputs/predictions/valid/D-003-{a,b}.csv`、`outputs/eval_reports/D-002-{a,b}{,-EMA}.txt`、`outputs/eval_reports/D-003-{a,b}.txt`、`outputs/comparisons/compare_D002_D003/`、`outputs/ensemble/test_fuse4/submission.csv`、`outputs/chain_a004b.sh`：从远端 GPU 回传此前本地缺失的小型实验产物。判定方式为内容哈希（md5）比对而非目录名，剔除 `*.pt` / `*.pth` 权重、`*.log` 日志、`*.py` 脚本与大于 5 MB 的文件；远端 350 个候选小产物中 27 个本地缺失，现已全部补齐，回传后再次哈希比对剩余缺失为 0。EMA 相关文件在本地统一改名为大写 `-EMA`，与实验命名保持一致；训练日志按要求未回传。
 
+- `18:55`（新增）`configs/exp_D002c.yaml`：新增 D-002 EMA 第三个训练 seed 216 的完整独立配置，其余参数与 D-002-a 一致；GPU 训练及评估未执行。
+
+- `19:04`（新增）`configs/exp_D005a.yaml`、`configs/exp_D005b.yaml`、`configs/exp_D005c.yaml`、`configs/exp_D005d.yaml`、`configs/exp_D005e.yaml`：新增五份独立 EMA 配置，分别以 D-002-a 为基线单独复核正位权重 0.8、384 分辨率、对比度 0.25、亮度 0.25、正位权重 0.9；保留 A-001 的学习率和训练预算、训练 seed 42。GPU 训练与评估未执行。
+- `19:13`（新增）`configs/exp_E001.yaml`、`configs/exp_E001a.yaml`：新增 EfficientNetV2-S RW + EMA 双分辨率独立配置，分别为 320 和 384，训练 seed 42，其他参数与 D-002-a 相同；GPU 训练及评估未执行。
+- `19:14`（变更）`configs/exp_D005{a,b,c,d,e}.yaml` → `configs/exp_D004{a,b,c,d,e}.yaml`：将五组实验编号及配置注释由 D-005 改为 D-004，训练参数保持不变。
+
 ## 2026-11-01
 - `10:47`（修复）`CHANGELOG.md`：还原 `2026-10-31` 的 `10:58` 条目——该条目在 `8acd94b` 解决合并冲突时被 `19:48` 的两条从中割断，正文混入裸 `## 2026-10-30` 标题且丢失开引号；同时把 `19:48` 两条恢复为独立条目并按同日时间正序归位到 `19:03` 组之后。条目内容未改写。
 - `10:59`（新增）`src/common/tracking.py`：新增训练曲线记录器，提供 `build_writer(log_dir, mode)`、`TENSORBOARD_MODES`、`TENSORBOARD_DIR_NAME`、`FLUSH_SECS`；`auto` 模式在导入 `torch.utils.tensorboard` 失败时打印一行提示并返回 `None`，`true` 模式则抛 `ImportError`，`false` 直接不建目录。模块顶层不导入 tensorboard，赛题环境未装该包时默认链路零影响；flush 间隔由默认 120 秒收紧到 30 秒。
