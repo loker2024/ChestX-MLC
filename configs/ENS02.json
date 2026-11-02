@@ -1,0 +1,39 @@
+{
+  "experiment_id": "ENS02",
+  "models": {
+    "R1": {
+      "path": "models/R1_best_model.pth",
+      "sha256": "ffd963c8c813ddffa14eeedc4fa20ba79f3b086f5f82563cb4b648abc53379f7",
+      "weight": 0.5,
+      "epoch": 5,
+      "loss": "BCE"
+    },
+    "R2": {
+      "path": "models/R2_best_model.pth",
+      "sha256": "ca84b3c2c800db06c7a2878b1b1c51bbb87b9290d61247ade6b56a73fc44dc21",
+      "weight": 0.5,
+      "epoch": 5,
+      "loss": "ASL"
+    }
+  },
+  "image_size": 384,
+  "normalization": "imagenet",
+  "batch_size": 16,
+  "num_workers": 4,
+  "aggregation": "G0",
+  "TTA": false,
+  "precision": "FP32",
+  "threshold": 0.5,
+  "labels": [
+    "Enlarged_Cardiomediastinum",
+    "Pneumothorax",
+    "Consolidation",
+    "Pneumonia",
+    "Edema",
+    "Cardiomegaly",
+    "Atelectasis",
+    "Lung_Opacity",
+    "Pleural_Effusion",
+    "No_Finding"
+  ]
+}
