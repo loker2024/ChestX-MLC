@@ -856,3 +856,12 @@ python src/run_ensemble.py --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/
 ```
 
 对比和融合需要相同验证样本；不同划分不可直接比较。原官方 valid 有样本已参与训练，不能再作为该模型的独立验证集；新验证指标与历史官方 valid 指标也不是同一数据口径。清单需要随权重一起保存和迁移，test 推理和提交口径不变。
+
+
+## 可选 EMA 与 Study 注意力聚合
+
+两个功能默认关闭，旧配置与 checkpoint 无需修改。示例配置分别为 `configs/example_ema.yaml` 和 `configs/example_study_attention.yaml`；示例独立于默认配置，训练前确认数据路径。
+
+EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
+
+`model.aggregation: study_attention` 使用图像特征和视角嵌入进行 study 内 gated attention，然后复用标准分类头；目前仅支持 `timm` 的 `convnext_tiny.fb_in1k`、标准头、全量微调、`dropout: 0`。单张图自然获得权重 1，未知视角使用独立嵌入；训练和推理使用相同前向。该模式不使用 `frontal_weight`，也不支持 G0/G1 聚合对照导出；设置 `head_lr` 时，注意力模块归入骨干学习率参数组。推理须使用对应 checkpoint 配置。GPU 显存、耗时和效果须实测。
