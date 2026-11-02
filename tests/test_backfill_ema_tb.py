@@ -117,6 +117,8 @@ def test_backfill_writes_separate_ema_panel(tmp_path: Path) -> None:
     assert not [tag for tag in scalars if tag.startswith("ema/")]
     # events 里存的是 float32，逐项比较要用 approx。
     assert scalars["valid/best_macro_auc"] == pytest.approx([0.71, 0.73, 0.73, 0.76])
+    # 差值曲线 = EMA - raw，四个 epoch 都是 +0.01。
+    assert scalars["ema_minus_raw/macro_auc"] == pytest.approx([0.01] * 4)
 
 
 @requires_tensorboard

@@ -604,7 +604,7 @@ python src/backfill_ema_tb.py outputs/20261102-145203_D-002-a   # 单个 run
 python src/backfill_ema_tb.py outputs --dry-run                  # 先看会写哪些
 ```
 
-脚本在 run 的 `tb_ema/` 下新建一个带 `.ema_backfill` 后缀的事件文件，不触碰已有事件文件；`step` 用真实 epoch 号，所以补出的曲线与 `tb/` 那组横轴对齐。目录里已有 `valid/macro_auc` 时默认跳过（幂等），要重写加 `--force`，它会先删掉上一次的补写文件再写，不会叠点。若历史 run 的 `tb/` 里残留早期版本写进去的 `ema/*` 补写文件，脚本会一并删除，让原面板恢复成只有 raw 曲线。
+脚本在 run 的 `tb_ema/` 下新建一个带 `.ema_backfill` 后缀的事件文件，不触碰已有事件文件；`step` 用真实 epoch 号，所以补出的曲线与 `tb/` 那组横轴对齐。目录里已有 `valid/macro_auc` 时默认跳过（幂等），要重写加 `--force`，它会先删掉上一次的补写文件再写，不会叠点。若历史 run 的 `tb/` 里残留早期版本写进去的 `ema/*` 补写文件，脚本会一并删除，让原面板恢复成只有 raw 曲线。回填只能提供 CSV 里有的东西：4 条主曲线加 `ema_minus_raw/macro_auc` 差值曲线，没有逐类明细；新训练的 EMA 面板会额外带 `valid/macro_precision|recall` 与逐类曲线。
 
 > 验证集只有几百个 study，逐类正样本可能只有个位数，曲线锯齿明显是样本量决定的，不代表训练不稳定。
 

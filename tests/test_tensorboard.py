@@ -220,6 +220,8 @@ def test_fit_writes_ema_in_separate_panel(config: Config, tmp_path: Path) -> Non
     assert {tag for tag in ema_scalars if tag.startswith("valid/auc/class_")}
     for tag in EMA_TAGS:
         assert len(ema_scalars[tag]) == 2, f"{tag} 应当每个 epoch 一个点"
+    # 另有一条 EMA 减 raw 的差值曲线，正数表示 EMA 更好。
+    assert len(ema_scalars["ema_minus_raw/macro_auc"]) == 2
     # 同名 tag 在两边都有，横轴同为 epoch，才能在 TensorBoard 里同图对比 raw 与 EMA。
     assert EMA_TAGS <= set(raw_scalars)
 

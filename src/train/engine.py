@@ -285,6 +285,17 @@ def evaluate(
     return metrics
 
 
+def _log_ema_delta(writer: Any, epoch: int, ema_auc: float, raw_auc: float) -> None:
+    """在 EMA 面板写一条「EMA 减 raw」的 macro-AUC 差值曲线。
+
+    正数表示 EMA 更好。D-002 双 seed 上 EMA 的逐轮优势并不恒定（首轮通常落后，
+    之后反超），一条差值曲线比两张图来回切更直观。任一值为 NaN 时跳过该轮。
+    """
+    if math.isnan(ema_auc) or math.isnan(raw_auc):
+        return
+    writer.add_scalar("ema_minus_raw/macro_auc", ema_auc - raw_auc, epoch)
+
+
 def _log_valid_curves(
     writer: Any,
     epoch: int,
@@ -489,6 +500,7 @@ def fit(
             _log_epoch(writer, epoch, lr, train_loss, valid_metrics, progress.best_auc, head_lr)
         if ema_writer is not None and ema_metrics is not None:
             # EMA 是独立面板，与 raw 面板同名 tag、不同 logdir。
+            _log_ema_delta(ema_writer, epoch, ema_metrics["macro_auc"], auc)
             _log_valid_curves(ema_writer, epoch, ema_metrics, progress.ema_best_auc)
 
         # early_stop_patience=0 表示关闭早停。早停也要先落盘再退出，

@@ -15,6 +15,7 @@
   面板名 `<run 目录名>/tb_ema`；
 - tag：与 raw 面板同名（`valid/loss`、`valid/macro_auc`、`valid/macro_f1`、
   `valid/best_macro_auc`），同时勾选两个面板就能在同一张图里对比 raw 与 EMA；
+  另多一条 `ema_minus_raw/macro_auc`，直接给出逐轮差值（正数 = EMA 更好）；
 - `step`：真实 epoch 号，与 `tb/` 的横轴对齐。
 
 实现上在 `tb_ema/` 下新建一个带 `.ema_backfill` 后缀的 events 文件，不碰已有
@@ -49,6 +50,9 @@ EMA_COLUMNS = {
 
 # 幂等判据：EMA 面板里有这条就说明补过图。
 PROBE_TAG = "valid/macro_auc"
+
+# EMA 相对同轮 raw 的 macro-AUC 差值，正数表示 EMA 更好。
+DELTA_TAG = "ema_minus_raw/macro_auc"
 
 
 def read_epochs(run_dir: Path) -> pd.DataFrame | None:
@@ -139,6 +143,13 @@ def backfill_run(run_dir: Path, *, force: bool = False, dry_run: bool = False) -
             if math.isnan(value):
                 continue
             writer.add_scalar("valid/best_macro_auc", value, int(epoch))
+        # 差值曲线要求 CSV 同时有 raw 列；缺列时只补四条主曲线。
+        if "valid_macro_auc" in frame.columns:
+            deltas = frame["ema_valid_macro_auc"] - frame["valid_macro_auc"]
+            for epoch, value in zip(frame["epoch"], deltas):
+                if pd.isna(value):
+                    continue
+                writer.add_scalar(DELTA_TAG, float(value), int(epoch))
     finally:
         writer.close()
 
