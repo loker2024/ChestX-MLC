@@ -118,17 +118,27 @@ def backfill_run(run_dir: Path, *, force: bool = False, dry_run: bool = False) -
         )
 
     removed = purge_legacy(run_dir)
-    if not force and PROBE_TAG in existing_tags(ema_dir):
-        return (
-            f"{run_dir.name}: 跳过（EMA 面板已有曲线，重写请加 --force）"
-            + (f"，已清理旧版混入 tb/ 的 {removed} 个文件" if removed else "")
-        )
+    backfill_files = sorted(ema_dir.glob(BACKFILL_PATTERN))
+    tags = existing_tags(ema_dir)
+    if PROBE_TAG in tags:
+        # 训练时就写过面板（目录里没有 .ema_backfill 文件）：再补一份只会叠出重复点。
+        if not backfill_files:
+            return (
+                f"{run_dir.name}: 跳过（面板由训练写入，不重复补写）"
+                + (f"，已清理旧版混入 tb/ 的 {removed} 个文件" if removed else "")
+            )
+        # 旧口径补写只有 4 条主曲线；缺差值曲线时自动重写，不必手动 --force。
+        if DELTA_TAG in tags and not force:
+            return (
+                f"{run_dir.name}: 跳过（EMA 面板已完整，重写请加 --force）"
+                + (f"，已清理旧版混入 tb/ 的 {removed} 个文件" if removed else "")
+            )
 
     from torch.utils.tensorboard import SummaryWriter
 
-    if force:
-        for stale in ema_dir.glob(BACKFILL_PATTERN):
-            stale.unlink()
+    # 补写文件是本脚本的产物，重写前先删干净，避免同一 tag 出现两组重复点。
+    for stale in backfill_files:
+        stale.unlink()
 
     ema_dir.mkdir(parents=True, exist_ok=True)
     writer = SummaryWriter(str(ema_dir), filename_suffix=BACKFILL_SUFFIX)

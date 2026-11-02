@@ -138,6 +138,46 @@ def test_backfill_purges_legacy_files_in_tb(tmp_path: Path) -> None:
 
 
 @requires_tensorboard
+def test_backfill_upgrades_panel_without_delta(tmp_path: Path) -> None:
+    """旧口径补写（4 条主曲线、无差值）应自动重写补齐，且不叠出重复点。"""
+    from torch.utils.tensorboard import SummaryWriter
+
+    run_dir = _write_run(tmp_path)
+    ema_dir = run_dir / TENSORBOARD_EMA_DIR_NAME
+    ema_dir.mkdir()
+    writer = SummaryWriter(str(ema_dir), filename_suffix=BACKFILL_SUFFIX)
+    try:
+        for epoch, value in zip([1, 2, 3, 4], [0.71, 0.73, 0.72, 0.76]):
+            writer.add_scalar("valid/macro_auc", value, epoch)
+    finally:
+        writer.close()
+
+    assert "已写入" in backfill_run(run_dir)
+    scalars = _read_scalars(ema_dir)
+    assert len(scalars["valid/macro_auc"]) == 4
+    assert len(scalars["ema_minus_raw/macro_auc"]) == 4
+
+
+@requires_tensorboard
+def test_backfill_leaves_training_panel_alone(tmp_path: Path) -> None:
+    """训练时写的面板没有补写文件，缺差值也不能覆盖，否则会和训练曲线叠点。"""
+    from torch.utils.tensorboard import SummaryWriter
+
+    run_dir = _write_run(tmp_path)
+    ema_dir = run_dir / TENSORBOARD_EMA_DIR_NAME
+    ema_dir.mkdir()
+    writer = SummaryWriter(str(ema_dir))  # 不带后缀，模拟训练时的写入
+    try:
+        for epoch, value in zip([1, 2, 3, 4], [0.71, 0.73, 0.72, 0.76]):
+            writer.add_scalar("valid/macro_auc", value, epoch)
+    finally:
+        writer.close()
+
+    assert "由训练写入" in backfill_run(run_dir)
+    assert len(_read_scalars(ema_dir)["valid/macro_auc"]) == 4
+
+
+@requires_tensorboard
 def test_backfill_is_idempotent(tmp_path: Path) -> None:
     """重复执行不该叠出双份点；--force 重写后点数仍然只有一份。"""
     run_dir = _write_run(tmp_path)
