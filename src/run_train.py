@@ -153,6 +153,11 @@ def _progress_from_checkpoint(checkpoint: dict[str, Any]) -> TrainProgress:
         best_state=extras["best_state"],
         history=[dict(record) for record in extras["history"]],
         stale_epochs=int(extras["stale_epochs"]),
+        ema_state=extras.get("ema_state"),
+        ema_best_auc=float(extras.get("ema_best_auc", float("nan"))),
+        ema_best_epoch=int(extras.get("ema_best_epoch", 0)),
+        ema_best_metrics=dict(extras.get("ema_best_metrics", {})),
+        ema_best_state=extras.get("ema_best_state"),
     )
 
 
@@ -348,6 +353,11 @@ def _save_last_checkpoint(
             "history": progress.history,
             "stale_epochs": progress.stale_epochs,
             "rng_state": _capture_rng_state(device),
+            "ema_state": progress.ema_state,
+            "ema_best_auc": progress.ema_best_auc,
+            "ema_best_epoch": progress.ema_best_epoch,
+            "ema_best_metrics": progress.ema_best_metrics,
+            "ema_best_state": progress.ema_best_state,
         },
     )
 
@@ -515,6 +525,18 @@ def run_training(
         },
     )
     print(f"最优权重已保存: {checkpoint_path}")
+    progress = result["progress"]
+    if config.train.ema_enabled and progress.ema_best_state is not None:
+        model.load_state_dict(progress.ema_best_state)
+        ema_metrics = _recheck_best_metrics(config, model, val_loader, train_loader, device)
+        save_checkpoint(run_dir / "best_ema.pt", model, epoch=progress.ema_best_epoch,
+                        metrics=ema_metrics, config=config, seed=config.seed,
+                        metadata={**_merge_metadata(_checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None), warm_metadata),
+                                  **({"split_manifest_sha256": split_digest} if split_digest else {}), "weights_kind": "ema"})
+        model.load_state_dict(result["best_state"])
+        print(f"EMA 最优权重已保存: {run_dir / 'best_ema.pt'}")
+    elif config.train.ema_enabled:
+        warnings.warn("EMA 验证 AUC 均无效，未生成 best_ema.pt", RuntimeWarning)
     return result
 
 

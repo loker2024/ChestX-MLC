@@ -114,6 +114,9 @@ def build_model(cfg: Config) -> nn.Module:
         model.head = ConvNeXtMLDecoderHead(model.head.norm, model.num_features, cfg.model.num_classes)
     if cfg.model.freeze_backbone:
         _freeze_backbone(model, cfg.model.backbone)
+    if cfg.model.aggregation == "study_attention":
+        from model.study_attention import AttentionStudyModel
+        model = AttentionStudyModel(model)
     return model
 
 
@@ -197,3 +200,11 @@ def aggregate_logits(
     merged = _study_mean(probs, offsets, views, frontal_weight)
     clamped = merged.clamp(PROBABILITY_EPS, 1.0 - PROBABILITY_EPS)
     return torch.logit(clamped).to(logits.dtype)
+
+
+def forward_studies(model: nn.Module, images: torch.Tensor, offsets: torch.Tensor, views: torch.Tensor | None = None, frontal_weight: float = 0.7, probability_space: bool = False) -> torch.Tensor:
+    """模型提供 study 前向时使用它；旧模型仍沿用原 logits 聚合。"""
+    forward = getattr(model, "forward_studies", None)
+    if callable(forward):
+        return forward(images, offsets, views)
+    return aggregate_logits(model(images), offsets, views, frontal_weight, probability_space)

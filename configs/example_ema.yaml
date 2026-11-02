@@ -1,0 +1,50 @@
+# EMA 示例：在 A-001 口径基础上启用 EMA；训练前检查数据路径。
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+
+image:
+  size: 320
+  letterbox: true
+  normalize: imagenet
+  hflip: false
+
+model:
+  backbone: convnext_tiny.fb_in1k
+  pretrained: true
+  num_classes: 10
+  aggregation: view_weighted
+  frontal_weight: 0.7
+
+train:
+  ema_enabled: true
+  ema_decay: 0.999
+  epochs: 8
+  batch_studies: 16
+  lr: 0.0003
+  weight_decay: 0.01
+  pos_weight: true
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 0.00001
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  early_stop_patience: 2
+
+eval:
+  batch_studies: 32
+  threshold: 0.5
+
+output:
+  run_dir: outputs
+
+seed: 42
+device: auto

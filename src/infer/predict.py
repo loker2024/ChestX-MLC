@@ -32,7 +32,7 @@ from common.config import Config, config_from_dict
 from common.constants import CLASS_IDS
 from data.dataset import load_image
 from data.transforms import build_eval_transform
-from model.network import aggregate_logits, build_model
+from model.network import forward_studies, build_model
 
 
 def load_checkpoint_model(
@@ -132,7 +132,7 @@ def _forward_logits(
     """CPU 上的 images/offsets -> CPU 上的 `[B, 10]` fp32 study logits。"""
     model_images = images.to(device=device, dtype=_model_dtype(model), non_blocking=True)
     model_offsets = offsets.to(device=device, non_blocking=True)
-    study_logits = aggregate_logits(model(model_images), model_offsets,
+    study_logits = forward_studies(model, model_images, model_offsets,
                                     views.to(device) if views is not None else None,
                                     frontal_weight, probability_space)
     # 先转 float32 再搬 CPU：以后即使模型用半精度推理，融合也使用稳定的 fp32 logits。

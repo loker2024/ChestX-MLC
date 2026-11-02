@@ -42,7 +42,7 @@ from torch.utils.data import DataLoader
 from common.config import Config
 from common.metrics import macro_auc, macro_f1, per_class_report
 from model.losses import build_loss
-from model.network import aggregate_logits, set_frozen_backbone_eval
+from model.network import forward_studies, set_frozen_backbone_eval
 
 
 @dataclass
@@ -61,6 +61,11 @@ class TrainProgress:
     best_state: dict[str, torch.Tensor] | None = None
     history: list[dict[str, float]] = field(default_factory=list)
     stale_epochs: int = 0  # 连续多少个 epoch 没有提升
+    ema_state: dict[str, Any] | None = None
+    ema_best_auc: float = float("nan")
+    ema_best_epoch: int = 0
+    ema_best_metrics: dict[str, float] = field(default_factory=dict)
+    ema_best_state: dict[str, torch.Tensor] | None = None
 
 
 @dataclass
@@ -163,6 +168,7 @@ def train_one_epoch(
     optimizer: Optimizer,
     scaler: torch.amp.GradScaler,
     device: torch.device,
+    *, ema: Any | None = None,
 ) -> float:
     """训练一个 epoch，返回按 study 数加权的平均 loss。"""
     model.train()
@@ -180,9 +186,9 @@ def train_one_epoch(
 
         optimizer.zero_grad(set_to_none=True)
         with torch.autocast(device_type=device.type, enabled=use_amp):
-            # 每张图各出一个 10 维 logits，再按 study 平均 —— 和计算指标的口径一致。
-            study_logits = aggregate_logits(
-                model(images),
+            # 统一使用训练与推理共享的 study 级前向。
+            study_logits = forward_studies(
+                model, images,
                 offsets,
                 batch["views"].to(device, non_blocking=True) if config.model.uses_views else None,
                 config.model.frontal_weight,
@@ -196,8 +202,11 @@ def train_one_epoch(
             # 否则裁的是放大过的梯度，阈值 5.0 就失去意义了。
             scaler.unscale_(optimizer)
             nn.utils.clip_grad_norm_(trainable_parameters, config.train.grad_clip)
+        old_scale = scaler.get_scale() if ema is not None else None
         scaler.step(optimizer)
         scaler.update()
+        if ema is not None and old_scale is not None and scaler.get_scale() >= old_scale:
+            ema.update(model)
 
         num_studies = len(batch["study_ids"])
         total_loss += loss.item() * num_studies
@@ -246,8 +255,8 @@ def evaluate(
         offsets = batch["offsets"].to(device, non_blocking=True)
 
         with torch.autocast(device_type=device.type, enabled=amp_allowed):
-            study_logits = aggregate_logits(
-                model(images),
+            study_logits = forward_studies(
+                model, images,
                 offsets,
                 batch["views"].to(device, non_blocking=True) if config.model.uses_views else None,
                 config.model.frontal_weight,
@@ -359,6 +368,14 @@ def fit(
 
     criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
     progress = TrainProgress() if progress is None else progress
+    ema = None
+    if config.train.ema_enabled:
+        from train.ema import ModelEMA
+        ema = ModelEMA(model, config.train.ema_decay)
+        if progress.epoch and progress.ema_state is None:
+            raise ValueError("EMA 断点缺少 EMA 状态，无法续训")
+        if progress.ema_state is not None:
+            ema.load_state_dict(progress.ema_state)
     if scheduler_state is not None and scheduler.last_epoch == progress.epoch - 1:
         scheduler.step()  # 旧版 last.pt 是在 scheduler.step() 之前保存的。
     # best_state 记录当前最优权重；续训时沿用存档里的，不能拿当前权重覆盖。
@@ -370,14 +387,30 @@ def fit(
         # 学习率在训练这一步用的是“当前值”，所以先记下来再更新。
         lr = optimizer.param_groups[0]["lr"]
         head_lr = optimizer.param_groups[1]["lr"] if config.train.head_lr is not None else None
-        train_loss = train_one_epoch(
-            config, model, train_loader, criterion, optimizer, scaler, device
-        )
+        if ema is None:
+            train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device)
+        else:
+            train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, ema=ema)
         # 只有真要写曲线时才多算一遍逐类明细，默认路径的开销保持不变。
         valid_metrics = evaluate(
             config, model, val_loader, criterion, device, with_per_class=writer is not None
         )
         auc = valid_metrics["macro_auc"]
+        ema_metrics = None
+        if ema is not None:
+            # DataLoader 迭代会消耗 CPU RNG；额外验证不能改变后续训练轨迹。
+            cuda_devices = [device.index if device.index is not None else torch.cuda.current_device()] if device.type == "cuda" else []
+            with torch.random.fork_rng(devices=cuda_devices):
+                ema_metrics = evaluate(config, ema.model, val_loader, criterion, device)
+        if ema_metrics is not None:
+            print(f"  EMA | valid_loss {ema_metrics['loss']:.4f} | macro_auc {ema_metrics['macro_auc']:.4f} | macro_f1 {ema_metrics['macro_f1']:.4f}")
+            ema_auc = ema_metrics["macro_auc"]
+            if not math.isnan(ema_auc) and (math.isnan(progress.ema_best_auc) or ema_auc > progress.ema_best_auc):
+                progress.ema_best_auc = ema_auc
+                progress.ema_best_epoch = epoch
+                progress.ema_best_metrics = dict(ema_metrics)
+                progress.ema_best_state = _snapshot(ema.model)
+            progress.ema_state = {"model": _snapshot(ema.model), "updates": ema.updates}
 
         progress.history.append(
             {
@@ -389,6 +422,8 @@ def fit(
                 "valid_macro_f1": valid_metrics["macro_f1"],
             }
         )
+        if ema_metrics is not None:
+            progress.history[-1].update({"ema_valid_loss": ema_metrics["loss"], "ema_valid_macro_auc": ema_metrics["macro_auc"], "ema_valid_macro_f1": ema_metrics["macro_f1"]})
         if head_lr is not None:
             progress.history[-1]["head_lr"] = head_lr
         lr_detail = f" | head_lr {head_lr:.2e}" if head_lr is not None else ""

@@ -159,3 +159,37 @@ def test_run_train_init_from_missing_checkpoint_is_rejected(tmp_path, labeled_sp
                 str(tmp_path / "missing.pt"),
             ]
         )
+
+
+def test_ema_cli_outputs_resume_state_and_best(tmp_path, labeled_split):
+    run_root = tmp_path / 'outputs'
+    config_path = _write_config(tmp_path, labeled_split, run_root)
+    text = config_path.read_text(encoding='utf-8').replace('train:\n', 'train:\n  ema_enabled: true\n  ema_decay: 0.9\n')
+    config_path.write_text(text, encoding='utf-8')
+    run_train.main(['--config', str(config_path), '--tag', 'ema'])
+    run_dir = next(run_root.iterdir())
+    last = load_checkpoint(run_dir / 'last.pt')
+    ema = load_checkpoint(run_dir / 'best_ema.pt')
+    assert last['extras']['ema_state']['updates'] > 0
+    assert ema['metadata']['weights_kind'] == 'ema'
+    assert ema['epoch'] == 1
+    metrics = pd.read_csv(run_dir / 'metrics.csv')
+    assert 'ema_valid_macro_auc' in metrics
+    run_train.main(['--resume', str(run_dir)])
+    assert load_checkpoint(run_dir / 'best_ema.pt')['epoch'] == 1
+
+
+def test_ema_validation_does_not_change_raw_training_trajectory(tmp_path, labeled_split):
+    import torch
+    run_root = tmp_path / 'outputs'
+    config_path = _write_config(tmp_path, labeled_split, run_root)
+    text = config_path.read_text(encoding='utf-8').replace('epochs: 1', 'epochs: 2')
+    config_path.write_text(text, encoding='utf-8')
+    run_train.main(['--config', str(config_path), '--tag', 'raw'])
+    raw_dir = next(run_root.iterdir())
+    config_path.write_text(text.replace('train:\n', 'train:\n  ema_enabled: true\n'), encoding='utf-8')
+    run_train.main(['--config', str(config_path), '--tag', 'ema'])
+    ema_dir = next(path for path in run_root.iterdir() if path != raw_dir)
+    raw = load_checkpoint(raw_dir / 'last.pt')['model']
+    with_ema = load_checkpoint(ema_dir / 'last.pt')['model']
+    assert all(torch.equal(raw[key], with_ema[key]) for key in raw)

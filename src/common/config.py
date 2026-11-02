@@ -102,8 +102,8 @@ class ImageConfig:
 #   logits 空间（G0）；
 # - `view_weighted_probability`：分组与权重同上，但先逐图 sigmoid 再在概率空间
 #   平均（G1）。训练损失与推理提交共用这条路径，保证口径一致。
-ALL_AGGREGATIONS = frozenset({"mean", "view_weighted", "view_weighted_probability"})
-VIEW_AGGREGATIONS = frozenset({"view_weighted", "view_weighted_probability"})
+ALL_AGGREGATIONS = frozenset({"mean", "view_weighted", "view_weighted_probability", "study_attention"})
+VIEW_AGGREGATIONS = frozenset({"view_weighted", "view_weighted_probability", "study_attention"})
 PROBABILITY_AGGREGATIONS = frozenset({"view_weighted_probability"})
 
 
@@ -139,6 +139,8 @@ class ModelConfig:
         return self.aggregation in PROBABILITY_AGGREGATIONS
 
     def __post_init__(self) -> None:
+        if self.aggregation == "study_attention" and (self.arch != "timm" or self.backbone != "convnext_tiny.fb_in1k" or self.head != "standard" or self.freeze_backbone or self.dropout != 0.0):
+            raise ValueError("study_attention 仅支持全量微调的标准 ConvNeXt-Tiny，且 dropout=0")
         if self.head not in {"standard", "csra", "ml_decoder"}:
             raise ValueError("model.head 只能是 standard、csra 或 ml_decoder")
         if not math.isfinite(self.csra_residual_weight) or self.csra_residual_weight < 0:
@@ -191,6 +193,8 @@ class ModelConfig:
 class TrainConfig:
     """训练超参数。"""
 
+    ema_enabled: bool = False
+    ema_decay: float = 0.999
     epochs: int = 25
     batch_studies: int = 16  # 每个 batch 的检查数；图片数由各 study 实际张数决定
     lr: float = 3e-4
@@ -212,6 +216,8 @@ class TrainConfig:
     asl_clip: float = 0.05  # ASL 概率移位量 m：负样本概率先推低 m 再取对数
 
     def __post_init__(self) -> None:
+        if not math.isfinite(self.ema_decay) or not 0 <= self.ema_decay < 1:
+            raise ValueError("train.ema_decay 必须在 [0, 1) 内")
         if self.epochs < 1:
             raise ValueError(f"train.epochs 必须 >= 1，当前为 {self.epochs}")
         if self.batch_studies < 1:
