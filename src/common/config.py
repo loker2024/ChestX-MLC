@@ -122,7 +122,9 @@ class ModelConfig:
     aggregation: str = "mean"
     frontal_weight: float = 0.7
     arch: str = "timm"  # "timm"=timm 骨干；"xrv_densenet121"=TorchXRayVision DenseNet-121（B 组隔离研究）
-    xrv_weights: str = "densenet121-res224-all"  # TxRV 预训练权重名
+    # TxRV 预训练权重名；None=未指定权重。仅 timm 分支允许留空，
+    # arch='xrv_densenet121' 时由 __post_init__ 强制要求非空。
+    xrv_weights: str | None = "densenet121-res224-all"
     xrv_cache_dir: Path | None = None  # 权重缓存目录；None=TxRV 默认 ~/.torchxrayvision/models_data
     xrv_sha256: str | None = None  # 期望的权重文件 SHA-256；None=不校验
 

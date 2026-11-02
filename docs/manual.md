@@ -238,7 +238,7 @@ data:
 | `model.aggregation` | 字符串 | `mean` | `mean` / `view_weighted` / `view_weighted_probability` | 聚合口径。`mean`：study 内图片等权均值（logits 空间）；`view_weighted`：按正/侧位分组均值再按 `frontal_weight` 加权（logits 空间，G0）；`view_weighted_probability`：分组与权重同上，但先逐图 sigmoid 再在概率空间加权（G1）。训练、验证、推理、提交共用同一口径。 |
 | `model.frontal_weight` | 数字 | `0.7` | `0 < 值 < 1` | 视角加权时正位权重；侧位权重为 `1 - frontal_weight`。`mean` 下不生效。 |
 | `model.arch` | 字符串 | `timm` | `timm` / `xrv_densenet121` | 模型实现分支。默认走 timm；`xrv_densenet121` 为 B 组隔离研究（TorchXRayVision DenseNet-121 医学预训练），仅研究，不用于赛题提交、融合或候选选择；该分支禁止 `freeze_backbone`。 |
-| `model.xrv_weights` | 字符串 | `densenet121-res224-all` | 非空 | 仅 `arch: xrv_densenet121` 生效：TxRV 预训练权重名。 |
+| `model.xrv_weights` | 字符串 / 空 | `densenet121-res224-all` | `arch: xrv_densenet121` 时非空；`timm` 下可写 `null` | 仅 `arch: xrv_densenet121` 生效：TxRV 预训练权重名。timm 分支不读取该字段，留 `null` 表示未指定权重。 |
 | `model.xrv_cache_dir` | 路径 / 空 | 空 | 可省略 | 仅 B 组生效：权重缓存目录；省略时用 TxRV 默认 `~/.torchxrayvision/models_data`。 |
 | `model.xrv_sha256` | 字符串 / 空 | 空 | 64 位十六进制 | 仅 B 组生效：期望的权重文件 SHA-256；给出时实际文件哈希不匹配立即报错。B-001 写死 `56524913dd16a906422e8d8b66a7a5c46be1d82eb7ac012d8103776f1aa68899`。 |
 

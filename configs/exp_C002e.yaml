@@ -49,7 +49,7 @@ model:
   aggregation: view_weighted
   frontal_weight: 0.7
   arch: timm
-  xrv_weights: densenet121-res224-all
+  xrv_weights: null
   xrv_cache_dir: null
   xrv_sha256: null
 train:

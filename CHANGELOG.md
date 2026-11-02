@@ -8,6 +8,9 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-11-02
+- `12:18`（变更）`configs/exp_C001a.yaml`、`configs/exp_C001b.yaml`、`configs/exp_C001c.yaml`、`configs/exp_C001d.yaml`、`configs/exp_C002a.yaml`、`configs/exp_C002b.yaml`、`configs/exp_C002b_extra.yaml`、`configs/exp_C002c.yaml`、`configs/exp_C002d.yaml`、`configs/exp_C002e.yaml`、`configs/exp_C003a.yaml`、`configs/exp_C003b.yaml`、`configs/exp_C004.yaml`、`configs/exp_C005a.yaml`、`configs/exp_C005b.yaml`、`configs/exp_C005c.yaml`、`configs/exp_C005d.yaml`、`configs/exp_C006a.yaml`、`configs/exp_C006b.yaml`、`configs/exp_C006c.yaml`、`configs/exp_C006d.yaml`；`src/common/config.py`；`docs/manual.md`：把 C 系列 21 份完整独立配置的 `model.xrv_weights` 由 `densenet121-res224-all` 改为 `null`。这 21 份配置 `model.arch` 均为 `timm`，该字段是从 dataclass 默认值抄下来的残留，训练链路根本不读取；留在配置里容易被误读为 C 组使用了外部医学预训练权重（赛题规则第 1 条敏感项），故清零。`configs/exp_B001.yaml` 是该字段的唯一真实使用者（`arch: xrv_densenet121`，配合 `xrv_sha256` 校验），按要求保持 `densenet121-res224-all` 不改。配套把 `ModelConfig.xrv_weights` 注解由 `str` 放宽为 `str | None`（默认值不变），否则 `_convert` 会以「应该是非空字符串」拒绝 `null`；`__post_init__` 原有的「`arch='xrv_densenet121'` 时不能为空」校验保留，因此 `null` 仅在 timm 分支合法，B 组不会静默退化成随机初始化。`docs/manual.md` 配置表同步把该字段允许值改为「`arch: xrv_densenet121` 时非空、`timm` 下可写 `null`」。验证：`common.config.load_config` 加载 `configs/*.yaml` 65 份全部通过，B-001 仍解析为 `densenet121-res224-all`、其余 21 份为 `None`；本机 `python -m pytest` 354 passed / 5 skipped。GPU 训练与评估未执行。
+
 ## 2026-11-01
 - `10:47`（修复）`CHANGELOG.md`：还原 `2026-10-31` 的 `10:58` 条目——该条目在 `8acd94b` 解决合并冲突时被 `19:48` 的两条从中割断，正文混入裸 `## 2026-10-30` 标题且丢失开引号；同时把 `19:48` 两条恢复为独立条目并按同日时间正序归位到 `19:03` 组之后。条目内容未改写。
 - `10:59`（新增）`src/common/tracking.py`：新增训练曲线记录器，提供 `build_writer(log_dir, mode)`、`TENSORBOARD_MODES`、`TENSORBOARD_DIR_NAME`、`FLUSH_SECS`；`auto` 模式在导入 `torch.utils.tensorboard` 失败时打印一行提示并返回 `None`，`true` 模式则抛 `ImportError`，`false` 直接不建目录。模块顶层不导入 tensorboard，赛题环境未装该包时默认链路零影响；flush 间隔由默认 120 秒收紧到 30 秒。
