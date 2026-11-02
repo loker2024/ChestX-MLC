@@ -397,6 +397,7 @@ outputs/
 | `best.pt` | 训练**正常结束后** | valid macro-AUC 最高的权重。推理、验证、对比都使用它。训练被中断时不会生成。 |
 | `last.pt` | 每个 epoch 结束时 | 可续训的完整状态：权重、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史。文件明显大于 `best.pt`。 |
 | `tb/` | 训练中每轮追加（需已装 `tensorboard` 且 `train.tensorboard` 不为 `false`） | TensorBoard 事件文件，内容和 `metrics.csv` 同源，另含 10 类逐类 AUC / F1。查看：`tensorboard --logdir outputs`，面板名是 run 目录名加 `/tb`。没装 tensorboard 时该目录不存在，训练不受影响。 |
+| `tb_ema/` | 同上，且 `train.ema_enabled: true` | EMA 影子权重的独立曲线面板（面板名 `<run>/tb_ema`），tag 与 `tb/` 同名但只含验证曲线。与原实验并列，不混进 `tb/`。 |
 | `summary.csv` / `per_class.csv` / `summary.md` | `run_compare.py` 运行后 | 多个 run 的指标对比表与逐类指标，见 3.6。 |
 | `submission.csv` | `run_infer.py` 运行后 | 赛题提交文件，长表格式，见 3.7。 |
 
@@ -581,21 +582,29 @@ tensorboard --logdir outputs --port 6006
 | `valid` | `valid/macro_precision`、`valid/macro_recall` | 按 `eval.threshold` 汇总的宏平均 |
 | `valid` | `valid/best_macro_auc` | 历史最优 macro-AUC，台阶状不回落，一眼看出最优权重停在哪轮 |
 | `valid/auc`、`valid/f1` | `class_1` … `class_10` | 逐类曲线，类别 ID 与赛题一致；互斥类（全阴/全阳）的 AUC 为 NaN 断点 |
-| `ema` | `ema/loss`、`ema/macro_auc`、`ema/macro_f1` | 仅 `train.ema_enabled: true` 时写入，与 `metrics.csv` 的 `ema_valid_*` 三列同源 |
-| `ema` | `ema/best_macro_auc` | EMA 权重的历史最优 macro-AUC，台阶状；与 `valid/best_macro_auc` 同图对照可看出 EMA 何时反超 |
+
+开了 EMA 时另有一组**独立面板** `tb_ema/`（面板名 `<run 目录名>/tb_ema`），tag 与 raw 面板同名，只是少了训练侧两条：
+
+| 分组 | tag | 含义 |
+| --- | --- | --- |
+| `tb_ema/`（独立面板） | `valid/loss`、`valid/macro_auc`、`valid/macro_f1` | 仅 `train.ema_enabled: true` 时生成，与 `metrics.csv` 的 `ema_valid_*` 三列同源 |
+| `tb_ema/`（独立面板） | `valid/best_macro_auc` | EMA 权重的历史最优 macro-AUC，台阶状 |
+| `tb_ema/`（独立面板） | `valid/macro_precision`、`valid/macro_recall`、`valid/auc/class_1..10`、`valid/f1/class_1..10` | 与 raw 面板同构的汇总与逐类曲线 |
+
+EMA 不写进原实验面板：它是同一批更新的影子权重，作为**并列的第二个 run** 记录更清楚，也避免原面板多出一组一直为空的分组。两个面板 tag 同名、横轴同为 epoch，在 TensorBoard 里同时勾选 `<run>/tb` 与 `<run>/tb_ema`，就能在同一张图上直接对比 raw 与 EMA 的曲线。EMA 面板没有 `train/lr`、`train/loss`——它没有独立的优化器轨迹。
 
 三个模式由 `train.tensorboard` 控制：`auto`（默认，装了才写，没装就跳过并在日志里说明）、`true`（必须写，缺包直接报错）、`false`（不写）。该字段不影响训练轨迹，续训时可随意改。
 
 续训时曲线接在原曲线之后（`global_step` 用真实 epoch 号），不会从 0 重新画。
 
-2026-11-02 之前的训练只把 raw 模型写进曲线，EMA 的三项指标只落在 `metrics.csv`。这类历史 run 可以用回填脚本补图，不必重训：
+2026-11-02 之前的训练只把 raw 模型写进曲线，EMA 的三项指标只落在 `metrics.csv`。这类历史 run 可以用回填脚本补面板，不必重训：
 
 ```bash
 python src/backfill_ema_tb.py outputs/20261102-145203_D-002-a   # 单个 run
 python src/backfill_ema_tb.py outputs --dry-run                  # 先看会写哪些
 ```
 
-脚本在 run 的 `tb/` 下新建一个带 `.ema_backfill` 后缀的事件文件，不触碰已有事件文件；`step` 用真实 epoch 号，所以补出的 `ema/` 曲线与 `valid/` 那组横轴对齐。目录里已有 `ema/macro_auc` 时默认跳过（幂等），要重写加 `--force`，它会先删掉上一次的补写文件再写，不会叠点。
+脚本在 run 的 `tb_ema/` 下新建一个带 `.ema_backfill` 后缀的事件文件，不触碰已有事件文件；`step` 用真实 epoch 号，所以补出的曲线与 `tb/` 那组横轴对齐。目录里已有 `valid/macro_auc` 时默认跳过（幂等），要重写加 `--force`，它会先删掉上一次的补写文件再写，不会叠点。若历史 run 的 `tb/` 里残留早期版本写进去的 `ema/*` 补写文件，脚本会一并删除，让原面板恢复成只有 raw 曲线。
 
 > 验证集只有几百个 study，逐类正样本可能只有个位数，曲线锯齿明显是样本量决定的，不代表训练不稳定。
 
@@ -873,6 +882,6 @@ python src/run_ensemble.py --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/
 
 两个功能默认关闭，旧配置与 checkpoint 无需修改。示例配置分别为 `configs/example_ema.yaml` 和 `configs/example_study_attention.yaml`；示例独立于默认配置，训练前确认数据路径。
 
-EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，并在 TensorBoard 里同时写 `ema/loss`、`ema/macro_auc`、`ema/macro_f1`、`ema/best_macro_auc` 四条曲线（与 `valid/` 那组同图对照），早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
+EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，并在 TensorBoard 里单独写一个 `<run>/tb_ema` 面板（tag 与 raw 同名，可与 `tb/` 同图对比），早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
 
 `model.aggregation: study_attention` 使用图像特征和视角嵌入进行 study 内 gated attention，然后复用标准分类头；目前仅支持 `timm` 的 `convnext_tiny.fb_in1k`、标准头、全量微调、`dropout: 0`。单张图自然获得权重 1，未知视角使用独立嵌入；训练和推理使用相同前向。该模式不使用 `frontal_weight`，也不支持 G0/G1 聚合对照导出；设置 `head_lr` 时，注意力模块归入骨干学习率参数组。推理须使用对应 checkpoint 配置。GPU 显存、耗时和效果须实测。

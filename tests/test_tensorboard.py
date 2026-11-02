@@ -16,7 +16,12 @@ import pytest
 import torch
 
 from common.config import Config, load_config
-from common.tracking import TENSORBOARD_DIR_NAME, TENSORBOARD_MODES, build_writer
+from common.tracking import (
+    TENSORBOARD_DIR_NAME,
+    TENSORBOARD_EMA_DIR_NAME,
+    TENSORBOARD_MODES,
+    build_writer,
+)
 from data.dataset import build_loader
 from model.network import build_model
 from train.engine import evaluate, fit
@@ -33,13 +38,8 @@ EPOCH_TAGS = {
     "valid/macro_recall",
 }
 
-# 开了 EMA 才有的曲线：与 metrics.csv 的 ema_valid_* 三列同源，另加一条历史最优。
-EMA_TAGS = {
-    "ema/loss",
-    "ema/macro_auc",
-    "ema/macro_f1",
-    "ema/best_macro_auc",
-}
+# EMA 是独立面板：只有验证曲线，tag 与 raw 面板同名（没有 train/lr、train/loss）。
+EMA_TAGS = EPOCH_TAGS - {"train/lr", "train/loss"}
 
 
 def _tensorboard_available() -> bool:
@@ -183,17 +183,19 @@ def test_fit_writes_epoch_curves(config: Config, tmp_path: Path) -> None:
     assert set(scalars) >= EPOCH_TAGS
     for tag in EPOCH_TAGS:
         assert len(scalars[tag]) == 2, f"{tag} 应当每个 epoch 一个点"
-    # 关着 EMA 时不该留下半截的 ema/ 曲线，否则面板上会出现一直为空的分组。
+    # EMA 有自己的面板，raw 面板里不该出现任何 ema/ 前缀的曲线。
     assert not [tag for tag in scalars if tag.startswith("ema/")]
 
 
 @requires_tensorboard
-def test_fit_writes_ema_curves(config: Config, tmp_path: Path) -> None:
-    """开 EMA 后多出一组 ema/ 曲线，点数与 epoch 一致，与 valid/ 同步落盘。"""
+def test_fit_writes_ema_in_separate_panel(config: Config, tmp_path: Path) -> None:
+    """开了 EMA 时曲线写进 tb_ema/：独立面板、tag 与 raw 同名（只少训练侧两条）。"""
     ema_config = replace(config, train=replace(config.train, ema_enabled=True))
-    log_dir = tmp_path / TENSORBOARD_DIR_NAME
-    writer = build_writer(log_dir, "true")
-    assert writer is not None
+    raw_dir = tmp_path / TENSORBOARD_DIR_NAME
+    ema_dir = tmp_path / TENSORBOARD_EMA_DIR_NAME
+    raw_writer = build_writer(raw_dir, "true")
+    ema_writer = build_writer(ema_dir, "true")
+    assert raw_writer is not None and ema_writer is not None
     try:
         fit(
             ema_config,
@@ -201,16 +203,25 @@ def test_fit_writes_ema_curves(config: Config, tmp_path: Path) -> None:
             build_loader(ema_config, "train", train=True),
             build_loader(ema_config, "valid"),
             torch.device("cpu"),
-            writer=writer,
+            writer=raw_writer,
+            ema_writer=ema_writer,
         )
     finally:
-        writer.close()
+        raw_writer.close()
+        ema_writer.close()
 
-    scalars = _read_scalars(log_dir)
-    missing = EMA_TAGS - set(scalars)
-    assert not missing, f"缺 EMA 曲线：{sorted(missing)}"
+    raw_scalars = _read_scalars(raw_dir)
+    ema_scalars = _read_scalars(ema_dir)
+    # 两个面板互不混入：raw 没有 ema/ 前缀，EMA 没有训练侧曲线。
+    assert not [tag for tag in raw_scalars if tag.startswith("ema/")]
+    assert not [tag for tag in ema_scalars if tag.startswith("train/")]
+    # EMA 面板与 raw 同构：8 条汇总曲线 + 逐类曲线，只少训练侧两条。
+    assert EMA_TAGS <= set(ema_scalars)
+    assert {tag for tag in ema_scalars if tag.startswith("valid/auc/class_")}
     for tag in EMA_TAGS:
-        assert len(scalars[tag]) == 2, f"{tag} 应当每个 epoch 一个点"
+        assert len(ema_scalars[tag]) == 2, f"{tag} 应当每个 epoch 一个点"
+    # 同名 tag 在两边都有，横轴同为 epoch，才能在 TensorBoard 里同图对比 raw 与 EMA。
+    assert EMA_TAGS <= set(raw_scalars)
 
 
 @requires_tensorboard

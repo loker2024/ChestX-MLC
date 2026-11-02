@@ -16,6 +16,10 @@
 `outputs/`（run 目录的上级）时，每个 run 的 `tb/` 会被识别成一个独立面板，
 面板名就是 run 目录名加 `/tb` 后缀。
 
+开了 EMA 时另起 `run_dir/tb_ema/` 一个独立面板（面板名 `<run>/tb_ema`），
+tag 与 raw 面板同名（`valid/loss` 等），选中两个 run 就能在同一张图里对比
+raw 与 EMA，而不是在原实验面板里塞一组 `ema/` 前缀曲线。
+
 `SummaryWriter` 的 flush 间隔从默认 120 秒收紧到 30 秒，代价可以忽略，
 换来的是进程被 kill 时最多只丢 30 秒的曲线。
 """
@@ -30,6 +34,9 @@ TENSORBOARD_MODES = frozenset({"auto", "true", "false"})
 
 # 曲线子目录名，相对于 run 目录。
 TENSORBOARD_DIR_NAME = "tb"
+
+# EMA 影子权重单独成面板，与 raw 面板并列；目录名同时决定 TensorBoard 里的面板名。
+TENSORBOARD_EMA_DIR_NAME = "tb_ema"
 
 # SummaryWriter 的自动 flush 间隔（秒）。
 FLUSH_SECS = 30

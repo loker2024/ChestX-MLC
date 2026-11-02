@@ -14,8 +14,10 @@
     last.pt       每个 epoch 结束时的完整状态，用于断点续训
     tb/           TensorBoard 曲线（仅在装了 tensorboard 且 train.tensorboard
                   不为 false 时生成；没装就跳过，不影响训练）
+    tb_ema/       EMA 影子权重的独立曲线面板，只在 train.ema_enabled 时生成
 
-曲线查看：`tensorboard --logdir outputs`，面板名就是 run 目录名加 `/tb`。
+曲线查看：`tensorboard --logdir outputs`，面板名就是 run 目录名加 `/tb`；
+开了 EMA 时会多一个并列面板 `<run 目录名>/tb_ema`，tag 与 raw 面板同名。
 
 `--resume` 既可以给 run 目录，也可以直接给其中的 last.pt。续训会复用原 run
 目录、追加写 train.log、沿用已完成的 epoch 与最优权重，不会新建目录重头再来。
@@ -44,7 +46,7 @@ from torch.utils.data import DataLoader
 from common.checkpoint import load_checkpoint, save_checkpoint
 from common.config import Config, config_from_dict, load_config
 from common.constants import CSV_ENCODING
-from common.tracking import TENSORBOARD_DIR_NAME, build_writer
+from common.tracking import TENSORBOARD_DIR_NAME, TENSORBOARD_EMA_DIR_NAME, build_writer
 from common.utils import make_run_dir, resolve_device, seed_everything
 from data.dataset import build_loader
 from data.resplit import MANIFEST_NAME, prepare_resplit, manifest_digest, checkpoint_manifest_path
@@ -387,6 +389,14 @@ def run_training(
             f"训练曲线: {run_dir / TENSORBOARD_DIR_NAME} | "
             f"查看方式: tensorboard --logdir {run_dir.parent}"
         )
+    # EMA 影子权重单独一个面板：开着训练曲线且开了 EMA 才建，否则保持 None。
+    ema_writer = (
+        build_writer(run_dir / TENSORBOARD_EMA_DIR_NAME, config.train.tensorboard)
+        if config.train.ema_enabled and writer is not None
+        else None
+    )
+    if ema_writer is not None:
+        print(f"EMA 曲线: {run_dir / TENSORBOARD_EMA_DIR_NAME}（独立面板）")
     pin_memory = device.type == "cuda"
     manifest_path = run_dir / MANIFEST_NAME if config.data.resplit.enabled else None
     split_digest = None
@@ -493,11 +503,14 @@ def run_training(
             scaler_state=scaler_state,
             on_epoch_end=on_epoch_end,
             writer=writer,
+            ema_writer=ema_writer,
         )
     finally:
         # 训练抛异常也要关掉 writer，否则 events 文件的最后一段可能没落盘。
         if writer is not None:
             writer.close()
+        if ema_writer is not None:
+            ema_writer.close()
 
     # best_state 是所有 epoch 里由 fit 挑出来的最优权重，最后才落盘，
     # 这样 best.pt 永远是完整文件，不会出现“写到一半”的坏权重。

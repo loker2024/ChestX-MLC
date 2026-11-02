@@ -285,45 +285,30 @@ def evaluate(
     return metrics
 
 
-def _log_epoch(
+def _log_valid_curves(
     writer: Any,
     epoch: int,
-    lr: float,
-    train_loss: float,
-    valid_metrics: dict[str, Any],
+    metrics: dict[str, Any],
     best_auc: float,
-    head_lr: float | None = None,
-    ema_metrics: dict[str, Any] | None = None,
-    ema_best_auc: float | None = None,
 ) -> None:
-    """把这一轮的标量写进 TensorBoard，tag 与 `metrics.csv` 的列一一对应。
+    """把一组验证指标写进一个面板：loss、三项 macro、历史最优与逐类曲线。
+
+    raw 与 EMA 共用这套 tag。两者写进不同的 logdir（`tb/` 与 `tb_ema/`），
+    TensorBoard 里是两个并列的 run 面板；tag 同名才能同时勾选两个 run 在同一张
+    图里对比，而不是靠 `ema/` 前缀在同一面板里分组。
 
     逐类曲线按 `valid/auc/class_<id>` 命名，class_<id> 用的是赛题类别 ID（1~10），
     不是数组下标。`valid/best_macro_auc` 是截至本轮的历史最优值，用来直观看出
     「最优权重停在哪一轮」——它是台阶状曲线，不下降。
-
-    开了 EMA（`train.ema_enabled`）时另写一组 `ema/loss`、`ema/macro_auc`、
-    `ema/macro_f1`、`ema/best_macro_auc`：前三项与 `metrics.csv` 的
-    `ema_valid_*` 列同源，最后一项是 EMA 权重的历史最优，与 `valid/` 那组同图
-    对照就能看出 EMA 是否真的更稳。`ema_metrics` 为 `None` 表示本轮没算 EMA，
-    这组 tag 不写，面板上不会出现空曲线。
     """
-    writer.add_scalar("train/lr", lr, epoch)
-    if head_lr is not None:
-        writer.add_scalar("train/head_lr", head_lr, epoch)
-    writer.add_scalar("train/loss", train_loss, epoch)
-    writer.add_scalar("valid/loss", valid_metrics["loss"], epoch)
-    writer.add_scalar("valid/macro_auc", valid_metrics["macro_auc"], epoch)
-    writer.add_scalar("valid/macro_f1", valid_metrics["macro_f1"], epoch)
-    writer.add_scalar("valid/best_macro_auc", best_auc, epoch)
-    if ema_metrics is not None:
-        writer.add_scalar("ema/loss", ema_metrics["loss"], epoch)
-        writer.add_scalar("ema/macro_auc", ema_metrics["macro_auc"], epoch)
-        writer.add_scalar("ema/macro_f1", ema_metrics["macro_f1"], epoch)
-        if ema_best_auc is not None and math.isfinite(ema_best_auc):
-            writer.add_scalar("ema/best_macro_auc", ema_best_auc, epoch)
+    writer.add_scalar("valid/loss", metrics["loss"], epoch)
+    writer.add_scalar("valid/macro_auc", metrics["macro_auc"], epoch)
+    writer.add_scalar("valid/macro_f1", metrics["macro_f1"], epoch)
+    # EMA 面板首轮之前没有最优值（NaN），写进去只会留一段无意义的断点。
+    if math.isfinite(best_auc):
+        writer.add_scalar("valid/best_macro_auc", best_auc, epoch)
 
-    report = valid_metrics.get("per_class")
+    report = metrics.get("per_class")
     if report is not None:
         writer.add_scalar("valid/macro_precision", float(report["precision"].mean()), epoch)
         writer.add_scalar("valid/macro_recall", float(report["recall"].mean()), epoch)
@@ -332,6 +317,27 @@ def _log_epoch(
             writer.add_scalar(f"valid/f1/class_{row.class_id}", row.f1, epoch)
     # 每轮落一次盘：进程被 kill 时最多丢这一轮，不用等 FLUSH_SECS 自动刷新。
     writer.flush()
+
+
+def _log_epoch(
+    writer: Any,
+    epoch: int,
+    lr: float,
+    train_loss: float,
+    valid_metrics: dict[str, Any],
+    best_auc: float,
+    head_lr: float | None = None,
+) -> None:
+    """把这一轮 raw 模型的标量写进 `tb/`，tag 与 `metrics.csv` 的列一一对应。
+
+    学习率与训练 loss 只属于 raw 面板：EMA 是同一批更新的滑动平均，没有独立的
+    优化器轨迹，写过去只会让人误以为有两套训练。
+    """
+    writer.add_scalar("train/lr", lr, epoch)
+    if head_lr is not None:
+        writer.add_scalar("train/head_lr", head_lr, epoch)
+    writer.add_scalar("train/loss", train_loss, epoch)
+    _log_valid_curves(writer, epoch, valid_metrics, best_auc)
 
 
 def fit(
@@ -347,6 +353,7 @@ def fit(
     scaler_state: dict[str, Any] | None = None,
     on_epoch_end: EpochEndHook | None = None,
     writer: Any | None = None,
+    ema_writer: Any | None = None,
 ) -> dict[str, Any]:
     """完整训练流程：逐 epoch 训练 / 验证，按 valid macro-AUC 保留最优权重。
 
@@ -366,6 +373,10 @@ def fit(
     `writer`（TensorBoard `SummaryWriter`）为 `None` 时不记录任何曲线；
     给了就每个 epoch 写一次，`global_step` 用真实 epoch 号，所以续训的曲线
     会自动接在旧曲线的后面，而不是从 0 重新画。
+
+    `ema_writer` 是 EMA 影子权重的独立面板（`tb_ema/`），与 `writer` 分开：
+    EMA 只有验证指标，没有自己的学习率与训练 loss，写进独立面板才不会和原实验
+    混在一起。它只在 `train.ema_enabled` 且本轮确实算了 EMA 时才有输出。
     """
     optimizer = _build_optimizer(model, config)
     scheduler = _build_scheduler(optimizer, config)
@@ -414,14 +425,20 @@ def fit(
             # DataLoader 迭代会消耗 CPU RNG；额外验证不能改变后续训练轨迹。
             cuda_devices = [device.index if device.index is not None else torch.cuda.current_device()] if device.type == "cuda" else []
             with torch.random.fork_rng(devices=cuda_devices):
-                ema_metrics = evaluate(config, ema.model, val_loader, criterion, device)
+                ema_metrics = evaluate(
+                    config, ema.model, val_loader, criterion, device,
+                    with_per_class=ema_writer is not None,
+                )
         if ema_metrics is not None:
             print(f"  EMA | valid_loss {ema_metrics['loss']:.4f} | macro_auc {ema_metrics['macro_auc']:.4f} | macro_f1 {ema_metrics['macro_f1']:.4f}")
             ema_auc = ema_metrics["macro_auc"]
             if not math.isnan(ema_auc) and (math.isnan(progress.ema_best_auc) or ema_auc > progress.ema_best_auc):
                 progress.ema_best_auc = ema_auc
                 progress.ema_best_epoch = epoch
-                progress.ema_best_metrics = dict(ema_metrics)
+                # per_class 是 DataFrame，只服务于曲线；checkpoint 里只留标量。
+                progress.ema_best_metrics = {
+                    key: value for key, value in ema_metrics.items() if key != "per_class"
+                }
                 progress.ema_best_state = _snapshot(ema.model)
             progress.ema_state = {"model": _snapshot(ema.model), "updates": ema.updates}
 
@@ -469,17 +486,10 @@ def fit(
             on_epoch_end(progress, runtime)
         if writer is not None:
             # 曲线排在 checkpoint 之后：关键产物先落盘，曲线是次要的观测手段。
-            _log_epoch(
-                writer,
-                epoch,
-                lr,
-                train_loss,
-                valid_metrics,
-                progress.best_auc,
-                head_lr,
-                ema_metrics=ema_metrics,
-                ema_best_auc=progress.ema_best_auc if ema_metrics is not None else None,
-            )
+            _log_epoch(writer, epoch, lr, train_loss, valid_metrics, progress.best_auc, head_lr)
+        if ema_writer is not None and ema_metrics is not None:
+            # EMA 是独立面板，与 raw 面板同名 tag、不同 logdir。
+            _log_valid_curves(ema_writer, epoch, ema_metrics, progress.ema_best_auc)
 
         # early_stop_patience=0 表示关闭早停。早停也要先落盘再退出，
         # 否则最后一轮的指标和进度会丢。
