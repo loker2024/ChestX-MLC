@@ -1,0 +1,13 @@
+{
+  "unit_tests": 3,
+  "passed": 3,
+  "cpu_checkpoint_strict_load": [
+    "R1",
+    "R2"
+  ],
+  "output_classes": 10,
+  "model_forward_run": false,
+  "training": false,
+  "GPU_used": false,
+  "cross_device_reproduction_verified": false
+}
