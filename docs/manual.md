@@ -581,10 +581,21 @@ tensorboard --logdir outputs --port 6006
 | `valid` | `valid/macro_precision`、`valid/macro_recall` | 按 `eval.threshold` 汇总的宏平均 |
 | `valid` | `valid/best_macro_auc` | 历史最优 macro-AUC，台阶状不回落，一眼看出最优权重停在哪轮 |
 | `valid/auc`、`valid/f1` | `class_1` … `class_10` | 逐类曲线，类别 ID 与赛题一致；互斥类（全阴/全阳）的 AUC 为 NaN 断点 |
+| `ema` | `ema/loss`、`ema/macro_auc`、`ema/macro_f1` | 仅 `train.ema_enabled: true` 时写入，与 `metrics.csv` 的 `ema_valid_*` 三列同源 |
+| `ema` | `ema/best_macro_auc` | EMA 权重的历史最优 macro-AUC，台阶状；与 `valid/best_macro_auc` 同图对照可看出 EMA 何时反超 |
 
 三个模式由 `train.tensorboard` 控制：`auto`（默认，装了才写，没装就跳过并在日志里说明）、`true`（必须写，缺包直接报错）、`false`（不写）。该字段不影响训练轨迹，续训时可随意改。
 
 续训时曲线接在原曲线之后（`global_step` 用真实 epoch 号），不会从 0 重新画。
+
+2026-11-02 之前的训练只把 raw 模型写进曲线，EMA 的三项指标只落在 `metrics.csv`。这类历史 run 可以用回填脚本补图，不必重训：
+
+```bash
+python src/backfill_ema_tb.py outputs/20261102-145203_D-002-a   # 单个 run
+python src/backfill_ema_tb.py outputs --dry-run                  # 先看会写哪些
+```
+
+脚本在 run 的 `tb/` 下新建一个带 `.ema_backfill` 后缀的事件文件，不触碰已有事件文件；`step` 用真实 epoch 号，所以补出的 `ema/` 曲线与 `valid/` 那组横轴对齐。目录里已有 `ema/macro_auc` 时默认跳过（幂等），要重写加 `--force`，它会先删掉上一次的补写文件再写，不会叠点。
 
 > 验证集只有几百个 study，逐类正样本可能只有个位数，曲线锯齿明显是样本量决定的，不代表训练不稳定。
 
@@ -862,6 +873,6 @@ python src/run_ensemble.py --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/
 
 两个功能默认关闭，旧配置与 checkpoint 无需修改。示例配置分别为 `configs/example_ema.yaml` 和 `configs/example_study_attention.yaml`；示例独立于默认配置，训练前确认数据路径。
 
-EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
+EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，并在 TensorBoard 里同时写 `ema/loss`、`ema/macro_auc`、`ema/macro_f1`、`ema/best_macro_auc` 四条曲线（与 `valid/` 那组同图对照），早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
 
 `model.aggregation: study_attention` 使用图像特征和视角嵌入进行 study 内 gated attention，然后复用标准分类头；目前仅支持 `timm` 的 `convnext_tiny.fb_in1k`、标准头、全量微调、`dropout: 0`。单张图自然获得权重 1，未知视角使用独立嵌入；训练和推理使用相同前向。该模式不使用 `frontal_weight`，也不支持 G0/G1 聚合对照导出；设置 `head_lr` 时，注意力模块归入骨干学习率参数组。推理须使用对应 checkpoint 配置。GPU 显存、耗时和效果须实测。

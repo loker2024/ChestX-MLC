@@ -33,6 +33,14 @@ EPOCH_TAGS = {
     "valid/macro_recall",
 }
 
+# 开了 EMA 才有的曲线：与 metrics.csv 的 ema_valid_* 三列同源，另加一条历史最优。
+EMA_TAGS = {
+    "ema/loss",
+    "ema/macro_auc",
+    "ema/macro_f1",
+    "ema/best_macro_auc",
+}
+
 
 def _tensorboard_available() -> bool:
     """能否导入 SummaryWriter，与 `build_writer` 的判断口径保持一致。"""
@@ -174,6 +182,34 @@ def test_fit_writes_epoch_curves(config: Config, tmp_path: Path) -> None:
     scalars = _read_scalars(log_dir)
     assert set(scalars) >= EPOCH_TAGS
     for tag in EPOCH_TAGS:
+        assert len(scalars[tag]) == 2, f"{tag} 应当每个 epoch 一个点"
+    # 关着 EMA 时不该留下半截的 ema/ 曲线，否则面板上会出现一直为空的分组。
+    assert not [tag for tag in scalars if tag.startswith("ema/")]
+
+
+@requires_tensorboard
+def test_fit_writes_ema_curves(config: Config, tmp_path: Path) -> None:
+    """开 EMA 后多出一组 ema/ 曲线，点数与 epoch 一致，与 valid/ 同步落盘。"""
+    ema_config = replace(config, train=replace(config.train, ema_enabled=True))
+    log_dir = tmp_path / TENSORBOARD_DIR_NAME
+    writer = build_writer(log_dir, "true")
+    assert writer is not None
+    try:
+        fit(
+            ema_config,
+            build_model(ema_config),
+            build_loader(ema_config, "train", train=True),
+            build_loader(ema_config, "valid"),
+            torch.device("cpu"),
+            writer=writer,
+        )
+    finally:
+        writer.close()
+
+    scalars = _read_scalars(log_dir)
+    missing = EMA_TAGS - set(scalars)
+    assert not missing, f"缺 EMA 曲线：{sorted(missing)}"
+    for tag in EMA_TAGS:
         assert len(scalars[tag]) == 2, f"{tag} 应当每个 epoch 一个点"
 
 

@@ -293,12 +293,20 @@ def _log_epoch(
     valid_metrics: dict[str, Any],
     best_auc: float,
     head_lr: float | None = None,
+    ema_metrics: dict[str, Any] | None = None,
+    ema_best_auc: float | None = None,
 ) -> None:
     """把这一轮的标量写进 TensorBoard，tag 与 `metrics.csv` 的列一一对应。
 
     逐类曲线按 `valid/auc/class_<id>` 命名，class_<id> 用的是赛题类别 ID（1~10），
     不是数组下标。`valid/best_macro_auc` 是截至本轮的历史最优值，用来直观看出
     「最优权重停在哪一轮」——它是台阶状曲线，不下降。
+
+    开了 EMA（`train.ema_enabled`）时另写一组 `ema/loss`、`ema/macro_auc`、
+    `ema/macro_f1`、`ema/best_macro_auc`：前三项与 `metrics.csv` 的
+    `ema_valid_*` 列同源，最后一项是 EMA 权重的历史最优，与 `valid/` 那组同图
+    对照就能看出 EMA 是否真的更稳。`ema_metrics` 为 `None` 表示本轮没算 EMA，
+    这组 tag 不写，面板上不会出现空曲线。
     """
     writer.add_scalar("train/lr", lr, epoch)
     if head_lr is not None:
@@ -308,15 +316,20 @@ def _log_epoch(
     writer.add_scalar("valid/macro_auc", valid_metrics["macro_auc"], epoch)
     writer.add_scalar("valid/macro_f1", valid_metrics["macro_f1"], epoch)
     writer.add_scalar("valid/best_macro_auc", best_auc, epoch)
+    if ema_metrics is not None:
+        writer.add_scalar("ema/loss", ema_metrics["loss"], epoch)
+        writer.add_scalar("ema/macro_auc", ema_metrics["macro_auc"], epoch)
+        writer.add_scalar("ema/macro_f1", ema_metrics["macro_f1"], epoch)
+        if ema_best_auc is not None and math.isfinite(ema_best_auc):
+            writer.add_scalar("ema/best_macro_auc", ema_best_auc, epoch)
 
     report = valid_metrics.get("per_class")
-    if report is None:
-        return
-    writer.add_scalar("valid/macro_precision", float(report["precision"].mean()), epoch)
-    writer.add_scalar("valid/macro_recall", float(report["recall"].mean()), epoch)
-    for row in report.itertuples(index=False):
-        writer.add_scalar(f"valid/auc/class_{row.class_id}", row.auc, epoch)
-        writer.add_scalar(f"valid/f1/class_{row.class_id}", row.f1, epoch)
+    if report is not None:
+        writer.add_scalar("valid/macro_precision", float(report["precision"].mean()), epoch)
+        writer.add_scalar("valid/macro_recall", float(report["recall"].mean()), epoch)
+        for row in report.itertuples(index=False):
+            writer.add_scalar(f"valid/auc/class_{row.class_id}", row.auc, epoch)
+            writer.add_scalar(f"valid/f1/class_{row.class_id}", row.f1, epoch)
     # 每轮落一次盘：进程被 kill 时最多丢这一轮，不用等 FLUSH_SECS 自动刷新。
     writer.flush()
 
@@ -456,7 +469,17 @@ def fit(
             on_epoch_end(progress, runtime)
         if writer is not None:
             # 曲线排在 checkpoint 之后：关键产物先落盘，曲线是次要的观测手段。
-            _log_epoch(writer, epoch, lr, train_loss, valid_metrics, progress.best_auc, head_lr)
+            _log_epoch(
+                writer,
+                epoch,
+                lr,
+                train_loss,
+                valid_metrics,
+                progress.best_auc,
+                head_lr,
+                ema_metrics=ema_metrics,
+                ema_best_auc=progress.ema_best_auc if ema_metrics is not None else None,
+            )
 
         # early_stop_patience=0 表示关闭早停。早停也要先落盘再退出，
         # 否则最后一轮的指标和进度会丢。
