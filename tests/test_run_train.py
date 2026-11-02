@@ -69,6 +69,12 @@ def test_run_train_cli_writes_artifacts(tmp_path, labeled_split):
     metrics = pd.read_csv(run_dir / "metrics.csv")
     assert len(metrics) == 1
     assert {"epoch", "train_loss", "valid_macro_auc"} <= set(metrics.columns)
+    # 训练结束后会用 fp32 对 best 权重复评一次，结果落在 *_fp32 列；
+    # 本机没有 CUDA，AMP 本就不生效，两套数应当一致。
+    assert {"valid_macro_auc_fp32", "valid_macro_f1_fp32"} <= set(metrics.columns)
+    assert metrics.loc[0, "valid_macro_auc_fp32"] == pytest.approx(metrics.loc[0, "valid_macro_auc"])
+    assert "fp32 复评" in log
+    assert checkpoint["metrics"]["macro_auc"] == pytest.approx(metrics.loc[0, "valid_macro_auc_fp32"])
 
 
 def test_run_train_freeze_head_records_parameter_counts(tmp_path, labeled_split):

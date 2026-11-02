@@ -258,7 +258,7 @@ data:
 | `train.warmup_epochs` | 整数 | `2` | `0 <= warmup < epochs` | 线性 warmup 轮数，按 epoch 逐步把学习率升到 `lr`。默认下第 1 轮为 `lr/2`、第 2 轮为 `lr`。 |
 | `train.lr_scheduler` | 字符串 | `cosine` | `warmup` / `cosine` | 默认配置在预热后余弦衰减；`warmup` 在预热后保持学习率。未指定字段时兼容旧配置，使用 `warmup`。 |
 | `train.lr_min` | 浮点 | `0.00001` | `0 <= lr_min <= lr` | 余弦调度的最低学习率；提前停止时可能尚未到达。 |
-| `train.amp` | 布尔 | `true` | `true` / `false` | 混合精度。仅在 CUDA 上生效，CPU / MPS 上自动等价于关闭。 |
+| `train.amp` | 布尔 | `true` | `true` / `false` | 混合精度。仅在 CUDA 上生效，CPU / MPS 上自动等价于关闭。训练期的验证也随之走 fp16 前向；训练结束后会用 fp32 对最优权重复评一次，结果写入 `metrics.csv` 的 `*_fp32` 列（与 `run_eval` / 提交同口径），所以 `valid_macro_f1` 与 `valid_macro_f1_fp32` 差千分位属正常。 |
 | `train.grad_clip` | 浮点 | `5.0` | `>= 0` | 梯度范数裁剪上限；`0` 表示不裁剪。 |
 | `train.num_workers` | 整数 | `8` | `>= 0` | DataLoader 工作进程数，train / valid / test 共用。Windows 或调试时可设为 `0`。 |
 | `train.tensorboard` | 字符串 | `auto` | `auto` / `true` / `false` | 训练曲线开关。`auto`：装了 `tensorboard` 就写到 run 目录下 `tb/`，没装则跳过并在训练日志里说明；`true`：必须写，缺包时直接报错；`false`：不写。纯观测开关，不影响训练轨迹，改它不会拦住续训。 |

@@ -141,6 +141,15 @@ def _train_labels(train_loader: DataLoader) -> np.ndarray:
     return np.stack([record.labels for record in train_loader.dataset.records]).astype(np.float32)
 
 
+def train_labels(train_loader: DataLoader) -> np.ndarray:
+    """`_train_labels` 的公开入口：训练结束后重建损失时也要用同一份标签统计。
+
+    单独开一个名字而不是把私有函数改成公开，是为了不打断已有的 monkeypatch
+    测试（它们替换的是 `_train_labels`，这里转发调用，替换依然生效）。
+    """
+    return _train_labels(train_loader)
+
+
 def _snapshot(model: nn.Module) -> dict[str, torch.Tensor]:
     """把当前权重在 CPU 上拷一份。训练中不带在 GPU 上，省显存也避免互相影响。"""
     return {name: value.detach().cpu().clone() for name, value in model.state_dict().items()}
@@ -208,6 +217,7 @@ def evaluate(
     device: torch.device,
     *,
     with_per_class: bool = False,
+    use_amp: bool | None = None,
 ) -> dict[str, Any]:
     """在带标签的数据集（也是 valid）上跑一遍，返回 loss 与按 study 计算的指标。
 
@@ -217,9 +227,14 @@ def evaluate(
 
     `per_class` 与 `macro_auc` / `macro_f1` 同源（后两者内部就是拿这张表聚合的），
     所以两条路径算出来的数不会互相矛盾。
+
+    `use_amp=None`（默认）跟随 `train.amp`，与训练期验证保持一致；显式传
+    `False` 强制 fp32 前向。训练结束后的最优权重复评就是传 `False`，让指标与
+    `run_eval` / 提交的同一条 fp32 推理路径对齐（fp16 前向在阈值附近会有
+    少量样本翻转，macro-F1 可差千分位）。
     """
     model.eval()
-    use_amp = _amp_enabled(config, device)
+    amp_allowed = _amp_enabled(config, device) if use_amp is None else (use_amp and device.type == "cuda")
     total_loss = 0.0
     total_studies = 0
     logits_list: list[torch.Tensor] = []
@@ -230,7 +245,7 @@ def evaluate(
         labels = batch["labels"].to(device, non_blocking=True)
         offsets = batch["offsets"].to(device, non_blocking=True)
 
-        with torch.autocast(device_type=device.type, enabled=use_amp):
+        with torch.autocast(device_type=device.type, enabled=amp_allowed):
             study_logits = aggregate_logits(
                 model(images),
                 offsets,

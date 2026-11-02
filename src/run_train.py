@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
+import math
 import random
 import sys
 import warnings
@@ -38,6 +39,7 @@ import pandas as pd
 import numpy as np
 import torch
 import yaml
+from torch.utils.data import DataLoader
 
 from common.checkpoint import load_checkpoint, save_checkpoint
 from common.config import Config, config_from_dict, load_config
@@ -46,8 +48,9 @@ from common.tracking import TENSORBOARD_DIR_NAME, build_writer
 from common.utils import make_run_dir, resolve_device, seed_everything
 from data.dataset import build_loader
 from data.resplit import MANIFEST_NAME, prepare_resplit, manifest_digest, checkpoint_manifest_path
+from model.losses import build_loss
 from model.network import build_model
-from train.engine import TrainProgress, TrainRuntime, fit
+from train.engine import TrainProgress, TrainRuntime, evaluate, fit, train_labels
 
 LAST_CHECKPOINT_NAME = "last.pt"
 
@@ -179,10 +182,71 @@ def _validate_resume_config(config: Config, saved: Config) -> None:
 
 
 def _write_metrics(path: Path, history: list[dict[str, float]]) -> None:
-    """把当前全部 epoch 记录写成 metrics.csv（每轮重写，中断也不丢已完成的轮次）。"""
+    """把当前全部 epoch 记录写成 metrics.csv（每轮重写，中断也不丢已完成的轮次）。
+
+    各 epoch 的键不一定完全相同（只有最优那一轮会带 `*_fp32` 复评列），
+    pandas 会按并集生成列、缺失处留空，所以列顺序以首次出现的顺序为准。
+    """
     if not history:
         return
     pd.DataFrame(history).to_csv(path, index=False, encoding=CSV_ENCODING)
+
+
+def _recheck_best_metrics(
+    config: Config,
+    model: torch.nn.Module,
+    val_loader: DataLoader,
+    train_loader: DataLoader,
+    device: torch.device,
+) -> dict[str, float]:
+    """用 fp32 前向把最优权重在 valid 上复评一次，作为「提交口径」的指标。
+
+    训练期的验证跟着 `train.amp` 走 AMP（fp16）前向，而 `run_eval`、`run_infer`
+    与提交都是 fp32 前向。两条路径的 logits 只差 1e-4~1e-3，但阈值 0.5 附近
+    翻掉个位数样本就能让 macro-F1 差到千分位、macro-AUC 差到万分之一，
+    于是 `metrics.csv` 与重算值长期对不上。这里只在训练结束后付一次 fp32
+    验证的开销，把三处数字统一。
+
+    重建 criterion 只为拿到 valid loss：pos_weight 只作用于训练损失，
+    对 AUC / F1 没有影响。
+    """
+    criterion = build_loss(config, train_labels(train_loader), device=device).to(device)
+    metrics = evaluate(config, model, val_loader, criterion, device, use_amp=False)
+    return {key: value for key, value in metrics.items() if key != "per_class"}
+
+
+def _record_fp32_metrics(
+    history: list[dict[str, float]], best_epoch: int, metrics: dict[str, float]
+) -> None:
+    """把复评结果写进最优那一轮，列名带 `_fp32` 后缀。
+
+    不覆盖原来的列：那几列是训练期 AMP 下的真实观测，逐轮曲线和早停判读
+    都依赖它们；两套数并列才看得出精度口径造成的差有多大。
+    """
+    for record in history:
+        if record.get("epoch") == best_epoch:
+            record["valid_loss_fp32"] = metrics["loss"]
+            record["valid_macro_auc_fp32"] = metrics["macro_auc"]
+            record["valid_macro_f1_fp32"] = metrics["macro_f1"]
+            return
+
+
+def _report_fp32_delta(
+    best_epoch: int, amp_metrics: dict[str, float], fp32_metrics: dict[str, float]
+) -> None:
+    """打印 AMP 与 fp32 两套指标，差异大到异常时能立刻看出来。"""
+
+    def _format(key: str) -> str:
+        fp32_value = float(fp32_metrics[key])
+        amp_value = float(amp_metrics.get(key, float("nan")))
+        if math.isnan(amp_value):
+            return f"{fp32_value:.4f}（训练期 AMP 无有效值）"
+        return f"{fp32_value:.4f}（AMP {amp_value:.4f}，Δ {fp32_value - amp_value:+.4f}）"
+
+    print(
+        f"最优权重 fp32 复评（epoch {best_epoch}）："
+        f"macro_auc {_format('macro_auc')} | macro_f1 {_format('macro_f1')}"
+    )
 
 
 def _checkpoint_metadata(
@@ -428,6 +492,13 @@ def run_training(
     # best_state 是所有 epoch 里由 fit 挑出来的最优权重，最后才落盘，
     # 这样 best.pt 永远是完整文件，不会出现“写到一半”的坏权重。
     model.load_state_dict(result["best_state"])
+    # 落盘前用 fp32 复评一次：训练期验证是 AMP 前向，与 run_eval / 提交的
+    # fp32 路径不同源，直接拿 metrics.csv 里的数当提交分数会差千分位。
+    amp_metrics = dict(result["best_metrics"])
+    result["best_metrics"] = _recheck_best_metrics(config, model, val_loader, train_loader, device)
+    _record_fp32_metrics(result["history"], result["best_epoch"], result["best_metrics"])
+    _write_metrics(run_dir / "metrics.csv", result["history"])
+    _report_fp32_delta(result["best_epoch"], amp_metrics, result["best_metrics"])
     checkpoint_path = save_checkpoint(
         run_dir / "best.pt",
         model,
@@ -516,7 +587,8 @@ def main(argv: list[str] | None = None) -> None:
                 raise
             print(
                 f"训练结束：最优 epoch {result['best_epoch']}，"
-                f"valid macro-AUC {result['best_macro_auc']:.4f}"
+                f"valid macro-AUC {result['best_metrics']['macro_auc']:.4f}"
+                f"（fp32 复评口径；权重挑选时 AMP 为 {result['best_macro_auc']:.4f}）"
             )
 
 

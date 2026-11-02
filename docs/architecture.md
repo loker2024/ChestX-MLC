@@ -78,7 +78,7 @@ outputs/
 
 | 文件 | 职责 | 关键接口 |
 |---|---|---|
-| `engine.py` | 单 epoch 训练与验证、AMP、梯度裁剪、学习率调度、早停、逐 epoch 记录、断点续训 | `fit(cfg, model, train_loader, val_loader, device, *, progress, optimizer_state, scheduler_state, scaler_state, on_epoch_end) -> dict`（`history / best_epoch / best_macro_auc / best_metrics / best_state / progress`）；`TrainProgress` 存进度与最优快照，`TrainRuntime` 暴露优化器/调度器/AMP 供回调落盘 |
+| `engine.py` | 单 epoch 训练与验证、AMP（`evaluate` 的 `use_amp=False` 可强制 fp32 前向）、梯度裁剪、学习率调度、早停、逐 epoch 记录、断点续训 | `fit(cfg, model, train_loader, val_loader, device, *, progress, optimizer_state, scheduler_state, scaler_state, on_epoch_end) -> dict`（`history / best_epoch / best_macro_auc / best_metrics / best_state / progress`）；`TrainProgress` 存进度与最优快照，`TrainRuntime` 暴露优化器/调度器/AMP 供回调落盘 |
 
 ### 3.5 infer：推理与提交
 
@@ -119,12 +119,14 @@ outputs/
 1. `data.index.read_split` 读取 CSV 并递归索引图片，返回 `list[StudyRecord]`。
 2. `data.dataset.StudyDataset` 按 study 取图，`collate_studies` 拼成 `images / offsets / labels`。
 3. `model.network` 逐图输出 logits，`aggregate_logits` 按 `offsets` 和可选视角信息聚合每个 study 的 logits。
-4. `train.engine` 按 `train.loss` 以 BCE（可选 `pos_weight`）或 ASL 训练，按 valid macro-AUC 保存最优权重。
+4. `train.engine` 按 `train.loss` 以 BCE（可选 `pos_weight`）或 ASL 训练，按 valid macro-AUC 保存最优权重；训练结束后 `run_train` 用 fp32 前向对最优权重复评一次（`evaluate(use_amp=False)`），复评指标写入 `metrics.csv` 的 `*_fp32` 列与 `best.pt` 的 `metrics`。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
 7. `src/cost.py` 加载同一份 checkpoint 与配置，按单图串行计时，并在完整测试索引可用时补齐 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
 
-每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv`、`per_class.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
+每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。
+
+`metrics.csv` 的 `valid_*` 列是训练期验证的实测值（CUDA 上跟着 `train.amp` 走 fp16 前向），只有最优那一轮额外带 `valid_loss_fp32` / `valid_macro_auc_fp32` / `valid_macro_f1_fp32`，是训练结束后用 fp32 前向复评的结果——与 `run_eval.py`、`run_infer.py` 走同一条数值路径，可以直接当提交口径引用。两者相差千分位属正常（阈值边界上的少量样本翻转），不是 bug。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv`、`per_class.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 
 ## 6. 待确认与已定事项
 
