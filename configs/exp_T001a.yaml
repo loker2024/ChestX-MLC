@@ -1,0 +1,80 @@
+# T-001-a：外部权重 R1（DenseNet-121 / 384 / BCE）的 valid 复评。完整独立配置，不使用 _base。
+#
+# 来源：桌面 ENS02_R1_R2_384_models_v1.zip 内的 models/R1_best_model.pth，
+#       sha256 = ffd963c8c813ddffa14eeedc4fa20ba79f3b086f5f82563cb4b648abc53379f7，
+#       与 yun 分支 configs/ENS02.json 冻结的 R1 权重逐字节一致。
+# 用途：只做推理。权重由外部代码库（torchvision densenet121 + 自定义训练循环）产出，
+#       本配置把「推理口径」对齐到它，再用本仓库的 run_eval.py 复算指标。
+#
+# 口径对齐依据（权重内 metadata）：
+#   input_size=384、letterbox、ImageNet 归一化、study 内取均值聚合（G0）、阈值 0.5、
+#   10 类、torchvision densenet121、第 5 轮最优。
+#   注意 aggregation 必须是 mean：ENS-02 的 R1/R2 都用 image-probability 均值，
+#   误写成 view_weighted 会改变同一份权重的分数分布。
+#
+# 训练段（train:）只记录来源超参供追溯，推理链路不读取；数值取自权重 metadata。
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+  resplit:
+    enabled: false
+    valid_fraction: 0.1
+    seed: 42
+image:
+  size: 384
+  letterbox: true
+  normalize: imagenet
+  hflip: false
+  brightness: 0.0
+  contrast: 0.0
+  in_channels: 3
+  xrv_maxval: 255
+model:
+  backbone: densenet121
+  pretrained: true
+  num_classes: 10
+  dropout: 0.0
+  head: standard
+  csra_residual_weight: 0.4
+  csra_temperature: 1.0
+  freeze_backbone: false
+  aggregation: mean
+  frontal_weight: 0.7
+  arch: timm
+  xrv_weights: null
+  xrv_cache_dir: null
+  xrv_sha256: null
+train:
+  epochs: 12
+  batch_studies: 8
+  lr: 0.0001
+  head_lr: 0.001
+  weight_decay: 0.01
+  pos_weight: false
+  pos_weight_power: 1.0
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 1.0e-05
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  tensorboard: auto
+  early_stop_patience: 3
+  loss: bce
+  asl_gamma_pos: 0.0
+  asl_gamma_neg: 4.0
+  asl_clip: 0.05
+eval:
+  batch_studies: 32
+  threshold: 0.5
+output:
+  run_dir: outputs
+seed: 42
+device: auto
