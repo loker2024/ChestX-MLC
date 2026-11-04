@@ -193,6 +193,9 @@ class ModelConfig:
 class TrainConfig:
     """训练超参数。"""
 
+    distill_enabled: bool = False
+    distill_cache: str | None = None
+    distill_weight: float = 0.5
     ema_enabled: bool = False
     ema_decay: float = 0.999
     epochs: int = 25
@@ -216,6 +219,10 @@ class TrainConfig:
     asl_clip: float = 0.05  # ASL 概率移位量 m：负样本概率先推低 m 再取对数
 
     def __post_init__(self) -> None:
+        if not math.isfinite(self.distill_weight) or self.distill_weight < 0:
+            raise ValueError("train.distill_weight 必须是非负有限数")
+        if self.distill_enabled and (self.loss != "bce" or not self.distill_cache):
+            raise ValueError("蒸馏要求 BCE 损失和教师缓存路径")
         if not math.isfinite(self.ema_decay) or not 0 <= self.ema_decay < 1:
             raise ValueError("train.ema_decay 必须在 [0, 1) 内")
         if self.epochs < 1:
@@ -310,6 +317,8 @@ class Config:
     device: str = "auto"  # auto / cpu / cuda / cuda:0 / mps
 
     def __post_init__(self) -> None:
+        if self.train.distill_enabled and self.data.resplit.enabled:
+            raise ValueError("蒸馏暂不支持 resplit")
         if self.seed < 0:
             raise ValueError(f"seed 必须 >= 0，当前为 {self.seed}")
         if not self.device:

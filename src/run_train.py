@@ -407,6 +407,19 @@ def run_training(
             checkpoint_manifest_path(config, checkpoint, run_dir / "last.pt")
     train_loader = build_loader(config, "train", train=True, pin_memory=pin_memory, manifest_path=manifest_path)
     val_loader = build_loader(config, "valid", pin_memory=pin_memory, manifest_path=manifest_path)
+    if config.train.distill_enabled:
+        from train.distillation import TeacherCache, records_digest, sha256_file
+        cache = TeacherCache.load(Path(config.train.distill_cache),
+                                  [record.study_id for record in train_loader.dataset.records],
+                                  sha256_file(config.data.train.csv),
+                                  index_sha256=records_digest(train_loader.dataset.records))
+        previous_digest = (checkpoint.get("metadata") or {}).get("distill_cache_sha256") if checkpoint else None
+        if checkpoint is not None and previous_digest != cache.digest:
+            raise ValueError("续训教师缓存摘要缺失或不一致")
+        train_loader.dataset.teacher_cache = cache
+        print(f"教师缓存 SHA-256: {cache.digest}")
+    else:
+        cache = None
     if manifest_path is not None:
         labels = np.stack([record.labels for record in val_loader.dataset.records])
         for i, positives in enumerate(labels.sum(axis=0), 1):
@@ -473,6 +486,9 @@ def run_training(
         )
         if progress.epoch >= config.train.epochs:
             print(f"该 run 已跑满 {config.train.epochs} 个 epoch，只重新导出 best.pt")
+
+    if cache is not None:
+        warm_metadata = {**(warm_metadata or {}), "distill_cache_sha256": cache.digest}
 
     def on_epoch_end(current: TrainProgress, runtime: TrainRuntime) -> None:
         # 先写指标再存权重：两个文件都以“当前 epoch 已完成”为准。

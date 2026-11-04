@@ -168,7 +168,7 @@ def train_one_epoch(
     optimizer: Optimizer,
     scaler: torch.amp.GradScaler,
     device: torch.device,
-    *, ema: Any | None = None,
+    *, ema: Any | None = None, teacher_cache: Any | None = None, loss_stats: dict[str, float] | None = None,
 ) -> float:
     """训练一个 epoch，返回按 study 数加权的平均 loss。"""
     model.train()
@@ -178,6 +178,7 @@ def train_one_epoch(
     use_amp = scaler.is_enabled()  # 只有 CUDA 上才会是 True
     total_loss = 0.0
     total_studies = 0
+    total_hard = total_soft = 0.0
 
     for batch in loader:
         images = batch["images"].to(device, non_blocking=True)
@@ -195,6 +196,13 @@ def train_one_epoch(
                 config.model.probability_space,
             )
             loss = criterion(study_logits, labels)
+            if teacher_cache is not None:
+                from train.distillation import distillation_loss
+                hard_loss = loss
+                soft_loss = distillation_loss(study_logits, teacher_cache.batch(batch["study_ids"], device))
+                loss = hard_loss + config.train.distill_weight * soft_loss
+                total_hard += hard_loss.item() * len(batch["study_ids"])
+                total_soft += soft_loss.item() * len(batch["study_ids"])
 
         scaler.scale(loss).backward()
         if config.train.grad_clip > 0:
@@ -214,6 +222,8 @@ def train_one_epoch(
 
     if total_studies == 0:
         raise RuntimeError("训练集为空，无法计算 loss")
+    if loss_stats is not None and teacher_cache is not None:
+        loss_stats.update(hard=total_hard / total_studies, soft=total_soft / total_studies)
     return total_loss / total_studies
 
 
@@ -422,10 +432,12 @@ def fit(
         # 学习率在训练这一步用的是“当前值”，所以先记下来再更新。
         lr = optimizer.param_groups[0]["lr"]
         head_lr = optimizer.param_groups[1]["lr"] if config.train.head_lr is not None else None
+        loss_stats: dict[str, float] = {}
+        distill_kwargs = {"teacher_cache": train_loader.dataset.teacher_cache, "loss_stats": loss_stats} if config.train.distill_enabled else {}
         if ema is None:
-            train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device)
+            train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, **distill_kwargs)
         else:
-            train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, ema=ema)
+            train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, ema=ema, **distill_kwargs)
         # 只有真要写曲线时才多算一遍逐类明细，默认路径的开销保持不变。
         valid_metrics = evaluate(
             config, model, val_loader, criterion, device, with_per_class=writer is not None
@@ -463,6 +475,8 @@ def fit(
                 "valid_macro_f1": valid_metrics["macro_f1"],
             }
         )
+        if loss_stats:
+            progress.history[-1].update(train_hard_loss=loss_stats["hard"], train_soft_loss=loss_stats["soft"])
         if ema_metrics is not None:
             progress.history[-1].update({"ema_valid_loss": ema_metrics["loss"], "ema_valid_macro_auc": ema_metrics["macro_auc"], "ema_valid_macro_f1": ema_metrics["macro_f1"]})
         if head_lr is not None:
