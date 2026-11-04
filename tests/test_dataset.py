@@ -57,6 +57,24 @@ def test_letterbox_keeps_aspect_ratio():
     assert (pixels[:4] == 0).all() and (pixels[28:] == 0).all()
 
 
+def test_letterbox_grayscale_resize_matches_convert_before_resize():
+    """灰度图先在 L 上缩放再转 RGB，必须与先转 RGB 再缩放逐像素一致。"""
+    rng = np.random.default_rng(0)
+    image = Image.fromarray(rng.integers(0, 256, (97, 61), dtype=np.uint8), mode="L")
+
+    optimized = Letterbox(32, channels=3)(image)
+
+    reference_image = image.convert("RGB")
+    scale = 32 / max(reference_image.size)
+    width = max(1, round(reference_image.width * scale))
+    height = max(1, round(reference_image.height * scale))
+    resized = reference_image.resize((width, height), Image.Resampling.BILINEAR)
+    canvas = Image.new("RGB", (32, 32), 0)
+    canvas.paste(resized, ((32 - width) // 2, (32 - height) // 2))
+
+    np.testing.assert_array_equal(np.asarray(optimized), np.asarray(canvas))
+
+
 def test_train_transform_output_shape():
     image = Image.new("RGB", (50, 70), (128, 128, 128))
 

@@ -44,6 +44,9 @@ class StudyDataset(Dataset):
         return len(self.records)
 
     def __getitem__(self, index: int) -> dict[str, Any]:
+        task = None
+        if isinstance(index, tuple):
+            index, task = index
         record = self.records[index]
         images = [self.transform(load_image(path, convert_rgb=not self.preserve_mode)) for path in record.image_paths]
 
@@ -54,6 +57,8 @@ class StudyDataset(Dataset):
         }
         if record.labels is not None:
             item["labels"] = torch.from_numpy(record.labels)
+        if task is not None:
+            item["task_id"] = task
         return item
 
 
@@ -96,6 +101,8 @@ def collate_studies(batch: list[dict[str, Any]]) -> dict[str, Any]:
     }
     if "labels" in batch[0]:
         collated["labels"] = torch.stack([item["labels"] for item in batch])
+    if "task_id" in batch[0]:
+        collated["task_id"] = torch.tensor([item["task_id"] for item in batch], dtype=torch.long)
     return collated
 
 
@@ -140,8 +147,15 @@ def build_loader(
         records = load_resplit_records(cfg, split, manifest_path)
     else:
         records = read_split(split_cfg.csv, split_cfg.images, labeled=split != "test")
+    dataset = StudyDataset(records, loader_transform, preserve_mode=cfg.image.normalize == "xrv")
+    if train and cfg.train.loss == "aucm":
+        import numpy as np
+        from data.aucm_sampler import AUCMBatchSampler
+        labels = np.stack([record.labels for record in records])
+        return DataLoader(dataset, batch_sampler=AUCMBatchSampler(labels, batch_size, cfg.seed),
+                          num_workers=cfg.train.num_workers, collate_fn=collate_studies, pin_memory=pin_memory)
     return DataLoader(
-        StudyDataset(records, loader_transform, preserve_mode=cfg.image.normalize == "xrv"),
+        dataset,
         batch_size=batch_size,
         shuffle=train,
         num_workers=cfg.train.num_workers,

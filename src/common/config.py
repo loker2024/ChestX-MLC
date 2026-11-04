@@ -112,6 +112,9 @@ class ModelConfig:
     """模型结构与权重来源。"""
 
     backbone: str = "resnet18"  # timm 的模型名
+    # timm 的 patch_embed 默认断言输入尺寸等于预训练尺寸。Swin 一类模型换分辨率
+    # （例如 256 预训练、320 微调）必须置 false，否则前向直接抛 AssertionError。
+    strict_img_size: bool = True
     pretrained: bool = True  # 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
     dropout: float = 0.0  # timm 分类头 dropout；旧配置默认关闭
@@ -196,7 +199,7 @@ class TrainConfig:
     distill_enabled: bool = False
     distill_cache: str | None = None
     distill_weight: float = 0.5
-    ema_enabled: bool = False
+    ema_enabled: bool = True
     ema_decay: float = 0.999
     epochs: int = 25
     batch_studies: int = 16  # 每个 batch 的检查数；图片数由各 study 实际张数决定
@@ -214,6 +217,7 @@ class TrainConfig:
     tensorboard: str = "auto"  # "auto"=装了 tensorboard 就写 run 目录下 tb/；"true"=必须写；"false"=关闭
     early_stop_patience: int = 5  # valid 指标连续多少个 epoch 不提升就停；0 表示关闭早停
     loss: str = "bce"  # "bce"=BCEWithLogitsLoss；"asl"=Asymmetric Loss（自带重加权）
+    aucm_require_bce_init: bool = False  # 第二阶段必须显式提供 BCE checkpoint
     asl_gamma_pos: float = 0.0  # ASL 正样本聚焦指数；论文默认 0，即不衰减正样本
     asl_gamma_neg: float = 4.0  # ASL 负样本聚焦指数；越大，简单负样本被压制得越狠
     asl_clip: float = 0.05  # ASL 概率移位量 m：负样本概率先推低 m 再取对数
@@ -266,8 +270,12 @@ class TrainConfig:
             raise ValueError(
                 f"train.early_stop_patience 必须 >= 0，当前为 {self.early_stop_patience}"
             )
-        if self.loss not in {"bce", "asl"}:
-            raise ValueError(f"train.loss 只能是 'bce' 或 'asl'，当前为 {self.loss!r}")
+        if self.loss not in {"bce", "asl", "aucm"}:
+            raise ValueError(f"train.loss 只能是 'bce'、'asl' 或 'aucm'，当前为 {self.loss!r}")
+        if self.loss == "aucm" and (self.pos_weight or self.head_lr is not None or self.batch_studies < 2 or self.batch_studies % 2):
+            raise ValueError("aucm 要求 pos_weight=false、head_lr=null 且 batch_studies 为至少 2 的偶数")
+        if self.aucm_require_bce_init and self.loss != "aucm":
+            raise ValueError("aucm_require_bce_init 仅适用于 AUCM")
         if self.asl_gamma_pos < 0 or self.asl_gamma_neg < 0:
             raise ValueError(
                 f"train.asl_gamma_pos / asl_gamma_neg 必须 >= 0，"

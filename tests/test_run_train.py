@@ -164,7 +164,7 @@ def test_run_train_init_from_missing_checkpoint_is_rejected(tmp_path, labeled_sp
 def test_ema_cli_outputs_resume_state_and_best(tmp_path, labeled_split):
     run_root = tmp_path / 'outputs'
     config_path = _write_config(tmp_path, labeled_split, run_root)
-    text = config_path.read_text(encoding='utf-8').replace('train:\n', 'train:\n  ema_enabled: true\n  ema_decay: 0.9\n')
+    text = config_path.read_text(encoding='utf-8').replace('train:\n', 'train:\n  ema_decay: 0.9\n')
     config_path.write_text(text, encoding='utf-8')
     run_train.main(['--config', str(config_path), '--tag', 'ema'])
     run_dir = next(run_root.iterdir())
@@ -184,7 +184,7 @@ def test_ema_validation_does_not_change_raw_training_trajectory(tmp_path, labele
     run_root = tmp_path / 'outputs'
     config_path = _write_config(tmp_path, labeled_split, run_root)
     text = config_path.read_text(encoding='utf-8').replace('epochs: 1', 'epochs: 2')
-    config_path.write_text(text, encoding='utf-8')
+    config_path.write_text(text.replace('train:\n', 'train:\n  ema_enabled: false\n'), encoding='utf-8')
     run_train.main(['--config', str(config_path), '--tag', 'raw'])
     raw_dir = next(run_root.iterdir())
     config_path.write_text(text.replace('train:\n', 'train:\n  ema_enabled: true\n'), encoding='utf-8')
@@ -193,3 +193,28 @@ def test_ema_validation_does_not_change_raw_training_trajectory(tmp_path, labele
     raw = load_checkpoint(raw_dir / 'last.pt')['model']
     with_ema = load_checkpoint(ema_dir / 'last.pt')['model']
     assert all(torch.equal(raw[key], with_ema[key]) for key in raw)
+
+
+def test_distill_training_records_losses_and_rejects_changed_cache_on_resume(tmp_path, labeled_split):
+    from data.index import read_split
+    from train.distillation import records_digest, sha256_file, write_teacher_cache
+    records = read_split(labeled_split['csv'], labeled_split['images'])
+    cache = tmp_path / 'teacher'
+    frame = pd.DataFrame([[r.study_id, *([0.7] * 10)] for r in records], columns=['Study_id', *[f'p{i}' for i in range(1, 11)]])
+    manifest = {'train_csv_sha256': sha256_file(labeled_split['csv']), 'index_sha256': records_digest(records), 'fusion': 'logit_clipped_probability', 'weights': [4, 2, 3], 'split': 'train'}
+    write_teacher_cache(cache, frame, manifest)
+    run_root = tmp_path / 'runs'
+    config_path = _write_config(tmp_path, labeled_split, run_root)
+    config_path.write_text(config_path.read_text().replace('train:\n', f'train:\n  distill_enabled: true\n  distill_cache: {json.dumps(str(cache))}\n'))
+    run_train.main(['--config', str(config_path), '--tag', 'distill'])
+    run_dir = next(run_root.iterdir())
+    checkpoint = load_checkpoint(run_dir / 'last.pt')
+    assert len(checkpoint['metadata']['distill_cache_sha256']) == 64
+    metrics = pd.read_csv(run_dir / 'metrics.csv')
+    assert {'train_hard_loss', 'train_soft_loss'} <= set(metrics.columns)
+    manifest_path = cache / 'manifest.json'
+    manifest_data = json.loads(manifest_path.read_text())
+    manifest_data['extra'] = 'changed'
+    manifest_path.write_text(json.dumps(manifest_data))
+    with pytest.raises(ValueError, match='教师缓存摘要'):
+        run_train.main(['--resume', str(run_dir)])

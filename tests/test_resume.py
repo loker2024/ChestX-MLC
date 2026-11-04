@@ -272,6 +272,22 @@ def test_run_train_resume_finishes_remaining_epochs(tmp_path: Path, labeled_spli
     assert "从断点继续" in log
 
 
+def test_resume_legacy_checkpoint_without_ema_field_stays_disabled(tmp_path: Path, labeled_split: dict) -> None:
+    import torch
+
+    run_root = tmp_path / "outputs"
+    first = _write_config(tmp_path, labeled_split, run_root, epochs=1)
+    first.write_text(first.read_text(encoding="utf-8").replace("train:\n", "train:\n  ema_enabled: false\n"), encoding="utf-8")
+    run_train.main(["--config", str(first)])
+    run_dir = next(run_root.iterdir())
+    checkpoint = load_checkpoint(run_dir / "last.pt")
+    checkpoint["config"]["train"].pop("ema_enabled")
+    torch.save(checkpoint, run_dir / "last.pt")
+    run_train.main(["--resume", str(run_dir)])
+    assert "ema_enabled: false" in (run_dir / "config_resume.yaml").read_text(encoding="utf-8")
+    assert not (run_dir / "best_ema.pt").exists()
+
+
 @pytest.mark.parametrize("field,value", [("lr", "0.01"), ("weight_decay", "0.2"), ("pos_weight", "true")])
 def test_resume_rejects_changed_training_hyperparameters(
     tmp_path: Path, labeled_split: dict, field: str, value: str

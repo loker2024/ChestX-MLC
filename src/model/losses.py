@@ -82,6 +82,24 @@ class AsymmetricLoss(nn.Module):
         return -loss.mean()
 
 
+class AUCMLoss(nn.Module):
+    """LibAUC v1 多标签 AUCM：输入 study logits，按指定类别计算。"""
+
+    def __init__(self, num_labels: int, device: torch.device) -> None:
+        super().__init__()
+        from libauc.losses import MultiLabelAUCMLoss
+        self.inner = MultiLabelAUCMLoss(num_labels=num_labels, margin=1.0, version="v1", device=device)
+        for name in ("a", "b", "alpha"):
+            self.register_buffer(name, getattr(self.inner, name))
+
+    def clear_dual_grad(self) -> None:
+        self.inner.alpha.grad = None
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor, task_id: torch.Tensor) -> torch.Tensor:
+        self.active_task = torch.unique(task_id).long()
+        return self.inner(torch.sigmoid(logits.float()), targets.float(), task_id=task_id)
+
+
 def build_loss(
     cfg: Config,
     train_labels: np.ndarray | None = None,
@@ -101,6 +119,8 @@ def build_loss(
       the same device"；不传时留在 CPU，便于 CPU 单测；
     - pos_weight 只作用于训练损失，推理和指标仍用原始概率，不受影响。
     """
+    if cfg.train.loss == "aucm":
+        return AUCMLoss(cfg.model.num_classes, torch.device(device or "cpu"))
     if cfg.train.loss == "asl":
         criterion = AsymmetricLoss(
             gamma_pos=cfg.train.asl_gamma_pos,

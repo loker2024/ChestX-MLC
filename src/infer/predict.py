@@ -16,7 +16,8 @@ sigmoid，保证提交概率、计时口径、校验口径不分叉。
 
 from __future__ import annotations
 
-from dataclasses import replace
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -33,6 +34,24 @@ from common.constants import CLASS_IDS
 from data.dataset import load_image
 from data.transforms import build_eval_transform
 from model.network import forward_studies, build_model
+
+
+@dataclass(frozen=True)
+class StudyModelSpec:
+    """多模型 study 推理中的一个成员：模型 + 预处理 + 聚合参数。
+
+    `transform_key` 是预处理的完整签名（尺寸、letterbox、归一化、通道数等）。
+    `predict_study_multi` 会把 key 相同的成员合并到一次预处理：同一张图只在
+    第一个成员上做一遍 transform，后续成员复用同一个 CPU 张量。这不改变数值，
+    但能把「N 个模型各做一遍预处理」压成「每种预处理做一遍」。
+    """
+
+    model: nn.Module
+    transform: Callable[[Image.Image], torch.Tensor]
+    transform_key: object | None = None
+    uses_views: bool = False
+    frontal_weight: float = 0.7
+    probability_space: bool = False
 
 
 def load_checkpoint_model(
@@ -243,22 +262,176 @@ def predict_study(
 ) -> np.ndarray:
     """一次检查（study）的 10 类概率：该 study 所有图片 logits 求均值后 sigmoid。
 
-    与 `predict_loader` 的聚合口径完全一致（同样的 aggregate_logits + sigmoid），
-    用于 cost.py 把 `pictures_100` 里的图片按 study 分组后与 submission.csv 比对。
+    与 `predict_loader` 的聚合口径完全一致（同样的 aggregate_logits + sigmoid）。
+    读图后转交 `predict_study_multi`：一次检查的全部图片拼成一个 batch、只做
+    一次前向，对应赛题答疑「batch=1 以 study_id 为单位，多图可同时处理」的口径。
+
     `pictures_100` 里一个 study 只有部分图片时，这里得到的是「这批图」的均值，
-    与提交时「全部图片」的均值会有差异——cost.py 的日志和文档都显式说明这一点。
+    与提交时「全部图片」的均值会有差异——赛题答疑已明确每个目录含该检查全部
+    图片，正常评测不会出现部分图片。
     """
     paths = [Path(path) for path in image_paths]
     if not paths:
         raise ValueError("一个 study 至少要有一张图片才能推理")
-    model.eval()
-    images = torch.stack(
-        # 与 predict_image 一致：灰度图保留 L 模式、在 resize 后再转 RGB。
-        [transform(load_image(path, convert_rgb=False)) for path in paths]
+    spec = StudyModelSpec(
+        model=model,
+        transform=transform,
+        transform_key=("single",),
+        uses_views=views is not None,
+        frontal_weight=frontal_weight,
+        probability_space=probability_space,
     )
-    offsets = torch.tensor([0, len(paths)], dtype=torch.long)
+    return predict_study_multi([spec], paths, device, views, max_workers=1)[0]
+
+
+@torch.inference_mode()
+def predict_study_images(
+    model: nn.Module,
+    images: Sequence[Image.Image],
+    transform: Callable[[Image.Image], torch.Tensor],
+    device: torch.device,
+    views: Sequence[int] | None = None,
+    frontal_weight: float = 0.7,
+    probability_space: bool = False,
+) -> np.ndarray:
+    """对已经解码的 PIL 图像做 study 级推理，返回 `[10]` fp32 概率。
+
+    与 `predict_study` 数值等价，区别只在读图由调用方完成。`cost.py` 的多模型
+    计时需要「同一张图只解码一次、多个模型各自预处理与前向」，因此把解码与
+    前向拆开；这样多模型融合的计时不会把同一张图的解码重复计 N 次。
+    """
+    if not images:
+        raise ValueError("一个 study 至少要有一张图片才能推理")
+    model.eval()
+    tensors = torch.stack([transform(image) for image in images])
+    offsets = torch.tensor([0, len(images)], dtype=torch.long)
     return _forward_probabilities(
-        model, images, offsets, device,
+        model, tensors, offsets, device,
         torch.tensor(views) if views is not None else None,
         frontal_weight, probability_space,
     )[0].numpy()
+
+
+def _map_parallel(
+    function,
+    items,
+    max_workers: int | None,
+    executor: ThreadPoolExecutor | None = None,
+):
+    """按需并行 map；1 张图或 `max_workers=1` 时保持串行，避免线程池开销。
+
+    传入 `executor` 时复用调用方持有的线程池，把「每个 study 建两次线程池」
+    压成「整次评测建一次」。线程数由 executor 决定，`max_workers` 只保留
+    「是否并行」的语义（等于 1 时仍串行）。
+    """
+    items = list(items)
+    if len(items) <= 1 or max_workers == 1:
+        return [function(item) for item in items]
+    if executor is not None:
+        return list(executor.map(function, items))
+    workers = min(len(items), max_workers or 4)
+    if workers <= 1:
+        return [function(item) for item in items]
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        return list(executor.map(function, items))
+
+
+@torch.inference_mode()
+def predict_study_multi(
+    specs: Sequence[StudyModelSpec],
+    image_paths: Sequence[str | Path],
+    device: torch.device,
+    views: Sequence[int] | None = None,
+    max_workers: int | None = 4,
+    executor: ThreadPoolExecutor | None = None,
+) -> list[np.ndarray]:
+    """对同一 study 的多张图片做多模型推理，返回每个模型的 `[10]` 概率。
+
+    - 图片只解码一次；`max_workers > 1` 且图数 > 1 时并行解码与缩放；
+    - `transform_key` 相同的成员共享一次预处理：同一张图只做一遍 transform，
+      后续成员复用同一个 CPU 张量（不改变数值，只省掉重复的 resize/normalize）；
+    - 每个成员仍各自做一次前向与 study 聚合，`uses_views` 控制是否传视角。
+
+    这是 `cost.py` 多模型计时的入口：调用方把整个函数包在计时区间里，因此解码、
+    预处理、所有模型前向、聚合都被计入；并行只改变 CPU 侧调度，不改变预测。
+    """
+    paths = [Path(path) for path in image_paths]
+    if not paths:
+        raise ValueError("一个 study 至少要有一张图片才能推理")
+    if not specs:
+        raise ValueError("至少需要一个模型才能推理")
+    if max_workers is not None and max_workers <= 0:
+        raise ValueError(f"max_workers 必须为正整数或 None，当前为 {max_workers!r}")
+
+    images = _map_parallel(
+        lambda path: load_image(path, convert_rgb=False), paths, max_workers, executor
+    )
+    offsets = torch.tensor([0, len(paths)], dtype=torch.long)
+
+    # 先按 transform_key 去重，再把「所有 key × 所有图片」放进同一个线程池。
+    # 这样 320 与 384 两种缩放是并行做的，而不是先做完 320 再做 384。
+    # 只有可哈希且显式提供的 key 才允许共享。缺少 key 或 key 本身不可哈希时，
+    # 给该模型分配一个独立哨兵，避免把两个未知预处理口径静默合并。
+    unique: dict[object, Callable[[Image.Image], torch.Tensor]] = {}
+    spec_keys: list[object] = []
+    for spec in specs:
+        key = spec.transform_key
+        try:
+            hash(key)
+        except TypeError:
+            key = None
+        if key is None:
+            key = object()
+        spec_keys.append(key)
+        unique.setdefault(key, spec.transform)
+
+    def transform_one(task):
+        key, image = task
+        return key, unique[key](image)
+
+    tasks = [(key, image) for key in unique for image in images]
+    transformed = _map_parallel(transform_one, tasks, max_workers, executor)
+    buckets: dict[object, list[torch.Tensor]] = {key: [] for key in unique}
+    for key, tensor in transformed:
+        buckets[key].append(tensor)
+    cache = {key: torch.stack(values) for key, values in buckets.items()}
+
+    results: list[np.ndarray] = []
+    for spec, key in zip(specs, spec_keys):
+        tensor = cache[key]
+        results.append(
+            _forward_probabilities(
+                spec.model, tensor, offsets, device,
+                torch.tensor(views) if spec.uses_views and views is not None else None,
+                spec.frontal_weight, spec.probability_space,
+            )[0].numpy()
+        )
+    return results
+
+
+@torch.inference_mode()
+def warmup_study_shapes(
+    model: nn.Module,
+    image_counts: Sequence[int],
+    size: int,
+    channels: int,
+    device: torch.device,
+    frontal_weight: float = 0.7,
+    probability_space: bool = False,
+) -> None:
+    """用合成零张量预热计时集中出现的 batch 形状，只做算子初始化，不计入成绩。
+
+    赛题答疑明确允许「使用合成虚拟张量完成 CUDA Graph 捕获、编译、算子初始化」。
+    同一 study 的图片数在 1~5 之间变化，某个形状第一次出现时会触发 kernel
+    选择/编译；不预热的话，这一个 study 的耗时会把 100 个 study 的均值拉高
+    几毫秒到几十毫秒。预热只走前向，不读图像、不写预测，也不参与计时。
+    """
+    counts = sorted({int(count) for count in image_counts if int(count) > 0})
+    if not counts:
+        return
+    for count in counts:
+        tensor = torch.zeros(count, channels, size, size)
+        offsets = torch.tensor([0, count], dtype=torch.long)
+        _forward_probabilities(
+            model, tensor, offsets, device, None, frontal_weight, probability_space
+        )

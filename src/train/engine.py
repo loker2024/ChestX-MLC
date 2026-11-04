@@ -41,7 +41,7 @@ from torch.utils.data import DataLoader
 
 from common.config import Config
 from common.metrics import macro_auc, macro_f1, per_class_report
-from model.losses import build_loss
+from model.losses import AUCMLoss, build_loss
 from model.network import forward_studies, set_frozen_backbone_eval
 
 
@@ -75,6 +75,7 @@ class TrainRuntime:
     optimizer: Optimizer
     scheduler: LambdaLR
     scaler: torch.amp.GradScaler
+    criterion: nn.Module | None = None
 
 
 # 每轮训练结束后调用，参数是当前进度和带状态的运行时对象。
@@ -109,6 +110,36 @@ def _build_optimizer(model: nn.Module, config: Config) -> Optimizer:
             {"params": head, "lr": config.train.head_lr},
         ]
     return torch.optim.AdamW(groups, lr=config.train.lr, weight_decay=config.train.weight_decay)
+
+
+def build_aucm_optimizer(model: nn.Module, criterion: AUCMLoss, lr: float, weight_decay: float) -> Optimizer:
+    """PESG 同时更新模型及 AUCM 的辅助变量。"""
+    from libauc.optimizers import PESG
+
+    class TaskPESG(PESG):
+        def step(self, closure=None):
+            # LibAUC 的 alpha 更新对整个向量生效；单类别 batch 必须保护其他类。
+            mask = torch.ones_like(criterion.alpha, dtype=torch.bool)
+            mask[criterion.active_task] = False
+            tensors = (criterion.a, criterion.b, criterion.alpha)
+            saved = [tensor.detach().clone() for tensor in tensors]
+            moment_states = []
+            for tensor in tensors[:2]:
+                moment_states.append({key: val.clone() for key, val in self.state.get(tensor, {}).items()
+                                      if torch.is_tensor(val) and val.shape == tensor.shape})
+            result = super().step(closure)
+            with torch.no_grad():
+                for tensor, old in zip(tensors, saved):
+                    tensor[mask] = old[mask]
+                for tensor, old_state in zip(tensors[:2], moment_states):
+                    for key, val in self.state[tensor].items():
+                        if torch.is_tensor(val) and val.shape == tensor.shape:
+                            val[mask] = old_state[key][mask] if key in old_state else 0
+            return result
+
+    return TaskPESG((p for p in model.parameters() if p.requires_grad), criterion.inner,
+                lr=lr, mode="adam", weight_decay=weight_decay, epoch_decay=0.0,
+                device=criterion.a.device, verbose=False)
 
 
 def _build_scheduler(optimizer: Optimizer, config: Config) -> LambdaLR:
@@ -186,6 +217,8 @@ def train_one_epoch(
         offsets = batch["offsets"].to(device, non_blocking=True)
 
         optimizer.zero_grad(set_to_none=True)
+        if isinstance(criterion, AUCMLoss):
+            criterion.clear_dual_grad()
         with torch.autocast(device_type=device.type, enabled=use_amp):
             # 统一使用训练与推理共享的 study 级前向。
             study_logits = forward_studies(
@@ -195,7 +228,10 @@ def train_one_epoch(
                 config.model.frontal_weight,
                 config.model.probability_space,
             )
-            loss = criterion(study_logits, labels)
+            if isinstance(criterion, AUCMLoss):
+                loss = criterion(study_logits, labels, batch["task_id"].to(device))
+            else:
+                loss = criterion(study_logits, labels)
             if teacher_cache is not None:
                 from train.distillation import distillation_loss
                 hard_loss = loss
@@ -203,6 +239,8 @@ def train_one_epoch(
                 loss = hard_loss + config.train.distill_weight * soft_loss
                 total_hard += hard_loss.item() * len(batch["study_ids"])
                 total_soft += soft_loss.item() * len(batch["study_ids"])
+            if not torch.isfinite(loss):
+                raise RuntimeError("训练损失不是有限数，停止训练")
 
         scaler.scale(loss).backward()
         if config.train.grad_clip > 0:
@@ -274,7 +312,8 @@ def evaluate(
             )
 
         num_studies = len(batch["study_ids"])
-        total_loss += criterion(study_logits, labels).item() * num_studies
+        valid_criterion = nn.BCEWithLogitsLoss() if isinstance(criterion, AUCMLoss) else criterion
+        total_loss += valid_criterion(study_logits.float(), labels.float()).item() * num_studies
         total_studies += num_studies
 
         # 先转 float32 再搬 CPU：混合精度下 logits 可能是 fp16，直接 sigmoid 精度不够。
@@ -372,6 +411,7 @@ def fit(
     optimizer_state: dict[str, Any] | None = None,
     scheduler_state: dict[str, Any] | None = None,
     scaler_state: dict[str, Any] | None = None,
+    criterion_state: dict[str, Any] | None = None,
     on_epoch_end: EpochEndHook | None = None,
     writer: Any | None = None,
     ema_writer: Any | None = None,
@@ -399,7 +439,15 @@ def fit(
     EMA 只有验证指标，没有自己的学习率与训练 loss，写进独立面板才不会和原实验
     混在一起。它只在 `train.ema_enabled` 且本轮确实算了 EMA 时才有输出。
     """
-    optimizer = _build_optimizer(model, config)
+    criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
+    if criterion_state is not None:
+        criterion.load_state_dict(criterion_state)
+    if isinstance(criterion, AUCMLoss):
+        if progress is not None and progress.epoch and criterion_state is None:
+            raise ValueError("AUCM 续训断点缺少损失状态")
+        optimizer = build_aucm_optimizer(model, criterion, config.train.lr, config.train.weight_decay)
+    else:
+        optimizer = _build_optimizer(model, config)
     scheduler = _build_scheduler(optimizer, config)
     scaler = torch.amp.GradScaler(device.type, enabled=_amp_enabled(config, device))
     # 先恢复优化器再恢复调度器：LambdaLR 的 last_epoch 决定下一轮的学习率。
@@ -409,9 +457,7 @@ def fit(
         scheduler.load_state_dict(scheduler_state)
     if scaler_state is not None:
         scaler.load_state_dict(scaler_state)
-    runtime = TrainRuntime(optimizer=optimizer, scheduler=scheduler, scaler=scaler)
-
-    criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
+    runtime = TrainRuntime(optimizer=optimizer, scheduler=scheduler, scaler=scaler, criterion=criterion)
     progress = TrainProgress() if progress is None else progress
     ema = None
     if config.train.ema_enabled:
@@ -429,6 +475,8 @@ def fit(
         progress.best_state = _snapshot(model)
 
     for epoch in range(progress.epoch + 1, config.train.epochs + 1):
+        if isinstance(criterion, AUCMLoss):
+            train_loader.batch_sampler.set_epoch(epoch)
         # 学习率在训练这一步用的是“当前值”，所以先记下来再更新。
         lr = optimizer.param_groups[0]["lr"]
         head_lr = optimizer.param_groups[1]["lr"] if config.train.head_lr is not None else None

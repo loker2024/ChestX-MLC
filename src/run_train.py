@@ -163,6 +163,14 @@ def _progress_from_checkpoint(checkpoint: dict[str, Any]) -> TrainProgress:
     )
 
 
+def _resume_checkpoint_config(checkpoint: dict[str, Any]) -> Config:
+    """旧断点未记录 EMA 开关时，沿用当时默认关闭的训练语义。"""
+    saved = checkpoint["config"]
+    if "ema_enabled" not in saved.get("train", {}):
+        saved = {**saved, "train": {**saved.get("train", {}), "ema_enabled": False}}
+    return config_from_dict(saved)
+
+
 def _validate_resume_config(config: Config, saved: Config) -> None:
     """只允许调整轮数和运行环境，保留训练及验证口径。"""
     current_values = config.to_dict()
@@ -360,6 +368,7 @@ def _save_last_checkpoint(
             "ema_best_epoch": progress.ema_best_epoch,
             "ema_best_metrics": progress.ema_best_metrics,
             "ema_best_state": progress.ema_best_state,
+            **({"criterion_state": runtime.criterion.state_dict()} if config.train.loss == "aucm" else {}),
         },
     )
 
@@ -380,7 +389,20 @@ def run_training(
     权重装进新模型，训练从第 1 轮重新开始（warm start）。
     """
     if checkpoint is not None:
-        _validate_resume_config(config, config_from_dict(checkpoint["config"]))
+        _validate_resume_config(config, _resume_checkpoint_config(checkpoint))
+    if config.train.aucm_require_bce_init and checkpoint is None:
+        if init_from is None:
+            raise ValueError("本 AUCM 配置需要 --init-from 指定 BCE checkpoint")
+        source_config = init_from[1].get("config")
+        if source_config is None:
+            raise ValueError("BCE 初始化 checkpoint 缺少配置，无法核对训练口径")
+        source = config_from_dict(source_config)
+        if source.train.loss != "bce" or source.model != config.model or source.data != config.data or source.image != config.image or source.seed != config.seed:
+            raise ValueError("初始化 checkpoint 必须来自数据、图像和模型口径一致的 BCE 训练")
+    if config.train.loss == "aucm" and config.data.resplit.enabled:
+        raise ValueError("AUCM 暂不支持 resplit，必须使用固定划分")
+    if config.train.loss == "aucm" and not config.train.aucm_require_bce_init and init_from is not None:
+        raise ValueError("全程 AUCM 配置不接受 --init-from")
     # 曲线开关先于数据加载处理：mode=true 却没装 tensorboard 时应当立刻失败，
     # 而不是等几分钟建完 loader 才报错。auto 模式下不装就安静跳过。
     writer = build_writer(run_dir / TENSORBOARD_DIR_NAME, config.train.tensorboard)
@@ -436,6 +458,8 @@ def run_training(
     )
     model = build_model(build_config).to(device)
     pretrained_loaded = bool(getattr(model, "pretrained_loaded", False))
+    if config.train.loss == "aucm" and checkpoint is None and init_from is None and config.model.pretrained and not pretrained_loaded:
+        raise RuntimeError("AUCM 预训练权重未加载，停止实验")
     warm_metadata: dict[str, Any] | None = None
     if init_from is not None:
         init_path, init_checkpoint, init_sha256 = init_from
@@ -469,7 +493,7 @@ def run_training(
             warnings.warn("旧断点缺少随机状态，续训不能精确重现连续训练", RuntimeWarning)
         else:
             _restore_rng_state(rng_state)
-        saved_config = config_from_dict(checkpoint["config"])
+        saved_config = _resume_checkpoint_config(checkpoint)
         old_device = (checkpoint.get("metadata") or {}).get("device")
         if saved_config.train.num_workers != config.train.num_workers or (old_device and old_device != str(device)):
             warnings.warn("续训设备或 num_workers 已改变，随机数恢复不保证训练轨迹一致", RuntimeWarning)
@@ -517,6 +541,7 @@ def run_training(
             optimizer_state=optimizer_state,
             scheduler_state=scheduler_state,
             scaler_state=scaler_state,
+            **({"criterion_state": checkpoint["extras"].get("criterion_state") if checkpoint else None} if config.train.loss == "aucm" else {}),
             on_epoch_end=on_epoch_end,
             writer=writer,
             ema_writer=ema_writer,
@@ -584,7 +609,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # 续训时优先用 last.pt 里存档的配置：它记录的就是这次训练真正的超参。
     if checkpoint is not None and args.config is None:
-        config = config_from_dict(checkpoint["config"])
+        config = _resume_checkpoint_config(checkpoint)
         config_source = f"{Path(args.resume)} 中存档的配置"
     else:
         config_path = args.config or "configs/default.yaml"
@@ -594,7 +619,7 @@ def main(argv: list[str] | None = None) -> None:
         config = replace(config, seed=args.seed)
 
     if checkpoint is not None:
-        _validate_resume_config(config, config_from_dict(checkpoint["config"]))
+        _validate_resume_config(config, _resume_checkpoint_config(checkpoint))
 
     seed_everything(config.seed)
     device = resolve_device(config.device)

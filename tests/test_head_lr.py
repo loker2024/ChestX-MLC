@@ -81,7 +81,7 @@ def test_two_groups_with_real_loader_and_training(tmp_path, labeled_split, write
 
 def test_resume_two_groups_preserves_training_and_logging(monkeypatch):
     cfg = load_config('configs/exp_C001a.yaml')
-    cfg = replace(cfg, train=replace(cfg.train, epochs=4, early_stop_patience=0, pos_weight=False))
+    cfg = replace(cfg, train=replace(cfg.train, epochs=4, early_stop_patience=0, pos_weight=False, ema_enabled=False))
 
     class Model(nn.Module):
         def __init__(self):

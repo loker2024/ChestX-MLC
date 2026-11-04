@@ -1,0 +1,3 @@
+# D-005 的可选训练依赖；LibAUC 的完整依赖会额外安装图学习等包。
+-r requirements.txt
+libauc==2.0.0

@@ -43,6 +43,8 @@ model:
 
 # 训练：batch 按“检查数”计。一次检查含 1~7 张图，实际图片数是各 study 图片数之和。
 train:
+  ema_enabled: true          # 默认启用 EMA；不需要时设为 false
+  ema_decay: 0.999
   epochs: 25
   batch_studies: 16
   lr: 0.0003                 # 注意用小数写法；YAML 1.1 会把 3e-4 读成字符串

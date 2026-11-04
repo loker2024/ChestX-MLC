@@ -78,12 +78,19 @@ def build_model(cfg: Config) -> nn.Module:
 
         return build_xrv_densenet121(cfg)
 
+    # 只有显式关闭时才把参数递给 timm：ConvNeXt / ResNet 等构造函数没有这个
+    # 关键字，无脑透传会直接 TypeError。
+    model_kwargs: dict[str, object] = {}
+    if not cfg.model.strict_img_size:
+        model_kwargs["strict_img_size"] = False
+
     try:
         model = timm.create_model(
             cfg.model.backbone,
             pretrained=cfg.model.pretrained,
             num_classes=cfg.model.num_classes,
             drop_rate=cfg.model.dropout,
+            **model_kwargs,
         )
         model.pretrained_loaded = bool(cfg.model.pretrained)
     except (OSError, RuntimeError) as error:
@@ -99,6 +106,7 @@ def build_model(cfg: Config) -> nn.Module:
             pretrained=False,
             num_classes=cfg.model.num_classes,
             drop_rate=cfg.model.dropout,
+            **model_kwargs,
         )
         model.pretrained_loaded = False
     if cfg.model.head == "csra":

@@ -33,7 +33,8 @@ def test_attention_is_per_study_and_differentiable():
 
 
 def test_configuration_defaults_and_switches():
-    assert not TrainConfig().ema_enabled
+    assert TrainConfig().ema_enabled
+    assert not TrainConfig(ema_enabled=False).ema_enabled
     assert ModelConfig(backbone='convnext_tiny.fb_in1k', aggregation='study_attention').uses_views
 
 
