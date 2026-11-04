@@ -1,4 +1,4 @@
-"""B 组 TxRV DenseNet-121 适配测试（docs/train_plan12.md 步骤③）。
+"""B 组 TxRV DenseNet-121 适配测试（archive/train_plan12.md 步骤③）。
 
 全部使用合成图与小尺寸输入（32/64/224），不碰真实影像：本机没有赛题数据，
 也不应该把影像带进仓库。真实权重相关的用例在缓存缺失时自动 skip，这样没装

@@ -245,3 +245,28 @@ def test_fit_with_pos_weight_on_cuda(config: Config) -> None:
 
     assert math.isfinite(result["history"][0]["train_loss"])
     assert math.isfinite(result["history"][0]["valid_loss"])
+
+@pytest.mark.parametrize(('metric', 'expected_epochs'), [('raw_auc', 2), ('ema_auc', 3)])
+def test_early_stop_metric_selects_independent_auc(config, monkeypatch, metric, expected_epochs):
+    config = replace(config, train=replace(config.train, epochs=4, early_stop_patience=1, ema_enabled=True, early_stop_metric=metric))
+    train_loader, val_loader = _loaders(config)
+    values = iter([0.6, 0.6, 0.5, 0.7, 0.4, 0.65, 0.3, 0.6])
+    monkeypatch.setattr(engine, 'evaluate', lambda *args, **kwargs: {'loss': 0.5, 'macro_auc': next(values), 'macro_f1': 0.5})
+    result = fit(config, build_model(config), train_loader, val_loader, torch.device('cpu'))
+    assert len(result['history']) == expected_epochs
+    assert result['best_epoch'] == 1
+    assert result['progress'].ema_best_epoch == 2
+
+
+def test_early_stop_metric_default_and_invalid():
+    from common.config import TrainConfig
+    assert TrainConfig().early_stop_metric == 'ema_auc'
+    with pytest.raises(ValueError, match='early_stop_metric'):
+        TrainConfig(early_stop_metric='invalid')
+
+
+def test_legacy_resume_uses_raw_early_stop(config):
+    from run_train import _resume_checkpoint_config
+    saved = config.to_dict()
+    saved['train'].pop('early_stop_metric')
+    assert _resume_checkpoint_config({'config': saved}).train.early_stop_metric == 'raw_auc'

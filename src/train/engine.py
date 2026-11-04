@@ -500,10 +500,12 @@ def fit(
                     config, ema.model, val_loader, criterion, device,
                     with_per_class=ema_writer is not None,
                 )
+        ema_improved = False
         if ema_metrics is not None:
             print(f"  EMA | valid_loss {ema_metrics['loss']:.4f} | macro_auc {ema_metrics['macro_auc']:.4f} | macro_f1 {ema_metrics['macro_f1']:.4f}")
             ema_auc = ema_metrics["macro_auc"]
             if not math.isnan(ema_auc) and (math.isnan(progress.ema_best_auc) or ema_auc > progress.ema_best_auc):
+                ema_improved = True
                 progress.ema_best_auc = ema_auc
                 progress.ema_best_epoch = epoch
                 # per_class 是 DataFrame，只服务于曲线；checkpoint 里只留标量。
@@ -549,6 +551,9 @@ def fit(
                 key: value for key, value in valid_metrics.items() if key != "per_class"
             }
             progress.best_state = _snapshot(model)
+
+        stop_improved = ema_improved if ema is not None and config.train.early_stop_metric == "ema_auc" else improved
+        if stop_improved:
             progress.stale_epochs = 0
         else:
             progress.stale_epochs += 1
@@ -568,7 +573,7 @@ def fit(
         # early_stop_patience=0 表示关闭早停。早停也要先落盘再退出，
         # 否则最后一轮的指标和进度会丢。
         patience = config.train.early_stop_patience
-        if not improved and patience and progress.stale_epochs >= patience:
+        if not stop_improved and patience and progress.stale_epochs >= patience:
             print(f"连续 {progress.stale_epochs} 个 epoch 没有提升，提前结束训练")
             break
 

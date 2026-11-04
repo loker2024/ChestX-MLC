@@ -6,7 +6,7 @@
 #
 # 字段含义与取值范围见 src/common/config.py 的注释；字段名写错会直接报错。
 # 实验配置用顶层 `_base: default.yaml` 继承本文件，只写要改的字段，
-# 例如 configs/exp_short.yaml；实验结论见 docs/experiments.md，执行计划见 docs/train_plan01.md。
+# 例如 configs/exp_short.yaml；实验结论见 docs/experiments.md，执行计划见 archive/train_plan01.md。
 
 # 数据：每个 split 一份标注 CSV + 一个图片根目录。
 # CSV 一行一张图，Study_id 相同的多行属于同一次检查（共享同一组标签）。
@@ -58,6 +58,7 @@ train:
   grad_clip: 5.0
   num_workers: 16
   tensorboard: auto          # 训练曲线：auto=装了 tensorboard 就写 run 目录下 tb/，没装则跳过；true=必须写；false=关闭
+  early_stop_metric: ema_auc  # ema_auc 或 raw_auc；关闭 EMA 时使用 raw_auc
   early_stop_patience: 5     # valid macro-AUC 连续 5 个 epoch 不提升就停；0 关闭
 
 # 验证与推理。

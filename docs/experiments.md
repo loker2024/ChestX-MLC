@@ -113,7 +113,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 
 ## 执行与结果
 
-执行步骤和判读门见 [训练计划](train_plan01.md)，通用命令及续训注意事项见 [使用手册](manual.md)。实际运行的配置、环境、指标和耗时记录在 [training_log.md](training_log.md)，对照结果以该文件为准。
+执行步骤和判读门见 [训练计划](../archive/train_plan01.md)，通用命令及续训注意事项见 [使用手册](manual.md)。实际运行的配置、环境、指标和耗时记录在 [training_log.md](training_log.md)，对照结果以该文件为准。
 
 截至 2026-10-30 的对照结论（数字均来自 `metrics.csv` 与 `outputs/compare/summary.md`）：
 
@@ -132,15 +132,15 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
 - **当前默认口径的 ResNet-18 基线（RUN-003-B）**：best epoch 8，macro-AUC **0.7837**、F1@0.5 **0.4040**，第 13 轮早停（33m44s）。ResNet-18 的四个口径组合现在都有实测：RUN-003（warmup + 无 `pos_weight`）0.7887、RUN-003-A（cosine + 无 `pos_weight`）0.7852、RUN-002-A（warmup + `pos_weight`）0.7872、RUN-003-B（cosine + `pos_weight`）0.7837，四组极差 0.0050 → **cosine 与 `pos_weight` 同时开启也没有 AUC 增益**，两项的单独结论方向一致。F1@0.5 的提升仍来自 `pos_weight` 的概率校准：阈值曲线峰从 RUN-003 的 0.2 右移到 0.4，上限 0.4059 低于 RUN-003 @0.2 的 0.4219。该 run 同时是 RUN-005 / RUN-006 的同口径基线。
 - **ResNet-50 略高于同口径基线**：RUN-005 best epoch 9，macro-AUC 0.7857（对比 RUN-003-B Δ+0.0020）、F1@0.5 0.4193（Δ+0.0153），第 14 轮早停（43m23s）；阈值 0.2–0.7 的 F1 多数点也更高。
 - **DenseNet-121 的 macro-AUC 最高、F1 仍低于 ResNet-50**：RUN-006 best epoch 8，AUC 0.7880（对比 RUN-003-B Δ+0.0043），但 F1@0.5 0.4070 只比基线高 0.0030，且低于 ResNet-50（Δ−0.0123）；逐类上 DenseNet-121 在 class3/7/9/10 更好（+0.0474/+0.0239/+0.0202/+0.0122），ResNet-50 在 class1/2/6 更好（以 005−006 计 +0.0529/+0.0151/+0.0180）。
-- **骨干结论修正**：此前用「RUN-005 / RUN-006 未超过 ResNet-18 历史 0.7887 / 0.7903」判断新骨干无增益，但历史 run 是 warmup + `pos_weight: false` 口径，不能与 cosine + `pos_weight: true` 的新骨干作单变量比较。补齐 RUN-003-B 后，同口径下 ResNet-50 / DenseNet-121 的 macro-AUC 分别高 0.0020 / 0.0043，方向有利于新骨干；但单 seed、差距较小，RUN-001 与 001R 同为 seed 42 且代码版本不同，其 0.0045 差值不能作为换 seed 波动，仍**不足以判定骨干优劣** → **暂不切换 `configs/default.yaml` 的 `model.backbone`**。若后续确定候选，还需按 [train_plan04.md](train_plan04.md) 核验预训练权重链接 / 许可 / SHA-256，并在赛题指定 T4 环境实测模型大小与端到端耗时（当前 `best.pt`：ResNet-50 91 MB、DenseNet-121 28 MB、ResNet-18 44.8 MB）。
+- **骨干结论修正**：此前用「RUN-005 / RUN-006 未超过 ResNet-18 历史 0.7887 / 0.7903」判断新骨干无增益，但历史 run 是 warmup + `pos_weight: false` 口径，不能与 cosine + `pos_weight: true` 的新骨干作单变量比较。补齐 RUN-003-B 后，同口径下 ResNet-50 / DenseNet-121 的 macro-AUC 分别高 0.0020 / 0.0043，方向有利于新骨干；但单 seed、差距较小，RUN-001 与 001R 同为 seed 42 且代码版本不同，其 0.0045 差值不能作为换 seed 波动，仍**不足以判定骨干优劣** → **暂不切换 `configs/default.yaml` 的 `model.backbone`**。若后续确定候选，还需按 [train_plan04.md](../archive/train_plan04.md) 核验预训练权重链接 / 许可 / SHA-256，并在赛题指定 T4 环境实测模型大小与端到端耗时（当前 `best.pt`：ResNet-50 91 MB、DenseNet-121 28 MB、ResNet-18 44.8 MB）。
 - **DenseNet-121 的 seed 复核（RUN-006-A，2026-10-29 下午）**：seed 2026 下 best epoch 5、macro-AUC **0.7913**、F1@0.5 **0.4103**，第 10 轮早停（34m14s，与 experiment4 的 EfficientNet-B2 实验并行，耗时不可与 RUN-006 的独占 44m32s 直接对照）。对比 RUN-006（seed 42）AUC 高 **+0.0033**；seed 42 的配对骨干差为 +0.0043；0.7913 比 seed 42 的 ResNet-18 高 0.0076，但 seed 不匹配，不能说明骨干优势在第二个 seed 上复现。需补跑同配置 ResNet-18 seed 2026；两次 DenseNet 的 AUC 差为 0.0033，**仍不足以判定骨干优劣**，默认骨干维持 `resnet18`，结论不变。
 
 2026-10-29 下午 RUN-007 正侧位加权聚合对照（数字来自 `outputs/compare_run007/summary.md`；与 RUN-006 同为 DenseNet-121 + seed 42，配置只差聚合方式）：
 
 - **正侧位 7:3 加权聚合未达 AUC 增益门**：best epoch 8，macro-AUC **0.7892**、F1@0.5 **0.4122**，第 13 轮早停（34m56s）。对比 RUN-006（等权均值，0.7880 / 0.4070）：AUC Δ**+0.0012**，未达历史 +0.005 判读门，且小于 DenseNet-121 的 seed 波动（RUN-006 与 RUN-006-A 差 0.0033）→ **单 seed 下不能判定加权聚合有效**。F1@0.5 的提升伴随阈值曲线右移：0.2–0.4 段更低（0.3596 / 0.3785 / 0.3972 vs 0.3674 / 0.3882 / 0.4069），峰从 0.6（0.4098）移到 0.5（0.4122），上限基本持平，属校准/阈值形态而非判别力提升。逐类 AUC 6 升 3 降（class2 −0.0428 最明显、class3 +0.0169、class6 +0.0147、class8 +0.0118），方向不一致。
-- **口径说明**：RUN-006 跑在 `da8fef7`（无视角元信息），RUN-007 跑在 `53568fe`（`62b6464` 起增加视角元信息贯通与 `view_weighted` 聚合）；`mean` 路径经 `tests` 与 RUN-006-A 在 `a41033d` 上的实测确认数值等价，但两组仍不是同代码版本的严格单变量对照，不能把差异全部归因于聚合方式。**默认 `model.aggregation` 维持 `mean`**；若继续，需按 [train_plan06.md](train_plan06.md) 补 seed 2026 复核（RUN-006-A 已有同 seed 的等权对照可配对）。
+- **口径说明**：RUN-006 跑在 `da8fef7`（无视角元信息），RUN-007 跑在 `53568fe`（`62b6464` 起增加视角元信息贯通与 `view_weighted` 聚合）；`mean` 路径经 `tests` 与 RUN-006-A 在 `a41033d` 上的实测确认数值等价，但两组仍不是同代码版本的严格单变量对照，不能把差异全部归因于聚合方式。**默认 `model.aggregation` 维持 `mean`**；若继续，需按 [train_plan06.md](../archive/train_plan06.md) 补 seed 2026 复核（RUN-006-A 已有同 seed 的等权对照可配对）。
 
-2026-10-29 下午 RUN-007-A seed 复核（数字来自 `outputs/compare_run007a/summary.md`；按 [train_plan07.md](train_plan07.md) 执行，seed 2026 的加权版与同 seed 等权版 RUN-006-A 配对比较）：
+2026-10-29 下午 RUN-007-A seed 复核（数字来自 `outputs/compare_run007a/summary.md`；按 [train_plan07.md](../archive/train_plan07.md) 执行，seed 2026 的加权版与同 seed 等权版 RUN-006-A 配对比较）：
 
 - **加权聚合在第二个 seed 上方向反转**：RUN-007-A best epoch 7，macro-AUC **0.7906**、F1@0.5 **0.4198**，第 12 轮早停（35m01s）。与 RUN-006-A（同 seed 等权，0.7913 / 0.4103）配对比较：AUC Δ**−0.0007**、F1@0.5 +0.0095。结合 seed 42 的配对差 +0.0012，两 seed 的配对差一正一负、均值 +0.00025，绝对值均远低于 +0.005 判读门 → **正侧位 7:3 加权聚合对 macro-AUC 无稳定增益，判定无效，默认 `model.aggregation` 维持 `mean`**。
 - **F1 变化同样不稳定**：seed 42 的 F1 只在 0.5–0.7 段提升（0.2–0.4 段下降），seed 2026 则 0.2–0.7 全线提升 +0.0067~+0.0196，两 seed 形态不同；逐类 AUC 上 seed 2026 为「常见类 5–10 升、稀有类 1–4 降」（class9 +0.0145、class10 +0.0147、class3 −0.0279），与 seed 42 的升降分布也不一致。F1 与逐类的这些差异不能作为判别力提升的证据。
@@ -150,14 +150,14 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
 - **384×384 + 6 轮短跑未见退化，但差异不可单变量归因**：best epoch 5，macro-AUC **0.7959**、F1@0.5 **0.4227**（6 轮跑满，23m42s，显存约 10.2–10.5 GB）。与 RUN-007-A（320×320、12 轮早停，0.7906 / 0.4198）相比 AUC **+0.0053**、F1@0.5 +0.0029；但 007B 的 cosine 周期压到 6 轮、第 5 轮 lr 已降到 8.25e-5 提前收敛，而 007A 第 6 轮 lr 仍有 2.87e-4，两组轮数与调度不同，**不能把 +0.0053 归因于分辨率**。逐类上稀有类 2（+0.0395）、4（+0.0171）贡献主要差值，常见类 5/6/9 略降，6 轮短跑下单类波动大。
 - **下一步**：若继续分辨率方向，需用 25 轮完整口径（同 seed、同 cosine 周期、早停 5）复跑 384 并与 320 配对，才能判定分辨率是否有 +0.005 以上的稳定增益；448 需先实测显存与耗时。
 
-2026-10-29 晚 RUN-008 骨干对照（数字来自 `outputs/compare_run008/summary.md`；按 [train_plan08.md](train_plan08.md) 执行，四组继承 RUN-007-A 的 7:3 加权聚合口径，只换骨干，并统一改为固定 6 轮、关闭早停；A+B / C+D 两两并行执行）：
+2026-10-29 晚 RUN-008 骨干对照（数字来自 `outputs/compare_run008/summary.md`；按 [train_plan08.md](../archive/train_plan08.md) 执行，四组继承 RUN-007-A 的 7:3 加权聚合口径，只换骨干，并统一改为固定 6 轮、关闭早停；A+B / C+D 两两并行执行）：
 
 - **ConvNeXt-Tiny 在 6 轮预算下 macro-AUC 最高**：RUN008-C best epoch 5，macro-AUC **0.8008**、F1@0.5 **0.4382**，比 RUN-007-A（0.7906 / 0.4198）高 AUC **+0.0102**、F1@0.5 **+0.0184**，超过 +0.005 判读门；逐类 8 升 2 降（class3 +0.0319、class4 +0.0275、class1 +0.0186，class8 −0.0113、class10 −0.0036）。但 RUN-007-A 是 25 轮上限、第 12 轮早停（峰值 epoch 7），RUN008-C 是 6 轮无早停预算，两者轮数与 cosine 周期不同、单 seed 且单组 → **+0.0102 只能作为候选方向，不能据此切换默认骨干**。
 - **EfficientNet 两组接近但未达门**：RUN008-A（EfficientNet-B2）macro-AUC **0.7952**、F1@0.5 0.4095；RUN008-B（EfficientNetV2-S RW）**0.7954** / 0.4100，分别比 RUN-007-A 高 +0.0046 / +0.0048，均低于 +0.005 判读门，F1@0.5 也低于 RUN-007-A 的 0.4198。逐类上 B 的 class2/class4 提升明显（+0.0451 / +0.0425）但 class8/10 回落，形态与阈值/校准差异混杂。
 - **ConvNeXtV2-Nano 组训练异常且许可不合规**：RUN008-D best epoch 2，`run_compare` 重算 macro-AUC **0.4977**、F1@0.5 0.1604（`metrics.csv` 峰值 0.5097 / 0.1604），逐类 AUC 0.46–0.54 近似随机，6 轮 train_loss 仅从 1.183 降到 1.162。已核验骨干 158 个权重张量与预训练文件数值一致（仅 `head.fc` 正常替换为 10 类），单独运行显存 5.9 GB 与 C 组同量级 → 排除权重加载失败与显存问题，原因未定位（疑与 AMP fp16 下 ConvNeXtV2 的 GRN/LayerNorm 组合或该骨干与当前 lr/优化器不匹配）。该权重为 **CC BY-NC 4.0**，赛题《比赛参赛规则》第 1 条明确不接受 NC 类许可证 → 仅研究记录，不参与骨干判读、不能用于提交。
 - **口径说明**：四组均为 seed 2026、320×320、`batch_studies: 16`、`pos_weight: true`、固定 6 轮无早停；A/B 于 20:59–21:37 并行，C/D 于 21:38–22:02 并行（D 首次并行运行按用户要求于 21:52 停止并删除，22:02 单独重跑至 22:25）。并行导致耗时不可与其他 run 对照。与 RUN-007-A 的预算差异使「+0.0102」不能当作严格单变量结论；若继续 ConvNeXt 方向，需按 25 轮完整口径重跑并补 T4 端到端耗时与权重许可核验。
 
-2026-10-30 RUN-009-A 384×384 完整口径复核（数字来自 `last.pt` 的 `extras.best_metrics` 与 `run_eval.py`；按 [train_plan09.md](train_plan09.md) 执行，本次只跑 A 组）：
+2026-10-30 RUN-009-A 384×384 完整口径复核（数字来自 `last.pt` 的 `extras.best_metrics` 与 `run_eval.py`；按 [train_plan09.md](../archive/train_plan09.md) 执行，本次只跑 A 组）：
 
 - **384 + 完整轮数在 6 轮内未见增量**：best epoch 5，macro-AUC **0.7944**、F1@0.5 **0.4185**（`run_eval` 重算 0.7945 / 0.4178），比 RUN-007-A（0.7906 / 0.4198）AUC **+0.0038**、F1@0.5 −0.0020，**未达 +0.005 判读门**（门 0.7956）；比同骨干 6 轮 320 的 RUN-008-B（0.7954 / 0.4100）AUC 低 **−0.0010**、F1 +0.0078。逐类 6 升 4 降：class2 +0.0676、class3 +0.0207 提升，class8 −0.0224、class6 −0.0143 回落，无单类大幅退化。
 - **只跑 6/25 轮，不能判定完整预算**：按用户要求在第 6 轮后停止（非早停、非跑满），cosine 周期未走完（第 6 轮 lr 仍 2.87e-4）；epoch 5 后 valid_loss 由 0.9507 升到 1.0356、AUC 回落，出现过拟合迹象。硬件为 V100-SXM2-32G（与 RUN-001~008 的 RTX 3090 不同实例），6 轮约 41 分钟、显存峰值约 15.9 GB，耗时不可横向对照。RUN-009-B（ConvNeXt-Tiny @384）未启动。
@@ -293,7 +293,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 `outputs/20261031-112106_B-001_xrv_densenet121_s224`，2026-10-31）：
 
 - 目的与边界：验证 TorchXRayVision `densenet121-res224-all`（18 类胸片预训练）在本地数据上的可复现差异；
-  **仅研究，不用于赛题提交、模型融合或候选选择**（规则第 1 条），计划见 [train_plan12.md](train_plan12.md)。
+  **仅研究，不用于赛题提交、模型融合或候选选择**（规则第 1 条），计划见 [train_plan12.md](../archive/train_plan12.md)。
 - 口径：单通道 224×224 + xrv 归一化 [-1024,1024]、letterbox、全量微调、BCE + `pos_weight`、`view_weighted`
   0.7/0.3、25 轮上限 + 早停 5、seed 42；与 A 组同数据划分、同聚合、同 seed。
 - 结果：第 11 轮早停（best epoch 6），valid macro-AUC **0.7912** / F1@0.5 **0.4120**（F1 峰值在 0.6：0.4228）；
@@ -325,7 +325,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-004-a / A-004-b：dropout 与 weight decay 的单变量分解**（配置 `configs/exp_A004a.yaml` /
 `configs/exp_A004b.yaml`，数字来自 `run_eval.py`，产物 `outputs/20261031-130923_A-004a_dropout_only_s42` /
-`outputs/20261031-134732_A-004b_weight_decay_only_s42`，2026-10-31，计划见 [train_plan14.md](train_plan14.md)）：
+`outputs/20261031-134732_A-004b_weight_decay_only_s42`，2026-10-31，计划见 [train_plan14.md](../archive/train_plan14.md)）：
 
 - 目的与口径：把 A-004 同时改的两项拆开——A-004-a 只开分类头 dropout 0.2（`weight_decay` 保持 0.01），
   A-004-b 只把 `train.weight_decay` 提到 0.05（dropout 保持 0）；其余（ConvNeXt-Tiny @320、epoch 8 /
@@ -350,7 +350,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-005：CSRA 分类头对照**（配置 `configs/exp_csra.yaml`，数字来自 `run_eval.py`，产物
 `outputs/20261031-164123_A-005/`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
-2026-10-31，计划见 [训练计划 15](train_plan15.md)）：
+2026-10-31，计划见 [训练计划 15](../archive/train_plan15.md)）：
 
 - 目的与口径：在 A-001 训练预算内只把标准分类头换成单头 CSRA（残差权重 0.4、温度 1.0、
   无 bias，27,827,808 参数），其余口径逐字段不变；与 A-006 共用同一配对基线（同版本重训
@@ -373,7 +373,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-006：ML-Decoder 分类头对照**（配置 `configs/exp_ml_decoder.yaml`，数字来自 `run_eval.py`，产物
 `outputs/20261031-155701_A-006_ml_decoder_s42`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
-2026-10-31，计划见 [train_plan16.md](train_plan16.md)）：
+2026-10-31，计划见 [train_plan16.md](../archive/train_plan16.md)）：
 
 - 目的与口径：ConvNeXt-Tiny @320、epoch 8 / patience 2、seed 42、`view_weighted` 0.7/0.3、BCE +
   `pos_weight`、cosine、batch 16 studies 全部与 A-001 一致，只把 `model.head` 由 `standard` 换成
@@ -397,7 +397,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-007：ConvNeXt-Small 骨干 + ImageNet-22k 预训练权重对照**（配置 `configs/exp_A007.yaml`，数字来自
 `run_eval.py`，产物 `outputs/20261031-172305_A-007_convnext_small_in22k_ft_s42`，2026-10-31，计划见
-[train_plan17.md](train_plan17.md)）：
+[train_plan17.md](../archive/train_plan17.md)）：
 
 - 目的与口径：数据、预处理、`view_weighted` 0.7/0.3、BCE + `pos_weight`、cosine、batch 16 studies、
   epoch 8 / patience 2、seed 42 全部与 A-001 一致，只把 `model.backbone` 由 `convnext_tiny.fb_in1k`
@@ -428,7 +428,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-008：聚合空间（logits G0 → 概率空间 G1）对照**（配置 `configs/exp_A008.yaml`，产物
 `outputs/20261031-190629_A-008_convnext_tiny_g1_s42`，2026-10-31，计划见
-[train_plan18.md](train_plan18.md)）
+[train_plan18.md](../archive/train_plan18.md)）
 
 - 配置：以 A-001 为基准只改 `model.aggregation: view_weighted → view_weighted_probability`，正侧位仍 7:3；展开配置逐字段核对仅此一项不同。
 - 结果：A-008 19:06:29–19:38:48（32m19s）、第 7 轮早停（best epoch 5），macro-AUC **0.7974** / F1@0.5 **0.4197**。
@@ -438,7 +438,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-009：优化超参联合放大（lr 1e-3 / wd 0.03 / 10 轮 / patience 4）对照**（配置 `configs/exp_A009.yaml`，产物
 `outputs/20261031-194952_A-009_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
-[train_plan19.md](train_plan19.md)）
+[train_plan19.md](../archive/train_plan19.md)）
 
 - 配置：以 A-001 为基准只改 `train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余口径逐字段不变；四项同改，差值不可拆单项。
 - 结果：A-009 19:49:52–20:33:27（43m35s）、10/10 轮跑满无早停（best epoch 10），macro-AUC **0.7799** / F1@0.5 **0.4101**。
@@ -450,7 +450,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 **A-009-r2：A-009 的二轮 warm start（以首轮 best.pt 为初始权重、同配置重训 10 轮）**（配置 `configs/exp_A009.yaml` + `src/run_train.py --init-from`，产物
 `outputs/20261031-204914_A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
-[train_plan20.md](train_plan20.md)）
+[train_plan20.md](../archive/train_plan20.md)）
 
 - 配置：与首轮 A-009 逐字段相同（lr 1e-3 / wd 0.03 / 10 轮 / patience 4），唯一区别是初始化——不加载 ImageNet 预训练权重，改为加载首轮 `best.pt`（epoch 10，SHA-256 `6988006910b824a83c277764695d0db4a3bdeb3ab0b1b029d22dc9e3ee0f1b15`）；训练从第 1 轮重新开始，不恢复优化器 / 调度器 / 进度。
 - 结果：20:49:14–21:13:48（24m34s，V100 与另一容器共享）、第 5 轮早停（连续 4 轮无提升，best epoch 1），macro-AUC **0.7764** / F1@0.5 **0.4117**；逐轮 AUC 0.7764 / 0.7739 / 0.7587 / 0.7692 / 0.7664。
@@ -549,7 +549,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：全部在 V100 上测得，**不能外推 T4**（T4 fp32 约为 V100 的 52%、CPU 更少），官方第 7 条以 T4 复测为准；CUDA Graph、`torch.compile`、fp16、量化未评估。完整口径见 [cost.md §9.3](cost.md)。
 
 **C-001：四骨干低学习率 + 分类头差异学习率对照**（配置 `configs/exp_C001{a,b,c,d}.yaml`，产物
-`outputs/20261101-114223_C-001-a` 等四组，2026-11-01，计划见 [train_plan21.md](train_plan21.md)）
+`outputs/20261101-114223_C-001-a` 等四组，2026-11-01，计划见 [train_plan21.md](../archive/train_plan21.md)）
 
 - 设计：四份配置逐字段一致，唯一变量是 `model.backbone`（ConvNeXt-Tiny `fb_in1k` / EfficientNet-B2 `ra_in1k` / EfficientNetV2-S RW `ra2_in1k` / DenseNet-121 `ra_in1k`）；骨干峰值 `train.lr=5e-5`、分类头 `train.head_lr=1.5e-4`，12 轮上限、patience 4、seed 42 串行独占 V100。
 - 结果：四组**全部在 best epoch 3 达峰、epoch 7 触发早停**，无一跑满 12 轮。C-001-a 0.7919 / 0.4191（31m33s）、C-001-b 0.7774 / 0.3996（33m01s）、C-001-c 0.7807 / 0.4055（29m52s）、C-001-d 0.7849 / 0.4049（27m04s）。
@@ -559,7 +559,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：**方向否定**——分层低学习率没有换来更长训练窗口，反而把峰值压在 warmup 结束的第 3 轮，epoch 4 起 valid_loss 单调反弹（C-001-c 0.9331 → 1.5712）。C-001 不产生提交候选，不改默认骨干与学习率；四组同受早峰压制，本轮不能判定骨干绝对优劣。未执行：第二 seed、逐类 bootstrap、test 推理与 T4 耗时自检、DenseNet-121 权重 SHA-256 单独记录。
 
 **C-002：ConvNeXt-Tiny 统一学习率双 seed 配对**（配置 `configs/exp_C002{a,b,c,d}.yaml`，产物
-`outputs/20261101-135010_C-002-a` 等四组，2026-11-01，计划见 [train_plan22.md](train_plan22.md)）
+`outputs/20261101-135010_C-002-a` 等四组，2026-11-01，计划见 [train_plan22.md](../archive/train_plan22.md)）
 
 - 设计：a（3e-4, seed 42）↔ b（1.5e-4, seed 42）、c（3e-4, seed 2026）↔ d（1.5e-4, seed 2026）两组 seed 内配对，每对仅 `train.lr` 不同；AdamW 单参数组（`head_lr: null`）、320×320、12 轮上限、patience 4、warmup 2 + cosine，V100-SXM2-32G 串行独占。
 - 结果：0.7962 / 0.4218（a，40m39s）、0.7976 / 0.4249（b，35m48s）、0.7958 / 0.4300（c，39m53s）、0.7956 / 0.4275（d，36m10s）；四组均在 best 后按 `patience 4` 早停，峰值集中在第 4–5 轮。
@@ -576,14 +576,14 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 影响边界：不影响 A-FUSE-2 / A-FUSE-3 的融合结论——融合增益是相对 A-001 的实测患者整簇配对 bootstrap（+0.0109，区间不跨 0），多模型平均本身会压低单类噪声。但融合选型若只按 10 类 macro-AUC 挑成员，会系统性偏好 class1 偶然偏高的模型，后续选型须用 9 类口径复核。
 
 **C-003：ConvNeXt-Tiny 输入分辨率 320 → 384 对照**（配置 `configs/exp_C003{a,b}.yaml`，产物
-`outputs/20261101-174052_C-003-a`、`outputs/20261101-181438_C-003-b`，2026-11-01，计划见 [train_plan23.md](train_plan23.md)）
+`outputs/20261101-174052_C-003-a`、`outputs/20261101-181438_C-003-b`，2026-11-01，计划见 [train_plan23.md](../archive/train_plan23.md)）
 
 - 设计：`image.size` 320→384，两 seed 各一组（a seed 42、b seed 2026），其余按 C-002-b 口径固定：AdamW 单参数组、峰值 lr 1.5e-4、12 轮上限、patience 2、warmup 2 + cosine、view_weighted 0.7/0.3。首轮 `train_plan23.md` 定的 3e-4 口径在学习率判读后由用户改为 C-002-b 口径，故两组均从 1.5e-4 起训，非从 A-001 checkpoint 热启动。
 - 结果：C-003-a **0.8020 / 0.4405**（best epoch 5，7 轮早停，17:40:52–18:14）、C-003-b **0.7969 / 0.4448**（best epoch 5，7 轮早停，18:14:38–18:48）。阈值曲线峰均落在 **0.5**（a 0.3846/0.4092/0.4239/**0.4405**/0.4397/0.4364，b 0.3940/0.4163/0.4311/**0.4448**/0.4351/0.4153）。
 - 判读：以同 seed 的 320 组为对照，ΔAUC 为 **+0.0044**（a vs C-002-b 0.7976）与 **+0.0013**（b vs C-002-d 0.7956），均未达 +0.005 方向性门；但对 A-001（0.8038）a 仍低 0.0018。**真正显著的是 F1@0.5：+0.0156 / +0.0173**，幅度是 AUC 变化的 3–13 倍，且两组峰位都稳定在 0.5、无校准漂移 → 384 抬高的是阈值处的判别质量（precision/recall 平衡），不是整体排序能力。（9 类口径：a **−0.0006**、b **−0.0041**，见上方告警——AUC 层面的「提升」不成立；F1@0.5 的抬升不受 class1 影响，仍是真实观察。）
 - 限制：对照组 patience 4、本组 patience 2，属**非纯分辨率对照**（`train_plan23.md` 已预先声明该差异）；每 seed 仅一组，无重复；未做配对 bootstrap；384 的显存峰值与单轮耗时未单独记录，不能据此估算算力代价；同受早峰压制（第 5 轮达峰、第 7 轮早停），与 320 组形态一致。
 
-**C-004：ConvNeXt-Tiny 平方根类别权重**（配置 `configs/exp_C004.yaml`，产物 `outputs/20261101-185032_C-004`，2026-11-01，计划见 [train_plan24.md](train_plan24.md)）
+**C-004：ConvNeXt-Tiny 平方根类别权重**（配置 `configs/exp_C004.yaml`，产物 `outputs/20261101-185032_C-004`，2026-11-01，计划见 [train_plan24.md](../archive/train_plan24.md)）
 
 - 设计：`train.pos_weight_power` 1.0 → **0.5**（BCE 正样本权重由 `负/正` 改为其平方根，权重只按训练集 study 标签统计），其余同 C-002-b 口径。配置首行注释仍写「与 A-001 展开配置仅 `pos_weight_power` 不同」，但字段值已是 lr 1.5e-4 / 12 轮 / patience 2 —— **以字段值为准，注释属未同步**。
 - 结果：**0.7950 / 0.4125**（best epoch 4，6 轮早停，18:50:32–19:18）。阈值曲线 **0.3967 / 0.4198 / 0.4362 / 0.4125 / 0.3894 / 0.3269**，峰在 **0.4** 而非 0.5。
@@ -591,7 +591,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：单 seed；未做配对 bootstrap；校准结论仅由阈值曲线峰位与两侧陡降推得，未出可靠性图或 ECE，也没有 logit 分布对比；峰位左移对提交无实质影响（提交输出全 10 类概率、不做阈值过滤）。
 
 **C-005：ConvNeXt-Tiny 正侧位聚合权重四组对照**（配置 `configs/exp_C005{a,b,c,d}.yaml`，产物
-`outputs/20261101-192302_C-005-a` 等四组，2026-11-01，计划见 [train_plan25.md](train_plan25.md)）
+`outputs/20261101-192302_C-005-a` 等四组，2026-11-01，计划见 [train_plan25.md](../archive/train_plan25.md)）
 
 - 设计：`model.frontal_weight` 0.7 → **0.5 / 0.6 / 0.8 / 0.9** 四组（侧位权重取补数），其余同 C-002-b 口径，全部从原始预训练权重全量训练、不热启动。四份配置展开后逐字段一致，唯一变量是聚合权重。
 - 结果（valid 859 studies，宏平均）：
@@ -609,7 +609,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：单 seed 四组，权重-性能关系可能被 seed 噪声主导（0.8 与 0.9 只差 0.0010）；逐类对比见 `outputs/comparisons/compare_C005/`（`summary.md` 的 per-run 表与逐类表），四组 `valid_ids_sha256` 一致可核；未做统一 bootstrap 的多重比较校正。
 
 **C-006：ConvNeXt-Tiny 亮度与对比度扰动四组对照**（配置 `configs/exp_C006{a,b,c,d}.yaml`，产物
-`outputs/20261101-212740_C-006-a` 等三组 + `outputs/20261102-122314_C-006-d`（d 为重跑），2026-11-01/02，计划见 [train_plan26.md](train_plan26.md)）
+`outputs/20261101-212740_C-006-a` 等三组 + `outputs/20261102-122314_C-006-d`（d 为重跑），2026-11-01/02，计划见 [train_plan26.md](../archive/train_plan26.md)）
 
 - 设计：以 `image.brightness=0.15`、`image.contrast=0.15` 为历史参考，a 亮度 0.15→0.05、b 亮度 0.15→0.25、c 对比度 0.15→0.05、d 对比度 0.15→0.25，每组只改一个参数，其余同 C-002-b 口径。
 - 结果：C-006-a **0.7957 / 0.4348**（best 5，7 轮）、C-006-b **0.8014 / 0.4263**（best 4，6 轮）、C-006-c **0.7927 / 0.4156**（best 4，6 轮）、C-006-d **0.8009 / 0.4371**（best 5，7 轮）。d 的 11-01 首跑被实例重启打断（仅 1 轮、无 `best.pt`），2026-11-02 12:23:14–12:55:15 在同一 HEAD `64d03da`、seed 42、同型号 V100 上重跑完成，中断残留归档到远端 `outputs/_aborted/`。四组已按 `run_compare.py` 统一重算（`outputs/comparisons/compare_C006/`），`valid_ids_sha256` 全部一致（`81e8be7f…`）、859 studies。阈值曲线：a 峰 0.6（0.4411）、b 峰 0.6（0.4382）、c 峰 **0.7**（0.4350）、d 峰 **0.6**（0.4493，四组最高）。
@@ -820,7 +820,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 | 优化项 | 预期收益 | 改动点 | 备注 |
 | --- | --- | --- | --- |
-| 新骨干对照 | 已验证（未达切换门槛） | `configs/exp_densenet121.yaml` / `configs/exp_resnet50.yaml` / `configs/exp_run008{a,b,c,d}.yaml` | **RUN-003-B / RUN-005 / RUN-006 / RUN-006-A 已完成（同口径）**：ResNet-18 基线 0.7837、ResNet-50 0.7857、DenseNet-121 0.7880（seed 42）/ 0.7913（seed 2026）；新骨干 macro-AUC 高 0.0020 / 0.0043，seed 2026 尚缺 ResNet-18 配对结果，仍不足以判定骨干优劣，暂不切换默认骨干。**RUN-008 骨干对照（2026-10-29 晚，6 轮无早停）**：ConvNeXt-Tiny 0.8008（比 RUN-007-A 高 +0.0102）、EfficientNet-B2 0.7952（+0.0046）、EfficientNetV2-S 0.7954（+0.0048）、ConvNeXtV2-Nano 0.4977（训练异常）；ConvNeXt-Tiny 超过判读门但预算与 RUN-007-A（25 轮、12 轮早停）不同且单 seed，只作候选方向；ConvNeXtV2-Nano 权重为 CC BY-NC 4.0，赛题规则不接受。详见 [train_plan04.md](train_plan04.md)、[train_plan05.md](train_plan05.md)、[train_plan08.md](train_plan08.md) 与训练记录。T4 端到端耗时与权重许可 / SHA-256 核验仍待做（仅当选新骨干时）。A-001（2026-10-30）在 seed 42、epoch 8、早停 2 下复现 0.8038，与 RUN008-C 同量级、差异混杂；**A-003（2026-10-30/31）**：MobileNetV3-Small 1.0×（1,528,106 参数）@320、25 轮上限 + 早停 5 口径在第 17 轮早停（best epoch 12），macro-AUC 0.7808 / F1@0.5 0.3881，低于 A-001 的 0.8038 且距 0.7988 门差 −0.0180 → 轻量 CNN 在本预算下未过门，默认骨干不切换；A-002（0.5×）第 5 轮按用户要求中止、无 `best.pt`，两者配对比较不成立（详见 [train_plan11.md](train_plan11.md)）；**A-007（2026-10-31）**：ConvNeXt-Small + `fb_in22k_ft_in1k`（49,462,378 参数）@320、8 轮 / patience 2 / seed 42 口径在第 8 轮跑满后早停（best epoch 6），macro-AUC 0.7903 / F1@0.5 0.4204，低于 A-001（0.8038 / 0.4255）ΔAUC −0.0135、距 0.8088 门 −0.0185，配对 bootstrap ΔAUC 95% CI [+0.0006, +0.0260] P=0.983 → 更大骨干 + 更强预训练在本预算下未过门，且同时变结构与权重不可单变量归因（详见 [train_plan17.md](train_plan17.md)） |
+| 新骨干对照 | 已验证（未达切换门槛） | `configs/exp_densenet121.yaml` / `configs/exp_resnet50.yaml` / `configs/exp_run008{a,b,c,d}.yaml` | **RUN-003-B / RUN-005 / RUN-006 / RUN-006-A 已完成（同口径）**：ResNet-18 基线 0.7837、ResNet-50 0.7857、DenseNet-121 0.7880（seed 42）/ 0.7913（seed 2026）；新骨干 macro-AUC 高 0.0020 / 0.0043，seed 2026 尚缺 ResNet-18 配对结果，仍不足以判定骨干优劣，暂不切换默认骨干。**RUN-008 骨干对照（2026-10-29 晚，6 轮无早停）**：ConvNeXt-Tiny 0.8008（比 RUN-007-A 高 +0.0102）、EfficientNet-B2 0.7952（+0.0046）、EfficientNetV2-S 0.7954（+0.0048）、ConvNeXtV2-Nano 0.4977（训练异常）；ConvNeXt-Tiny 超过判读门但预算与 RUN-007-A（25 轮、12 轮早停）不同且单 seed，只作候选方向；ConvNeXtV2-Nano 权重为 CC BY-NC 4.0，赛题规则不接受。详见 [train_plan04.md](../archive/train_plan04.md)、[train_plan05.md](../archive/train_plan05.md)、[train_plan08.md](../archive/train_plan08.md) 与训练记录。T4 端到端耗时与权重许可 / SHA-256 核验仍待做（仅当选新骨干时）。A-001（2026-10-30）在 seed 42、epoch 8、早停 2 下复现 0.8038，与 RUN008-C 同量级、差异混杂；**A-003（2026-10-30/31）**：MobileNetV3-Small 1.0×（1,528,106 参数）@320、25 轮上限 + 早停 5 口径在第 17 轮早停（best epoch 12），macro-AUC 0.7808 / F1@0.5 0.3881，低于 A-001 的 0.8038 且距 0.7988 门差 −0.0180 → 轻量 CNN 在本预算下未过门，默认骨干不切换；A-002（0.5×）第 5 轮按用户要求中止、无 `best.pt`，两者配对比较不成立（详见 [train_plan11.md](../archive/train_plan11.md)）；**A-007（2026-10-31）**：ConvNeXt-Small + `fb_in22k_ft_in1k`（49,462,378 参数）@320、8 轮 / patience 2 / seed 42 口径在第 8 轮跑满后早停（best epoch 6），macro-AUC 0.7903 / F1@0.5 0.4204，低于 A-001（0.8038 / 0.4255）ΔAUC −0.0135、距 0.8088 门 −0.0185，配对 bootstrap ΔAUC 95% CI [+0.0006, +0.0260] P=0.983 → 更大骨干 + 更强预训练在本预算下未过门，且同时变结构与权重不可单变量归因（详见 [train_plan17.md](../archive/train_plan17.md)） |
 | **视图元信息（ViewPosition）** | 已验证（无效） | 已实现 `StudyRecord` / `collate_studies` 传递视角及正侧位加权聚合 | **RUN-007 / RUN-007-A 已判无效**：seed 42 加权 macro-AUC 0.7892 vs 等权 0.7880（Δ+0.0012），seed 2026 加权 0.7906 vs 等权 0.7913（Δ−0.0007），两 seed 配对差方向相反且均低于 +0.005 门；F1 与逐类变化在两 seed 间也不一致。**A-001-D（2026-10-30）在 ConvNeXt-Tiny 上做等权 vs 加权**：等权 0.7931 / F1@0.5 0.4340 vs 加权 A-001 0.8038 / 0.4255，AUC **−0.0107**（超 ±0.005 门、约 3.2 倍 seed 波动）、F1 +0.0085（峰位 0.6→0.5 的校准差）→ 等权不优于加权；A-001 系列口径维持 `view_weighted`，`configs/default.yaml` 的默认聚合未改动。两套骨干结论方向一致：正侧位加权的收益未被证明，但取消加权同样不是改善方向。`Rows`/`Columns` 不建议用（易学设备偏差），`Subject_id` 严禁入特征 |
 | 阈值曲线选点 | 中 | 仅推理侧：`run_compare.py` 扫 0.2~0.7，必要时改 `eval.threshold` | RUN-003 正式模型已复核：F1 峰值仍在 0.2（0.4219，@0.5 为 0.2655），与 RUN-001R 形态一致；RUN-002-A/B 的 pos_weight 模型把峰右移到 0.5–0.6（0.4182 / 0.4212）、RUN-003-B（cosine + pos_weight）峰在 0.4（0.4059），上限均与基线 @0.2 持平，这些选点仅用于验证 F1；默认提交输出全部 10 类概率，不按阈值过滤 |
 | 训练轮数 | 已验证 | 在正式基线之后调整 `train.epochs` | **RUN-003 已判无效**：epoch 8 达峰（0.7887）后过拟合、第 13 轮早停，25 轮上限未带来 AUC 增益（Δ−0.0016 vs RUN-001R），该次实验未证明增加训练轮数有收益 |

@@ -215,6 +215,7 @@ class TrainConfig:
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
     num_workers: int = 8
     tensorboard: str = "auto"  # "auto"=装了 tensorboard 就写 run 目录下 tb/；"true"=必须写；"false"=关闭
+    early_stop_metric: str = "ema_auc"
     early_stop_patience: int = 5  # valid 指标连续多少个 epoch 不提升就停；0 表示关闭早停
     loss: str = "bce"  # "bce"=BCEWithLogitsLoss；"asl"=Asymmetric Loss（自带重加权）
     aucm_require_bce_init: bool = False  # 第二阶段必须显式提供 BCE checkpoint
@@ -266,6 +267,8 @@ class TrainConfig:
                 + "、".join(sorted(TENSORBOARD_MODES))
                 + f"，当前为 {self.tensorboard!r}"
             )
+        if self.early_stop_metric not in {"raw_auc", "ema_auc"}:
+            raise ValueError("train.early_stop_metric 只能是 raw_auc 或 ema_auc")
         if self.early_stop_patience < 0:
             raise ValueError(
                 f"train.early_stop_patience 必须 >= 0，当前为 {self.early_stop_patience}"

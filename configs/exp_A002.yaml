@@ -7,7 +7,7 @@
 #   3. `train.early_stop_patience`: 2 → 5（配合更长的轮数上限）
 # 注意 `train.epochs` 同时决定 cosine 衰减周期（末轮正好到 `lr_min`），
 # 所以相对 A-001 的 cosine 周期也由 5 步变为 22 步；比较时不能把轮数差
-# 当成模型收敛快慢的证据，详见 `docs/train_plan10.md`。
+# 当成模型收敛快慢的证据，详见 `archive/train_plan10.md`。
 # 其余口径逐字段沿用 A-001：320×320 letterbox、ImageNet 归一化、关闭水平翻转、
 # `view_weighted` 聚合（正位 0.7 / 侧位 0.3）、BCE + `pos_weight`、
 # batch 16 studies、lr 0.0003、weight decay 0.01、warmup 2、最低 lr 0.00001、

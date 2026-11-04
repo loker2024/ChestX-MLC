@@ -168,6 +168,8 @@ def _resume_checkpoint_config(checkpoint: dict[str, Any]) -> Config:
     saved = checkpoint["config"]
     if "ema_enabled" not in saved.get("train", {}):
         saved = {**saved, "train": {**saved.get("train", {}), "ema_enabled": False}}
+    if "early_stop_metric" not in saved.get("train", {}):
+        saved = {**saved, "train": {**saved.get("train", {}), "early_stop_metric": "raw_auc"}}
     return config_from_dict(saved)
 
 

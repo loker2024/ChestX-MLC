@@ -735,7 +735,7 @@ RUN-006 的 0.6（0.4098）移到 0.5（0.4122），上限基本持平，属校�
 提升。逐类 AUC 6 升 3 降 1 平（见下表），class2 −0.0428（support 37）最明显、class3
 +0.0169，方向不一致。RUN-006 与 RUN-007 的代码版本不同（`da8fef7` → `53568fe`，新增
 视角元信息贯通），不能把差异全部归因于聚合方式；若要继续，需按
-[train_plan06.md](train_plan06.md) 补 seed 2026 复核（RUN-006-A 已有同 seed 的等权
+[train_plan06.md](../archive/train_plan06.md) 补 seed 2026 复核（RUN-006-A 已有同 seed 的等权
 对照可配对）。**默认 `model.aggregation` 维持 `mean`。**
 
 逐类 AUC（`outputs/compare_run007/per_class.csv`，Δ 为四位小数相减）：
@@ -924,7 +924,7 @@ RUN-007-A（320×320、12 轮早停，0.7906 / 0.4198）相比 AUC **+0.0053**�
 
 ## RUN-008 骨干对照 @320（EfficientNet-B2 / EfficientNetV2-S / ConvNeXt-Tiny / ConvNeXtV2-Nano）
 
-按 [train_plan08.md](train_plan08.md) 执行：继承 RUN-007-A 的正侧位 7:3 加权聚合口径
+按 [train_plan08.md](../archive/train_plan08.md) 执行：继承 RUN-007-A 的正侧位 7:3 加权聚合口径
 （`configs/exp_run007a.yaml`），四组只覆盖 `model.backbone`，并把训练预算统一改为
 **固定 6 轮、关闭早停**。seed 2026、320×320 letterbox、ImageNet 归一化、`batch_studies: 16`、
 `pos_weight: true`、warmup 2 轮后 cosine 衰减到 1e-5、CUDA AMP、`num_workers: 16`。
@@ -1163,7 +1163,7 @@ RUN-007-A（−0.0103 / −0.0098），C 高 +0.0184，且 C 在 0.2–0.7 全�
 
 ## RUN-009 骨干 @384×384 完整口径复核（EfficientNetV2-S RW）
 
-按 [train_plan09.md](train_plan09.md) 执行：在 RUN-008 的 6 轮 320×320 骨干对照基础上，把输入
+按 [train_plan09.md](../archive/train_plan09.md) 执行：在 RUN-008 的 6 轮 320×320 骨干对照基础上，把输入
 分辨率提到 384×384、训练预算恢复为 25 轮上限 + 早停 5，复核 RUN-008-B 的 EfficientNetV2-S RW。
 原计划串行先跑 RUN-009-B（ConvNeXt-Tiny）、后跑 RUN-009-A；实际训练环境换为新实例
 （V100-SXM2-32G），原串行脚本 `/root/run009.sh` 不在该实例上，遂先启动 RUN-009-A，并在第 6 轮
@@ -1894,7 +1894,7 @@ metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触�
 
 ## A-002 / A-003：MobileNetV3-Small 轻量骨干宽度对照（320×320 / seed=42）
 
-按 [train_plan10.md](train_plan10.md) 与 [train_plan11.md](train_plan11.md) 执行：先以 A-002 检验
+按 [train_plan10.md](../archive/train_plan10.md) 与 [train_plan11.md](../archive/train_plan11.md) 执行：先以 A-002 检验
 MobileNetV3-Small 0.5× 的轻量骨干表现，再以同配方换 1.0× 宽度做 A-003 对照。A-002 于 2026-10-30
 22:39:11 启动，23:03:03 第 5 轮写盘后按用户要求中止（非早停、非收敛），因此没有 `best.pt`，无法与
 A-003 做 `run_compare` 配对比较；本小节只把 A-002 的 5 轮指标作为历史记录，A-003 是完整 run。
@@ -2007,7 +2007,7 @@ class8 基本持平（−0.0008），高频 class9 / class10 低 −0.0064 / −
 
 ## B-001：B 组医学预训练 DenseNet-121 对照（224×224 / 单通道 / seed=42，仅研究）
 
-B 组独立研究对照，计划与边界见 [train_plan12.md](train_plan12.md)。仅作研究记录，**不用于赛题提交、模型融合或候选选择**（外部医学影像预训练，违反赛题规则第 1 条）。
+B 组独立研究对照，计划与边界见 [train_plan12.md](../archive/train_plan12.md)。仅作研究记录，**不用于赛题提交、模型融合或候选选择**（外部医学影像预训练，违反赛题规则第 1 条）。
 
 - 配置：`configs/exp_B001.yaml`（`_base: default.yaml`），完整展开见 run 目录 `config.yaml`；数据划分、聚合与 seed 与 A 组一致（同 train/valid CSV、`view_weighted` 正位 0.7 / 侧位 0.3、seed 42）。
 - 骨干：TorchXRayVision `densenet121-res224-all`（DenseNet-121，6,957,834 参数；18 类分类头替换为 10 类、置空 `op_threshs`，输出原始 logits，先聚合再算 loss），单通道 224×224、letterbox、归一化到 [-1024, 1024]（`image.normalize: xrv`、`image.in_channels: 1`、`image.xrv_maxval: 255`）；全量微调、BCE + `pos_weight`、关闭 `image.hflip`。
@@ -2045,7 +2045,7 @@ B 组独立研究对照，计划与边界见 [train_plan12.md](train_plan12.md)�
 背景：A-001 在 ConvNeXt-Tiny @320 上以 8 轮上限 + 早停 2 跑出 valid macro-AUC 0.8038 / F1@0.5
 0.4255，但训练与验证损失从 epoch 4 起明显分离（train 0.8466 → 0.7613，valid 0.8856 → 0.9333），
 valid_loss 在 epoch 4 见底后反弹。本组验证「分类头 dropout + 更强 weight decay」这组正则化组合能否
-推迟过拟合、把 macro-AUC 推过方向性门（A-001 重算值 + 0.005 = 0.8088），计划见 [train_plan13.md](train_plan13.md)。
+推迟过拟合、把 macro-AUC 推过方向性门（A-001 重算值 + 0.005 = 0.8088），计划见 [train_plan13.md](../archive/train_plan13.md)。
 
 | 项 | 值 |
 |---|---|
@@ -2122,7 +2122,7 @@ class2 / class6，与整体 −0.0050 的方向一致。
 
 背景：A-004 同时打开 dropout 0.2 与 weight_decay 0.05，组合相对 A-001 差 AUC −0.0050，但无法归因到
 具体一项。本组只开分类头 dropout、weight_decay 保持 A-001 的 0.01，其余口径逐字段一致，回答
-「dropout 单独是否退化、退化多少」，计划见 [train_plan14.md](train_plan14.md)。
+「dropout 单独是否退化、退化多少」，计划见 [train_plan14.md](../archive/train_plan14.md)。
 
 | 项 | 值 |
 |---|---|
@@ -2193,7 +2193,7 @@ A-004-a 的 F1 峰从 A-001 的 0.6 左移到 0.4（0.4400 vs 0.4328，+0.0072�
 
 背景：A-004 同时打开 dropout 0.2 与 weight_decay 0.05，组合相对 A-001 差 AUC −0.0050。本组只把
 `train.weight_decay` 提到 0.05、dropout 保持 0，其余口径与 A-001 逐字段一致，回答「weight decay
-单独是否退化」，与 A-004-a 一起把组合差拆分到两项。计划见 [train_plan14.md](train_plan14.md)。
+单独是否退化」，与 A-004-a 一起把组合差拆分到两项。计划见 [train_plan14.md](../archive/train_plan14.md)。
 
 | 项 | 值 |
 |---|---|
@@ -2349,7 +2349,7 @@ P=0.998（2,000 / 2,000 次有效）。对历史 A-001（0.8038 / 0.4255）：Δ
 背景：A-001 的 timm 标准分类头（LayerNorm → Dropout → Linear 768→10）在 ConvNeXt-Tiny @320 上达到
 0.8038 / 0.4255。本组保持数据、预处理、聚合、损失、优化器、轮数与 seed 全部不变，只把分类头换成
 轻量 ML-Decoder（10 个类别查询 + 单层 4 头交叉注意力 + 逐类权重向量，内部维度 256），检验「用类别
-查询从特征图自适应抽取类证据」能否改善 study 级 Macro-AUC。计划见 [train_plan16.md](train_plan16.md)，
+查询从特征图自适应抽取类证据」能否改善 study 级 Macro-AUC。计划见 [train_plan16.md](../archive/train_plan16.md)，
 结构见 [ml_decoder_implementation.md](ml_decoder_implementation.md)。
 
 | 项 | 值 |
@@ -2440,7 +2440,7 @@ A-006 的 F1 峰仍在 0.6（0.4173 vs 0.4383，−0.0210），0.2 段略高、0
 的 valid 水平。本组保持数据、预处理、聚合、损失、优化器、轮数与 seed 全部不变，只把骨干换成
 ConvNeXt-Small 并改用 `fb_in22k_ft_in1k` 权重（ImageNet-22k 预训练后在 ImageNet-1k 微调），检验
 「更大骨干 + 更强预训练」能否在训练预算不变的前提下提升 study 级 Macro-AUC。计划见
-[train_plan17.md](train_plan17.md)。注意这是「骨干结构 + 预训练数据」同时变的混合对照，不能把差异
+[train_plan17.md](../archive/train_plan17.md)。注意这是「骨干结构 + 预训练数据」同时变的混合对照，不能把差异
 单变量归因于结构或权重之一。
 
 | 项 | 值 |
@@ -2535,7 +2535,7 @@ class2 是 A-007 掉出判读门的主要来源（10 类平均上拉低约 0.010
 
 ## A-008：A-001 的聚合空间对照（logits G0 → 概率空间 G1，320×320 / seed=42）
 
-背景与判读门见 [train_plan18.md](train_plan18.md)；配置 `configs/exp_A008.yaml`（`_base: exp_A001.yaml`，
+背景与判读门见 [train_plan18.md](../archive/train_plan18.md)；配置 `configs/exp_A008.yaml`（`_base: exp_A001.yaml`，
 只覆盖 `model.aggregation: view_weighted → view_weighted_probability`，`frontal_weight: 0.7` 不变）。
 
 | 项 | 值 |
@@ -2566,7 +2566,7 @@ ep5 见顶（A-001 为 ep4），ep6–7 过拟合更陡（valid_loss 1.0375 / 1.
 
 ## A-009：A-001 的优化超参联合放大（lr 1e-3 / wd 0.03 / 10 轮 / patience 4，320×320 / seed=42）
 
-背景与判读门见 [train_plan19.md](train_plan19.md)；配置 `configs/exp_A009.yaml`（`_base: exp_A001.yaml`，
+背景与判读门见 [train_plan19.md](../archive/train_plan19.md)；配置 `configs/exp_A009.yaml`（`_base: exp_A001.yaml`，
 只覆盖 `train.lr: 0.0003 → 0.001`、`train.weight_decay: 0.01 → 0.03`、`train.epochs: 8 → 10`、
 `train.early_stop_patience: 2 → 4`，其余逐字段继承 A-001）。
 
@@ -2620,7 +2620,7 @@ lr 放大后的收敛推迟与过拟合加剧，但不能据此排除 wd 与轮�
 不补 seed 2026；若继续调参，应另开 lr、wd 单变量实验。
 ## A-009-r2：A-009 的二轮 warm start（以首轮 best.pt 为初始权重、同配置重训 10 轮，320×320 / seed=42）
 
-背景与判读门见 [train_plan20.md](train_plan20.md)；配置 `configs/exp_A009.yaml`（与首轮 A-009 逐字段相同，
+背景与判读门见 [train_plan20.md](../archive/train_plan20.md)；配置 `configs/exp_A009.yaml`（与首轮 A-009 逐字段相同，
 只把初始化改为首轮 `best.pt`，epoch 10 权重，SHA-256 `6988006910b824a83c277764695d0db4a3bdeb3ab0b1b029d22dc9e3ee0f1b15`）。
 训练从第 1 轮重新开始，不恢复优化器 / 调度器 / 进度。
 
@@ -3249,7 +3249,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 ## D-005：多标签 AUCM 对照（初筛，两组均失败）
 
-- 依据 [train_plan28.md](train_plan28.md)。D-005-a 为 ImageNet 初始化后全程 AUCM；D-005-b 从 D-002-a 的 BCE `best_ema.pt` warm start 后转 AUCM 微调。两组均 `pos_weight: false`、`loss: aucm`、`aucm_require_bce_init` 分别为 false / true，PESG（adam 模式、lr 3e-4、weight decay 0.01、epoch_decay 0）、AUCM margin 1.0 / version v1、`batch_studies: 16`，按类别均衡采样（每批单类别、正负各半）。
+- 依据 [train_plan28.md](../archive/train_plan28.md)。D-005-a 为 ImageNet 初始化后全程 AUCM；D-005-b 从 D-002-a 的 BCE `best_ema.pt` warm start 后转 AUCM 微调。两组均 `pos_weight: false`、`loss: aucm`、`aucm_require_bce_init` 分别为 false / true，PESG（adam 模式、lr 3e-4、weight decay 0.01、epoch_decay 0）、AUCM margin 1.0 / version v1、`batch_studies: 16`，按类别均衡采样（每批单类别、正负各半）。
 - 依赖与环境：`libauc==2.0.0` 用 uv 装入主 `.venv`（`--index-url` 阿里云），新增 40 个包、无版本升降级，torch 保持 `2.10.0+cu128`；`tests/test_aucm.py` 7 passed。
 - 执行：D-005-a 11:05:29–11:22:44（17m15s），best epoch **1**；D-005-b 11:22:44–11:39:57（17m13s），warm start 从 `20261102-145203_D-002-a/best_ema.pt`（source epoch 5，sha256 `aeeb2106…`），best epoch **1**。两组均在第 3 轮后退化为 0.50 附近并触发早停。
 - 结果：
@@ -3293,7 +3293,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 ## Distill-1：固定融合教师离线蒸馏配对实验
 
-- 依据 [train_plan29.md](train_plan29.md) 与 [train_plan30.md](train_plan30.md)。教师为 A-FUSE-5 的固定三模型融合：D-002-a `best_ema.pt`（sha256 `aeeb2106…f08`）、C-005-c `best.pt`（`1fb3b039…df`）、E-001 `best.pt`（`7d95b6d0…930`），各自按 checkpoint 配置做 study 聚合，再以裁剪后 logit 按 4:2:3 融合；学生训练集软标签来自 `outputs/distill/Distill-1_teacher/`（train split 18,513 studies，`cache_digest` `5d41fe72…eff28`、`predictions_sha256` `91bb6c41…baedf`、`manifest_sha256` `4d99cd2b…e5f50`、`train_csv_sha256` `3a07b4bb…f17`、`index_sha256` `9fbf9bce…a1b`），是 in-sample 预测而非 OOF。
+- 依据 [train_plan29.md](../archive/train_plan29.md) 与 [train_plan30.md](../archive/train_plan30.md)。教师为 A-FUSE-5 的固定三模型融合：D-002-a `best_ema.pt`（sha256 `aeeb2106…f08`）、C-005-c `best.pt`（`1fb3b039…df`）、E-001 `best.pt`（`7d95b6d0…930`），各自按 checkpoint 配置做 study 聚合，再以裁剪后 logit 按 4:2:3 融合；学生训练集软标签来自 `outputs/distill/Distill-1_teacher/`（train split 18,513 studies，`cache_digest` `5d41fe72…eff28`、`predictions_sha256` `91bb6c41…baedf`、`manifest_sha256` `4d99cd2b…e5f50`、`train_csv_sha256` `3a07b4bb…f17`、`index_sha256` `9fbf9bce…a1b`），是 in-sample 预测而非 OOF。
 - 设计：两份独立完整配置、无 `_base`，展开后唯一差异是 `train.distill_enabled`（a 关闭、b 开启，λ=0.5、T=1，软目标为无 `pos_weight` 的 BCE）。学生均从 `convnext_tiny.fb_in1k` ImageNet 权重与新分类头开始（日志确认「预训练权重: 已加载」），seed 42、320、batch 16 studies、lr 3e-4、warmup 2、cosine 8 轮、`lr_min=1e-5`、patience 2，BCE + `pos_weight`，EMA decay 0.999，亮度/对比度 0.15，正位/侧位 0.7/0.3；早停按 raw valid Macro-AUC，`best_ema.pt` 取已训练轮次的 EMA 最优。
 - 环境与核验：autodl Tesla V100-SXM2-32G（32,768 MiB，driver 580.105.08），Python 3.12.3 / torch 2.10.0+cu128，代码版本 `529f9f1`（runner 记录 `dirty_files 60`，未提交内容为 cost 重构与 AUCM 改动，不涉及蒸馏路径）。缓存校验：study 集合与 train 18,513 完全一致，概率范围 [0.000244, 0.998769]，融合方式与权重、三 checkpoint SHA-256 与记录一致。两组训练前各做 2 batch GPU smoke：a loss 1.2095、b 1.4874（hard 1.1449 / soft 0.6850），均有限；显存峰值 3,956.2 / 4,352.3 MiB。计划 §2.4 要求的教师 valid 逐 study 复算未执行（见文末未完成项），与教师的比较使用既有 A-FUSE-5 记录值。
 - 执行：Distill-1-a 13:55:13–14:29:42（34m29s，7/8 轮早停）；Distill-1-b 14:29:42–15:04:18（34m36s，7/8 轮早停）；两组串行、无并行。

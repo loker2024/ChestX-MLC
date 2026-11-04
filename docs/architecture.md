@@ -2,7 +2,7 @@
 
 本文件记录 ChestX-MLC 的目标代码结构、模块边界与运行方式。赛题背景、数据格式与评测口径见 [赛题说明](多目标胸部病变检测分类（ChestX-MLC）.md)，数据流示意见 [胸片多标签分类数据流](胸片多标签分类数据流.svg)。
 
-> P1–P8 的代码与配置已按本文件落地；P7 对照实验在训练环境执行。实际改动与进度以 `CHANGELOG.md` 为准，调优结论见 [experiments.md](experiments.md)，执行命令见 [train_plan01.md](train_plan01.md)。
+> P1–P8 的代码与配置已按本文件落地；P7 对照实验在训练环境执行。实际改动与进度以 `CHANGELOG.md` 为准，调优结论见 [experiments.md](experiments.md)，执行命令见 [train_plan01.md](../archive/train_plan01.md)。
 
 ## 1. 设计约束
 
@@ -99,7 +99,7 @@ outputs/
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 | `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `per_class.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
 | `run_ensemble.py` | 多模型融合入口：`--fusion probability`（默认，概率平均）或 `logit`（先平均 study 级 logits 再 sigmoid），按 `Study_id` 对齐后写提交或验证报告 |
-| `run_aggregation_compare.py` | 聚合空间对照入口：`export` 导出固定 checkpoint 的逐图 logits 缓存，`compare` 离线重算 G0（logits 平均后 sigmoid）与 G1（逐图 sigmoid 后平均），只读缓存、不加载模型。设计见 [train_plan_aggregation.md](train_plan_aggregation.md) |
+| `run_aggregation_compare.py` | 聚合空间对照入口：`export` 导出固定 checkpoint 的逐图 logits 缓存，`compare` 离线重算 G0（logits 平均后 sigmoid）与 G1（逐图 sigmoid 后平均），只读缓存、不加载模型。设计见 [train_plan_aggregation.md](../archive/train_plan_aggregation.md) |
 | `backfill_ema_tb.py` | 补面板入口：按 `metrics.csv` 的 `ema_valid_*` 列给历史 run 生成独立的 `tb_ema/` 面板（tag 与 `tb/` 同名），新建 `.ema_backfill` 事件文件、不动原文件；已有曲线时跳过，`--force` 重写，并清理旧版误写进 `tb/` 的补写文件。用法见 [manual.md](manual.md)「查看训练曲线」 |
 | `src/cost.py` | 耗时自检与提交一致性检查：以单个 study 为计时单元、多图同批前向，支持多模型融合与视角元数据；初始化打印 `init_ms`、5 个预热 study 不计入成绩。调用方式与限制见 [cost.md](cost.md) |
 

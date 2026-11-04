@@ -34,7 +34,7 @@ from common.config import Config
 
 # TxRV 官方覆盖 5 个数据集的权重名；B 组固定用它（对照 RUN-006 的 ImageNet 权重）。
 DEFAULT_WEIGHTS = "densenet121-res224-all"
-# TxRV 所有 DenseNet 权重的原生输入分辨率，与 docs/train_plan12.md 的 224 一致。
+# TxRV 所有 DenseNet 权重的原生输入分辨率，与 archive/train_plan12.md 的 224 一致。
 XRV_INPUT_RESOLUTION = 224
 
 
