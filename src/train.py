@@ -40,7 +40,8 @@ def make_optimizer(model: nn.Module, settings: dict) -> torch.optim.AdamW:
 
 
 def train_step(model: nn.Module, images: torch.Tensor, labels: torch.Tensor,
-               optimizer: torch.optim.Optimizer, *, study_index: torch.Tensor | None = None) -> tuple[float, list[int]]:
+               optimizer: torch.optim.Optimizer, *, study_index: torch.Tensor | None = None,
+               label_loss=None) -> tuple[float, list[int]]:
     model.train()
     optimizer.zero_grad(set_to_none=True)
     logits = model(images)
@@ -50,7 +51,11 @@ def train_step(model: nn.Module, images: torch.Tensor, labels: torch.Tensor,
         raise ValueError('标签必须是有限的 0/1 值')
     if not torch.isfinite(logits).all():
         raise ValueError('模型输出包含非有限值')
-    if study_index is None:
+    if label_loss is not None:
+        from .study_training import reduce_study_label_losses
+        per_label=label_loss(logits,labels)
+        loss=per_label.mean() if study_index is None else reduce_study_label_losses(per_label,study_index)
+    elif study_index is None:
         loss = nn.BCEWithLogitsLoss()(logits, labels)
     else:
         from .study_training import study_balanced_bce

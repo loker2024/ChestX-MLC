@@ -66,7 +66,21 @@ def study_balanced_bce(logits: torch.Tensor, labels: torch.Tensor, indices: torc
         raise ValueError('Study索引须连续从0开始')
     if not torch.isfinite(logits).all() or not torch.isfinite(labels).all() or not ((labels==0)|(labels==1)).all():
         raise ValueError('logits须有限，标签须为0/1')
-    losses=torch.nn.functional.binary_cross_entropy_with_logits(logits,labels,reduction='none').mean(1)
+    losses=torch.nn.functional.binary_cross_entropy_with_logits(logits,labels,reduction='none')
+    return reduce_study_label_losses(losses,indices)
+
+
+def reduce_study_label_losses(label_losses: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
+    """类别均值→Study内图片均值→Batch内Study均值，BCE/ASL共享同一归约。"""
+    if label_losses.ndim!=2 or label_losses.shape[1]!=10 or not len(label_losses):
+        raise ValueError('逐标签损失须为非空[B,10]')
+    if indices.shape!=(len(label_losses),) or indices.dtype!=torch.long:
+        raise ValueError('Study索引须为每图对应long向量')
+    if not torch.isfinite(label_losses).all():raise ValueError('逐标签Loss非有限')
+    indices=indices.to(label_losses.device); groups=torch.unique(indices,sorted=True)
+    if not torch.equal(groups,torch.arange(len(groups),device=indices.device)):
+        raise ValueError('Study索引须连续从0开始')
+    losses=label_losses.mean(1)
     sums=losses.new_zeros(len(groups)).scatter_add(0,indices,losses)
     counts=torch.bincount(indices,minlength=len(groups)).to(losses.dtype)
     return (sums/counts).mean()
@@ -77,9 +91,11 @@ def make_study_loader(dataset: ChestXrayDataset, settings: dict) -> DataLoader:
     if type(workers) is not int or workers<0 or type(settings.get('pin_memory',False)) is not bool:
         raise ValueError('num_workers/pin_memory不合法')
     sampler=StudyBatchSampler(dataset,settings['studies_per_batch'],settings['max_images_per_batch'],settings['seed'])
-    return DataLoader(dataset,batch_sampler=sampler,num_workers=workers,
+    loader = DataLoader(dataset,batch_sampler=sampler,num_workers=workers,
         generator=torch.Generator().manual_seed(settings['seed']),collate_fn=collate_studies,
         pin_memory=settings.get('pin_memory',False))
+    loader.cxr_loss_reduction=settings.get('loss_reduction','study_balanced_image_bce')
+    return loader
 
 
 def sampling_summary(dataset: ChestXrayDataset, loader) -> dict:
@@ -91,7 +107,7 @@ def sampling_summary(dataset: ChestXrayDataset, loader) -> dict:
         'positive_studies_per_class':labels.sum(0).astype(int).tolist(),
         'positive_images_per_class':dataset.labels.sum(0).astype(int).tolist(),
         'planned_next_epoch_batches':len(loader),'old_image_batch16_steps':math.ceil(len(dataset)/16),
-        'scheduler_unit':'epoch','loss_reduction':'study_balanced_image_bce',
+        'scheduler_unit':'epoch','loss_reduction':getattr(loader,'cxr_loss_reduction','study_balanced_image_bce'),
         'max_images_per_batch':loader.batch_sampler.max_images_per_batch,
         'studies_per_batch':loader.batch_sampler.studies_per_batch,
         'batch_limit_policy':'close batch before image cap; never split Study',
@@ -99,7 +115,7 @@ def sampling_summary(dataset: ChestXrayDataset, loader) -> dict:
 
 
 def run_study_epoch(model: torch.nn.Module, optimizer: torch.optim.Optimizer,
-                    loader: DataLoader, device: str) -> dict:
+                    loader: DataLoader, device: str, *, label_loss=None) -> dict:
     from .train import train_step
     image_ids,study_ids=set(),set()
     total_loss=0.;steps=0;peak_images=0
@@ -112,7 +128,8 @@ def run_study_epoch(model: torch.nn.Module, optimizer: torch.optim.Optimizer,
         image_ids.update(ids);study_ids.update(studies)
         indices=batch['study_index']
         loss,_=train_step(model,batch['image'].to(device,non_blocking=True),
-            batch['label'].to(device,non_blocking=True),optimizer,study_index=indices)
+            batch['label'].to(device,non_blocking=True),optimizer,study_index=indices,
+            **({'label_loss':label_loss} if label_loss is not None else {}))
         total_loss+=loss*len(studies);peak_images=max(peak_images,len(ids))
         positive_images+=batch['label'].sum(0).numpy().astype(int)
         for i in range(len(studies)):
