@@ -10,6 +10,8 @@
 
 ## 2026-11-04
 
+- `19:26`（变更）`AGENTS.md`：明确本项目默认禁止运行测试（太浪费时间），改为在代码提交与拉取后只做代码检查——读 `git diff`、审阅改动逻辑与影响范围、核对 `CHANGELOG.md` 与文档同步，不执行 `pytest` 及训练/评测/耗时自检脚本；确有必须运行才能确认的疑点时先说明再征得用户同意。
+
 - `19:02`（变更）`src/common/config.py`、`src/train/engine.py`、`src/run_train.py`、`configs/default.yaml`、`tests/test_engine.py`、`docs/manual.md`：新增早停指标选择，默认使用 EMA AUC，可选 raw AUC；EMA 关闭及旧断点续训保持 raw 口径，raw 与 EMA 最优权重分别保存。
 
 - `08:27`（新增）`docs/cost_optimization_plan.md`：保存 A-FUSE-5 端到端耗时优化计划，明确基线、分段诊断、线程池与设备传输优化、对照实验、数值一致性和 T4 复测门槛；尚未执行 GPU 测试或修改推理代码。
