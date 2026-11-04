@@ -60,6 +60,7 @@ class TrainProgress:
     best_metrics: dict[str, float] = field(default_factory=dict)
     best_state: dict[str, torch.Tensor] | None = None
     history: list[dict[str, float]] = field(default_factory=list)
+    monitor: str | None = None
     stale_epochs: int = 0  # 连续多少个 epoch 没有提升
     ema_state: dict[str, Any] | None = None
     ema_best_auc: float = float("nan")
@@ -155,7 +156,7 @@ def _build_scheduler(optimizer: Optimizer, config: Config) -> LambdaLR:
     """
     warmup_epochs = config.train.warmup_epochs
     if config.train.lr_scheduler == "cosine":
-        total_epochs = config.train.epochs
+        total_epochs = config.train.cosine_end_epoch or config.train.epochs
         lr_floor = config.train.lr_min / config.train.lr
         # 预热结束后开始衰减，分母用“最后一轮的步数 - warmup”，保证末轮正好到 lr_min。
         decay_steps = max(1, total_epochs - 1 - warmup_epochs)
@@ -210,11 +211,17 @@ def train_one_epoch(
     total_loss = 0.0
     total_studies = 0
     total_hard = total_soft = 0.0
+    mixed_studies = 0
 
     for batch in loader:
         images = batch["images"].to(device, non_blocking=True)
         labels = batch["labels"].to(device, non_blocking=True)
         offsets = batch["offsets"].to(device, non_blocking=True)
+
+        if config.train.mixup_prob:
+            from train.study_mixup import mixup_studies
+            images, labels, mixed_count = mixup_studies(images, offsets, labels, batch["views"], alpha=config.train.mixup_alpha, probability=config.train.mixup_prob)
+            mixed_studies += mixed_count
 
         optimizer.zero_grad(set_to_none=True)
         if isinstance(criterion, AUCMLoss):
@@ -262,6 +269,8 @@ def train_one_epoch(
         raise RuntimeError("训练集为空，无法计算 loss")
     if loss_stats is not None and teacher_cache is not None:
         loss_stats.update(hard=total_hard / total_studies, soft=total_soft / total_studies)
+    if loss_stats is not None and config.train.mixup_prob:
+        loss_stats.update(mixup_mixed_studies=mixed_studies, mixup_total_studies=total_studies, mixup_fraction=mixed_studies / total_studies)
     return total_loss / total_studies
 
 
@@ -459,6 +468,10 @@ def fit(
         scaler.load_state_dict(scaler_state)
     runtime = TrainRuntime(optimizer=optimizer, scheduler=scheduler, scaler=scaler, criterion=criterion)
     progress = TrainProgress() if progress is None else progress
+    monitor = config.train.early_stop_monitor or (config.train.early_stop_metric if config.train.ema_enabled else "raw_auc")
+    if progress.monitor is not None and progress.monitor != monitor:
+        raise ValueError("续训不能切换早停监控指标")
+    progress.monitor = monitor
     ema = None
     if config.train.ema_enabled:
         from train.ema import ModelEMA
@@ -482,6 +495,8 @@ def fit(
         head_lr = optimizer.param_groups[1]["lr"] if config.train.head_lr is not None else None
         loss_stats: dict[str, float] = {}
         distill_kwargs = {"teacher_cache": train_loader.dataset.teacher_cache, "loss_stats": loss_stats} if config.train.distill_enabled else {}
+        if config.train.mixup_prob:
+            distill_kwargs["loss_stats"] = loss_stats
         if ema is None:
             train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, **distill_kwargs)
         else:
@@ -525,8 +540,11 @@ def fit(
                 "valid_macro_f1": valid_metrics["macro_f1"],
             }
         )
-        if loss_stats:
+        if "hard" in loss_stats:
             progress.history[-1].update(train_hard_loss=loss_stats["hard"], train_soft_loss=loss_stats["soft"])
+        if "mixup_fraction" in loss_stats:
+            progress.history[-1].update({k: v for k, v in loss_stats.items() if k.startswith("mixup_")})
+            print(f"  Mixup | studies {loss_stats['mixup_mixed_studies']}/{loss_stats['mixup_total_studies']} | fraction {loss_stats['mixup_fraction']:.4f}")
         if ema_metrics is not None:
             progress.history[-1].update({"ema_valid_loss": ema_metrics["loss"], "ema_valid_macro_auc": ema_metrics["macro_auc"], "ema_valid_macro_f1": ema_metrics["macro_f1"]})
         if head_lr is not None:
@@ -552,12 +570,16 @@ def fit(
             }
             progress.best_state = _snapshot(model)
 
-        stop_improved = ema_improved if ema is not None and config.train.early_stop_metric == "ema_auc" else improved
+        stop_improved = ema_improved if monitor == "ema_auc" else improved
         if stop_improved:
             progress.stale_epochs = 0
         else:
             progress.stale_epochs += 1
 
+        monitor_value = ema_metrics["macro_auc"] if monitor == "ema_auc" else auc
+        monitor_best = progress.ema_best_auc if monitor == "ema_auc" else progress.best_auc
+        progress.history[-1].update(early_stop_monitor=monitor, early_stop_value=monitor_value, early_stop_best=monitor_best, stale_epochs=progress.stale_epochs)
+        print(f"  early_stop | {monitor} {monitor_value:.4f} | best {monitor_best:.4f} | stale {progress.stale_epochs}")
         progress.epoch = epoch
         scheduler.step()
         if on_epoch_end is not None:

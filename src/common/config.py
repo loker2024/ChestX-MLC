@@ -117,6 +117,7 @@ class ModelConfig:
     strict_img_size: bool = True
     pretrained: bool = True  # 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
+    drop_path_rate: float = 0.0
     dropout: float = 0.0  # timm 分类头 dropout；旧配置默认关闭
     head: str = "standard"  # standard=原 timm 分类头；csra=类别空间注意力
     csra_residual_weight: float = 0.4
@@ -142,6 +143,10 @@ class ModelConfig:
         return self.aggregation in PROBABILITY_AGGREGATIONS
 
     def __post_init__(self) -> None:
+        if not math.isfinite(self.drop_path_rate) or not 0 <= self.drop_path_rate < 1:
+            raise ValueError("model.drop_path_rate 必须为 [0, 1) 内有限数")
+        if self.drop_path_rate and (self.arch != "timm" or self.backbone != "convnext_tiny.fb_in1k" or self.head != "standard"):
+            raise ValueError("drop_path_rate 仅支持标准 ConvNeXt-Tiny")
         if self.aggregation == "study_attention" and (self.arch != "timm" or self.backbone != "convnext_tiny.fb_in1k" or self.head != "standard" or self.freeze_backbone or self.dropout != 0.0):
             raise ValueError("study_attention 仅支持全量微调的标准 ConvNeXt-Tiny，且 dropout=0")
         if self.head not in {"standard", "csra", "ml_decoder"}:
@@ -199,6 +204,7 @@ class TrainConfig:
     distill_enabled: bool = False
     distill_cache: str | None = None
     distill_weight: float = 0.5
+    require_pretrained: bool = False
     ema_enabled: bool = True
     ema_decay: float = 0.999
     epochs: int = 25
@@ -215,6 +221,10 @@ class TrainConfig:
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
     num_workers: int = 8
     tensorboard: str = "auto"  # "auto"=装了 tensorboard 就写 run 目录下 tb/；"true"=必须写；"false"=关闭
+    early_stop_monitor: str | None = None  # None 沿用旧 early_stop_metric
+    cosine_end_epoch: int | None = None
+    mixup_alpha: float = 0.0
+    mixup_prob: float = 0.0
     early_stop_metric: str = "ema_auc"
     early_stop_patience: int = 5  # valid 指标连续多少个 epoch 不提升就停；0 表示关闭早停
     loss: str = "bce"  # "bce"=BCEWithLogitsLoss；"asl"=Asymmetric Loss（自带重加权）
@@ -224,6 +234,16 @@ class TrainConfig:
     asl_clip: float = 0.05  # ASL 概率移位量 m：负样本概率先推低 m 再取对数
 
     def __post_init__(self) -> None:
+        if self.early_stop_monitor not in {None, "raw_auc", "ema_auc"}:
+            raise ValueError("train.early_stop_monitor 无效")
+        if self.early_stop_monitor == "ema_auc" and not self.ema_enabled:
+            raise ValueError("ema_auc 需要开启 EMA")
+        if self.cosine_end_epoch is not None and (isinstance(self.cosine_end_epoch, bool) or not isinstance(self.cosine_end_epoch, int) or self.lr_scheduler != "cosine" or not self.warmup_epochs + 2 <= self.cosine_end_epoch <= self.epochs):
+            raise ValueError("train.cosine_end_epoch 无效")
+        if not math.isfinite(self.mixup_alpha) or self.mixup_alpha < 0 or not math.isfinite(self.mixup_prob) or not 0 <= self.mixup_prob <= 1:
+            raise ValueError("Mixup 参数无效")
+        if self.mixup_prob and (self.mixup_alpha <= 0 or self.loss != "bce" or self.distill_enabled):
+            raise ValueError("Mixup 需要正 alpha、BCE 且不能蒸馏")
         if not math.isfinite(self.distill_weight) or self.distill_weight < 0:
             raise ValueError("train.distill_weight 必须是非负有限数")
         if self.distill_enabled and (self.loss != "bce" or not self.distill_cache):
@@ -328,6 +348,8 @@ class Config:
     device: str = "auto"  # auto / cpu / cuda / cuda:0 / mps
 
     def __post_init__(self) -> None:
+        if self.train.mixup_prob and (self.model.head != "standard" or self.model.aggregation != "view_weighted"):
+            raise ValueError("Mixup 需要 standard 分类头和 view_weighted 聚合")
         if self.train.distill_enabled and self.data.resplit.enabled:
             raise ValueError("蒸馏暂不支持 resplit")
         if self.seed < 0:

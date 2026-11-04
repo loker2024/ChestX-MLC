@@ -42,6 +42,11 @@
 
 - `19:13`（移除）`docs/cost_optimization_plan.md`、`docs/manual.md`、`docs/model_flow.md`、`docs/plan0.md`、`docs/superpowers/plans/2026-10-30-ensemble.md`、`docs/superpowers/plans/2026-10-30-freeze-classifier-head.md`、`docs/superpowers/plans/2026-10-31-patient-resplit.md`、`docs/superpowers/specs/2026-10-30-ensemble-design.md`、`docs/superpowers/specs/2026-10-30-freeze-classifier-head-design.md`、`docs/superpowers/specs/2026-11-03-cost-latency-optimization-design.md`：记录用户自行删除的文档，按当前工作区状态同步。
 
+- `19:17`（新增）`docs/20261104-train-plan-01.md`、`configs/exp_D006c.yaml`；（变更）`configs/exp_D006a.yaml`、`configs/exp_D006b.yaml`、`archive/train_plan29.md`（本地忽略归档）、`CHANGELOG.md`：制定 D-006-a/b/c 单模型三方向初筛计划，分别配置 DropPath 0.1、cosine 第 6 轮达到最低 LR、Study Mixup alpha 0.2 / 概率 0.3；统一 EMA AUC 早停、seed 42、8 轮上限 / patience 2，复用历史 D-002-a-EMA，不新增基线或早停对照。重分配原未启动蒸馏草案编号并标明历史入口失效，Distill-1 配置保留。计划明确新增字段、Mixup 多图与标签契约、调度序列、续训兼容和验证要求；当前仅完成计划与独立 YAML 草案，训练代码尚不支持新增字段，未启动 GPU 训练、未填写实验结果或表格。
+
+
+- `19:22`（新增）`src/train/study_mixup.py`、`tests/test_d006_contract.py`；（变更）`src/common/config.py`、`src/model/network.py`、`src/train/engine.py`、`src/run_train.py`、`configs/exp_D006a.yaml`、`configs/exp_D006b.yaml`、`configs/exp_D006c.yaml`、`docs/20261104-train-plan-01.md`：接入 D-006 的 DropPath、独立 cosine 终点、按视角配对的 study Mixup、EMA 早停及断点监控身份，并为三组强制检查预训练加载；旧早停配置沿用既有语义。GPU smoke 和正式训练尚未执行。
+
 ## 2026-11-03
 
 - `13:05`（新增）`docs/superpowers/specs/2026-11-03-cost-latency-optimization-design.md`：固化 `cost.py` 端到端耗时优化设计。保持 study 级计时、融合公式、submission 一致性和退出码不变，规划 study 内一次解码、按预处理签名共享批次、保守的逐模型前向与低开销写出，并定义错误边界、回归测试和 GPU 复测标准。

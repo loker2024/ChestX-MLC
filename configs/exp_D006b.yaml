@@ -1,5 +1,6 @@
-# D-006-b：离线蒸馏配对实验；训练 seed 42。
-# 独立完整配置；timm 架构不读取 xrv_weights。
+# D-006-b：cosine 第 6 轮到达最低学习率；seed 42。
+# 计划：docs/20261104-train-plan-01.md；完整独立配置，不使用 _base。
+# 本地实现已接入；正式训练前仍需完成计划规定的 GPU smoke 和环境核验。
 data:
   train:
     csv: data/train.csv
@@ -38,10 +39,9 @@ model:
   xrv_weights: densenet121-res224-all
   xrv_cache_dir: null
   xrv_sha256: null
+  drop_path_rate: 0.0
 train:
-  distill_enabled: true
-  distill_cache: outputs/distill/afuse5_train
-  distill_weight: 0.5
+  require_pretrained: true
   ema_enabled: true
   ema_decay: 0.999
   epochs: 8
@@ -63,6 +63,13 @@ train:
   asl_gamma_pos: 0.0
   asl_gamma_neg: 4.0
   asl_clip: 0.05
+  distill_enabled: false
+  distill_cache: null
+  distill_weight: 0.5
+  early_stop_monitor: ema_auc
+  cosine_end_epoch: 6
+  mixup_alpha: 0.0
+  mixup_prob: 0.0
 eval:
   batch_studies: 32
   threshold: 0.5

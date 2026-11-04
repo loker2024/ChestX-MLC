@@ -155,6 +155,7 @@ def _progress_from_checkpoint(checkpoint: dict[str, Any]) -> TrainProgress:
         best_state=extras["best_state"],
         history=[dict(record) for record in extras["history"]],
         stale_epochs=int(extras["stale_epochs"]),
+        monitor=extras.get("early_stop_monitor", (checkpoint.get("config", {}).get("train", {}).get("early_stop_metric", "raw_auc") if checkpoint.get("config", {}).get("train", {}).get("ema_enabled", False) else "raw_auc")),
         ema_state=extras.get("ema_state"),
         ema_best_auc=float(extras.get("ema_best_auc", float("nan"))),
         ema_best_epoch=int(extras.get("ema_best_epoch", 0)),
@@ -364,6 +365,7 @@ def _save_last_checkpoint(
             "best_state": progress.best_state,
             "history": progress.history,
             "stale_epochs": progress.stale_epochs,
+            "early_stop_monitor": progress.monitor,
             "rng_state": _capture_rng_state(device),
             "ema_state": progress.ema_state,
             "ema_best_auc": progress.ema_best_auc,
@@ -460,6 +462,8 @@ def run_training(
     )
     model = build_model(build_config).to(device)
     pretrained_loaded = bool(getattr(model, "pretrained_loaded", False))
+    if config.train.require_pretrained and checkpoint is None and init_from is None and not pretrained_loaded:
+        raise RuntimeError("预训练权重未加载，停止实验")
     if config.train.loss == "aucm" and checkpoint is None and init_from is None and config.model.pretrained and not pretrained_loaded:
         raise RuntimeError("AUCM 预训练权重未加载，停止实验")
     warm_metadata: dict[str, Any] | None = None
