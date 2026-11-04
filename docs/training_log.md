@@ -3316,7 +3316,8 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
   5. **软目标信息量有限。** b 的 `train_soft_loss` 由 epoch 1 的 0.5434 降到 epoch 5 的 0.4919、末轮回升至 0.5501，全程仅降 0.05 量级；同期 `train_hard_loss` 由 0.9787 降到 0.4439。软 BCE 下降幅度小且后程回升，与「教师即同分布同数据模型融合、软目标与硬标签高度一致」相符，也解释了为何蒸馏没有带来可测增益。
   6. **额外成本可忽略。** 两组耗时 34m29s 与 34m36s，差 7s；蒸馏只增加软目标 BCE 项，无额外前向，显存峰值仍在 3.96 / 4.35 GiB 量级。
 - 限制：教师软标签为 in-sample（学生训练集上的教师预测，非 OOF），教师本身也在同一 valid 上选型；单 seed、同一 valid 反复选型，bootstrap 只覆盖患者抽样、不覆盖训练随机性与选择偏差；未做 seed 2026 配对复核。结论限定为「本次单 seed、当前 λ/T 与 8 轮预算下蒸馏未带来可测增益」，不外推到其他温度、权重或更长预算。
-- 未执行：计划 §2.4 的教师 valid 原始预测逐 study 复算（与教师比较仍用 A-FUSE-5 历史 0.8171 / 0.8249）；seed 2026 配对复核；test 集学生预测与 `submission.csv`；学生 checkpoint 的 `cost.py` 耗时对比（无 T4，不能声明 T4 达标）。
+- 未执行：计划 §2.4 的教师 valid 原始预测逐 study 复算（与教师比较仍用 A-FUSE-5 历史 0.8171 / 0.8249）；seed 2026 配对复核；学生 checkpoint 的 `cost.py` 耗时对比（无 T4，不能声明 T4 达标）。
+- test 推理（2026-11-04 21:36，按用户要求补做）：用各 run 目录内 `config.yaml` 与 `best_ema.pt` 执行 `run_infer.py`，输出全部 10 类概率、未加阈值过滤。b-EMA 写 `outputs/submissionxx.csv`（归档 `outputs/predictions/submissions/submission_Distill-1-b-EMA.csv`，SHA-256 `f308adcf…58d6`），a-EMA 写 `outputs/submission_distill1a_EMA.csv`（归档 `submission_Distill-1-a-EMA.csv`，`79732388…8a62`）。校验：1,414 study / 14,140 行、每 study 覆盖 10 类、study 集合与 `data/test.csv` 完全一致、`Subject_id` 逐 study 匹配、无 NaN、概率范围 [0.0005, 0.9975]；a/b 逐类相关系数 0.938–0.981。仅生成文件，未上传平台（无官方得分）、未做耗时实测。
 - 产物：`outputs/20261104-135517_Distill-1-a/`、`outputs/20261104-142947_Distill-1-b/`（各含 `best.pt`、`best_ema.pt`、`last.pt`、`config.yaml`、`metrics.csv`、`train.log`、`tb/`、`tb_ema/`）、教师缓存 `outputs/distill/Distill-1_teacher/`、`outputs/predictions/valid/Distill-1-{a,b}-{EMA,raw}.csv`、`outputs/comparisons/Distill-1/{summary.md,per_class.csv,bootstrap.json}`、批次日志 `outputs/distill1_run/{runner.log,eval.log}`。
 
 ## 汇总
