@@ -3628,6 +3628,26 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 判读：**DropPath 0.1 没有可测增益，也没有明确损害。** 方向略负（−0.0019）但远小于单次 859-study macro-AUC 的 SE 0.0094，不能读成「DropPath 有害」。本轮早停依据改为 EMA AUC，且 EMA best epoch（5）与基线相同，两个 EMA 权重在第 5 轮的可比性较好；但单 seed、单次训练不能支持方法级结论，若继续该方向应改多 seed 配对，而不是在同一 valid 上继续调强度。
 - 产物：`outputs/20261104-193131_D-006-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-a-EMA.csv`、`D-006-a.csv`；`outputs/predictions/submissions/submission_D006a_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-a{,-EMA}.txt` 与 `outputs/eval_reports/D-006-a*-analysis.json`；`outputs/cost_reports/D-006-a-EMA.json`。本机副本已同步 `outputs/predictions/valid/` 与 `outputs/eval_reports/`。
 
+## D-006-b：cosine 第 6 轮到达最低学习率
+
+- 依据 [20261104-train-plan-01.md](20261104-train-plan-01.md)。唯一研究变量 `train.cosine_end_epoch` null→6：衰减分母由 `epochs-1-warmup=5` 改为 `6-1-2=3`，第 6 轮即到 `lr_min` 1e-5，第 7–8 轮保持。其余与 D-006-a 完全相同（含 `ema_auc` 早停、8 轮、patience 2、lr 3e-4、seed 42、drop_path 0）。逐轮 LR 用真实 optimizer/scheduler 连走 8 轮核验，与计划表 3.3 逐位一致：`0.000150 / 0.000300 / 0.000300 / 0.0002275 / 0.0000825 / 0.000010 / 0.000010 / 0.000010`，第 6–8 轮无反弹。
+- 执行（2026-11-04 20:14:57 启动，20:49:28 结束，**34m31s**，V100-SXM2-32G 独占）：实际训练 **7/8 轮**。第 5 轮（lr 8.25e-5）达到最好，第 6 轮（lr 1e-5）EMA 0.8102（stale 1）、第 7 轮 0.8074（stale 2）触发早停。
+- 结果：
+
+  | 组 | 权重 | best | 实际轮数 | macro-AUC | 9 类口径 | F1@0.5 | F1 峰位 / 峰值 | 耗时 |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+  | D-002-a-EMA（基线） | `best_ema.pt` | 5 | 7/8 | **0.8100** | 0.8196 | 0.4283 | 0.6 / 0.4422 | 34m57s |
+  | D-006-b | `best.pt` | 5 | 7/8 | 0.8071 | 0.8147 | 0.4425 | 0.6 / 0.4513 | 34m31s |
+  | D-006-b-EMA | `best_ema.pt` | 5 | 同 b | **0.8108** | 0.8189 | 0.4297 | 0.6 / 0.4491 | 同 b，不重复计 |
+
+- 显著性：EMA **Δ10 +0.0008 / Δ9 −0.0007**，患者整簇配对 bootstrap（2000 次、seed 2026、228 患者、2000/2000 有效）95% CI **[-0.0042, +0.0059]**、P(Δ>0)=0.635 → **完全不可分辨**，0.8108 不能读成「超过基线」。raw **Δ10 +0.0067 / Δ9 +0.0059**，CI **[-0.0025, +0.0158]**、P(Δ>0)=0.915，下界贴 0 但未跨 0——这是 D 系列单组相对基线最大的 raw 正向差，仍在单 seed 噪声边界上。
+- 逐类：EMA AUC `c1 .7380 / c2 .8422 / c3 .8030 / c4 .7606 / c5 .8749 / c6 .7941 / c7 .7879 / c8 .7248 / c9 .9024 / c10 .8802`，Δ `+0.0145 −0.0142 −0.0060 +0.0154 −0.0015 +0.0034 −0.0101 +0.0050 −0.0016 +0.0029`（6 升 4 降，无一项触 0.02 门）。raw Δ `+0.0137 +0.0118 +0.0041 +0.0407 +0.0027 +0.0057 −0.0096 −0.0065 −0.0016 +0.0056`，**class4 +0.0407 超过 0.02 逐类门**，class7 −0.0096 为最大跌幅。
+- **低 LR 保持阶段无增益（关键执行事实）**：第 6–7 轮 lr 均为 1e-5，EMA 0.8102 → 0.8074、raw 0.8054 → 0.8041，同期 train_loss 0.573 → 0.542 继续下降、valid_loss 0.921 → 0.982 上升，是过拟合而非「还没收敛」。因此本组的机制不是「更长的低 LR 训练」，而是**第 5 轮的 lr 位置**：b 的第 5 轮 lr 8.25e-5，a 为 2.0e-4，更早衰减使该轮权重优于 a 的同一轮（EMA 0.8108 vs 0.8082）。计划第 3.3 条要求「若 EMA 早停未进入第 6 轮，标注未充分观察低 LR 阶段」——本轮实际进入第 6、7 轮，观察到的是无增益，**不属观察不足**。
+- F1：raw 0.4425 / 峰值 0.6 的 **0.4513**、EMA 0.4297 / 峰值 0.6 的 **0.4491**，两组峰值均为本批（含 D-002/D-004）最高。但 F1 峰值只反映阈值处形态，不作为选型依据；AUC 侧 EMA 仅 +0.0008。
+- 耗时（`cost.py`，fp32，100 study / 162 图，3 轮）：**53.9 ms/study**（162 图折算 33.3 ms/图），0 个 study 与 submission 不一致，init 59.9 ms。与 D-006-a 的 54.5 ms 差 0.6 ms，属同机型重复测量的正常波动，不是配置差异（两组推理路径完全相同）。
+- 判读：**提前完成 cosine 使 EMA 权重持平、raw 权重小幅正向，均未越过证据门槛。** EMA 是主权重，+0.0008 落在噪声内；raw 的 +0.0067 与 class4 +0.0407 值得作为线索，但单 seed、单次训练、且 raw 不是本轮主权重。结论限于「8 轮、lr 3e-4、warmup 2」这一配方的初筛，不外推到更长预算或更小初始 lr；若要验证，应固定其余变量做 3 seed 配对，或把 `cosine_end_epoch` 与更小 lr/更长 warmup 组合后再测。
+- 产物：`outputs/20261104-201457_D-006-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-b-EMA.csv`、`D-006-b.csv`；`outputs/predictions/submissions/submission_D006b_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-b{,-EMA}.txt` 与 `D-006-b*-analysis.json`；`outputs/cost_reports/D-006-b-EMA.json`。本机副本已同步。
+
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 
 ## 环境
