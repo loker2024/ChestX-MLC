@@ -1,0 +1,36 @@
+{
+  "status": "approved",
+  "weight_sha256": "b137f0e2d744bbe1e82ad10ddb8dc938676cf04a4332eae66e45c2048ac09711",
+  "competition_use": true,
+  "redistribution": true,
+  "nc": false,
+  "gated": false,
+  "evidence": [
+    {
+      "path": "docs/pretrained/swinv2/TV_LICENSE.txt",
+      "sha256": "6502f676851cfe25f8af75531dfb32375b7325b73c37e7b43741fa422893e71d"
+    },
+    {
+      "path": "docs/pretrained/swinv2/TV_MODELS.txt",
+      "sha256": "d2ebddab57d902b26603ae25c238598b89a6c969afd8644a9fdfa0cc6d9d7b2c"
+    },
+    {
+      "path": "docs/pretrained/swinv2/TV_RECIPE.txt",
+      "sha256": "f7d92cb018bc38f609967d768c02899f678828b6dec2a68f10f2645b987f0c10"
+    },
+    {
+      "path": "docs/pretrained/swinv2/MS_LICENSE.txt",
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+    },
+    {
+      "path": "docs/pretrained/swinv2/user_confirmation.md",
+      "sha256": "647c7c290ecc93fd21507700f96d05df4f6f98215a0a648a435e52fae00b2172"
+    }
+  ],
+  "reason": "用户对当前指定权重明确确认许可，按既有项目用户确认机制采用；非独立核验主办方书面答复",
+  "review_basis": "explicit_user_confirmation_with_archived_public_source_evidence",
+  "reviewed_at": "2026-11-02T20:11:28.027984+08:00",
+  "prior_scope_note": "官方代码许可证与ImageNet来源已确认，具体TV权重再分发范围尚未闭环；微软MIT不能自动推广到TV另训文件",
+  "user_confirmation_path": "docs/pretrained/swinv2/user_confirmation.md",
+  "user_confirmation_sha256": "647c7c290ecc93fd21507700f96d05df4f6f98215a0a648a435e52fae00b2172"
+}
