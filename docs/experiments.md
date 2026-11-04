@@ -104,6 +104,8 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | D-005-b | `D-005-b` | `configs/exp_D005b.yaml`（完整展开） | 8（早停 2，实际 3） | 是 | 从 D-002-a BCE `best_ema.pt` warm start 后转 AUCM 微调；**失败**（原始 0.5411 / 0.0000，EMA 0.5825 / 0.0000，起点 0.8100 一个 epoch 掉到 0.5422） |
 | E-001 | `E-001` | `configs/exp_E001.yaml`（完整展开） | 8（早停 2，实际 5） | 是 | 换骨干 `efficientnetv2_rw_s.ra2_in1k` + EMA，320 档；已完成（原始 0.7970 / 0.4112，EMA 0.8038 / 0.4307，vs 基线 −0.0062 未过门） |
 | E-001-a | `E-001-a` | `configs/exp_E001a.yaml`（完整展开） | 8（早停 2，实际 3） | 是 | 同 E-001 骨干，`image.size` 320→384；已完成（原始 0.7865 / 0.4000，EMA 0.7969 / 0.4137，vs 基线 −0.0131，明显退化） |
+| Distill-1-a | `Distill-1-a` | `configs/exp_Distill1a.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | 固定融合教师离线蒸馏的配对基线：同代码、同预算、`distill_enabled: false`，seed 42；已完成（raw 0.7987 / 0.4351，EMA 0.8092 / 0.4339，9 类 0.8190） |
+| Distill-1-b | `Distill-1-b` | `configs/exp_Distill1b.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | 同 a 仅开 `distill_enabled: true`（λ=0.5、T=1，教师 A-FUSE-5 裁剪 logit 4:2:3 缓存）；已完成（raw 0.8024 / 0.4344，EMA 0.8109 / 0.4328，9 类 0.8172；vs a EMA +0.0017，CI [-0.0037, +0.0078] 跨 0，未达 +0.010） |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -756,6 +758,27 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   - **D-005-b 是定性证据**：起点 BCE-EMA 0.8100，一个 epoch 后 0.5422，第三轮 0.5000 → AUCM 的更新在破坏已收敛权重，问题在优化/损失侧而非初始化。
   - 根因未定，候选按可疑度：(a) PESG 的 lr 3e-4 相对 1157 步/epoch 过大，配合默认 `clip_value=1.0` 快速把权重带离预训练解；(b) `TaskPESG` 对 `a/b/alpha` 的逐类 mask 恢复在单类别 batch 下可能让 alpha 与动量状态累积偏差；(c) AUCM 需要更长预算与更小 lr，8 轮、3e-4 的初筛设置本身不匹配。三种假设均未验证。
   - **结论**：AUCM 在当前实现与初筛超参下不可用，不能作为提交候选；两组记为负结果，不构成「AUCM 方法无效」的证据。后续若继续，先固定 D-005-b 的 warm start 对 lr ∈ {3e-5, 1e-5} 做单变量对照，确认不塌缩后再看全程 AUCM。
+
+**Distill-1：固定融合教师离线蒸馏配对对照**（配置 `configs/exp_Distill1a.yaml`、`configs/exp_Distill1b.yaml`，产物 `outputs/20261104-135517_Distill-1-a`、`outputs/20261104-142947_Distill-1-b`，教师缓存 `outputs/distill/Distill-1_teacher`，2026-11-04）
+
+- 设计：依据 `train_plan29.md` / `train_plan30.md`。教师固定为 A-FUSE-5 的三模型裁剪 logit 4:2:3 融合（D-002-a `best_ema.pt`、C-005-c `best.pt`、E-001 `best.pt`），先把训练集 18,513 个 study 的软标签落盘并校验（study 集合、概率范围、三 checkpoint SHA-256、融合权重），再由学生读取；缓存为 in-sample 预测，不是 OOF。两份配置独立完整、无 `_base`，展开后唯一差异是 `train.distill_enabled`：a 关闭，b 开启（λ=0.5、T=1，软目标 BCE 不带 `pos_weight`）。学生同从 `convnext_tiny.fb_in1k` 初始化（确认已加载），seed 42、320、batch 16 studies、lr 3e-4、warmup 2、cosine 8 轮、patience 2、BCE + `pos_weight`、EMA 0.999。
+- 结果：
+
+  | 实验 | 权重 | best | 实际轮数 | 10 类 Macro-AUC | 9 类口径 | F1@0.5 | 训练耗时 |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | Distill-1-a | `best.pt` | 5 | 7/8 | 0.7987 | 0.8069 | 0.4351 | 34m29s |
+  | Distill-1-a-EMA | `best_ema.pt` | 4 | 同 a | 0.8092 | 0.8190 | 0.4339 | 同 a |
+  | Distill-1-b | `best.pt` | 5 | 7/8 | 0.8024 | 0.8069 | 0.4344 | 34m36s |
+  | Distill-1-b-EMA | `best_ema.pt` | 4 | 同 b | 0.8109 | 0.8172 | 0.4328 | 同 b |
+  | D-002-a-EMA（历史基线） | `best_ema.pt` | 5 | 7/8 | **0.8100** | 0.8196 | 0.4283 | 34m57s |
+
+- 判读：
+  - **主比较未达参考线。** b−a 的 EMA 10 类 Δ **+0.0017**，患者整簇配对 bootstrap（2,000 次、seed 2026、228 名患者、有效 2000/2000）95% CI **[-0.0037, +0.0078]**、P(Δ>0)=0.752；9 类 **−0.0018**、F1@0.5 **−0.0012**。未达 +0.010 优先复核参考线且 CI 跨 0，单 seed 下既不能判增益，也不能判等价。
+  - **与重跑噪声同量级**：a / b 的 EMA 相对 D-002-a-EMA 0.8100 为 −0.0008 / +0.0009，说明同配置换一次运行的波动已在 ±0.001；本次 Δ 不能与噪声区分。
+  - **增益集中在 class1**：逐类只有 c1 +0.0337（support 24），c2 −0.0118、c3 −0.0140；9 类口径由正转负，与 D-002 系列「组级提升靠 class1」的模式一致。
+  - **压缩损失点估计 0.006–0.008**：b-EMA 对教师 0.8171 / 0.8249 为 −0.0061（CI [-0.0125, +0.0009]）/ −0.0078；教师为 in-sample 三模型融合，单学生落后符合预期，但比较仅用历史记录值，不宣称非劣。
+  - **软目标信息量有限**：b 的 `train_soft_loss` 0.5434→0.4919（epoch 5）→0.5501（epoch 7），全程仅降 0.05 量级，而 `train_hard_loss` 0.9787→0.4439；软 BCE 后程回升与 valid_loss 上升同步，说明教师与硬标签高度一致、软标签未提供额外排序信息。
+- 限制：教师软标签为 in-sample 且教师也在同一 valid 上选型；单 seed；同一 valid 反复选型；bootstrap 不覆盖训练随机性与选择偏差；未做 seed 2026 配对、test 评估、教师 valid 独立复算与学生耗时对比。结论限于「当前 λ/T、8 轮预算、单 seed 下无可测增益」，不外推到其他温度、权重或更长训练。
 
 ## 冻结结论
 

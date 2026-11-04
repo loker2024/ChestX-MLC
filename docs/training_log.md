@@ -3291,6 +3291,34 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 未执行：`efficientnetv2_rw_s` 的 lr / 分辨率专项调参、384 档配更小 lr 或更大 batch 的变体、配对 bootstrap。
 
+## Distill-1：固定融合教师离线蒸馏配对实验
+
+- 依据 [train_plan29.md](train_plan29.md) 与 [train_plan30.md](train_plan30.md)。教师为 A-FUSE-5 的固定三模型融合：D-002-a `best_ema.pt`（sha256 `aeeb2106…f08`）、C-005-c `best.pt`（`1fb3b039…df`）、E-001 `best.pt`（`7d95b6d0…930`），各自按 checkpoint 配置做 study 聚合，再以裁剪后 logit 按 4:2:3 融合；学生训练集软标签来自 `outputs/distill/Distill-1_teacher/`（train split 18,513 studies，`cache_digest` `5d41fe72…eff28`、`predictions_sha256` `91bb6c41…baedf`、`manifest_sha256` `4d99cd2b…e5f50`、`train_csv_sha256` `3a07b4bb…f17`、`index_sha256` `9fbf9bce…a1b`），是 in-sample 预测而非 OOF。
+- 设计：两份独立完整配置、无 `_base`，展开后唯一差异是 `train.distill_enabled`（a 关闭、b 开启，λ=0.5、T=1，软目标为无 `pos_weight` 的 BCE）。学生均从 `convnext_tiny.fb_in1k` ImageNet 权重与新分类头开始（日志确认「预训练权重: 已加载」），seed 42、320、batch 16 studies、lr 3e-4、warmup 2、cosine 8 轮、`lr_min=1e-5`、patience 2，BCE + `pos_weight`，EMA decay 0.999，亮度/对比度 0.15，正位/侧位 0.7/0.3；早停按 raw valid Macro-AUC，`best_ema.pt` 取已训练轮次的 EMA 最优。
+- 环境与核验：autodl Tesla V100-SXM2-32G（32,768 MiB，driver 580.105.08），Python 3.12.3 / torch 2.10.0+cu128，代码版本 `529f9f1`（runner 记录 `dirty_files 60`，未提交内容为 cost 重构与 AUCM 改动，不涉及蒸馏路径）。缓存校验：study 集合与 train 18,513 完全一致，概率范围 [0.000244, 0.998769]，融合方式与权重、三 checkpoint SHA-256 与记录一致。两组训练前各做 2 batch GPU smoke：a loss 1.2095、b 1.4874（hard 1.1449 / soft 0.6850），均有限；显存峰值 3,956.2 / 4,352.3 MiB。计划 §2.4 要求的教师 valid 逐 study 复算未执行（见文末未完成项），与教师的比较使用既有 A-FUSE-5 记录值。
+- 执行：Distill-1-a 13:55:13–14:29:42（34m29s，7/8 轮早停）；Distill-1-b 14:29:42–15:04:18（34m36s，7/8 轮早停）；两组串行、无并行。
+- 结果：
+
+| 实验 | 权重 | 10 类 Macro-AUC | 9 类口径（c2–c10） | F1@0.5 | F1 峰位 / 峰值 | best epoch |
+| --- | --- | ---: | ---: | ---: | --- | ---: |
+| Distill-1-a | `best.pt`（raw） | 0.7987 | 0.8069 | 0.4351 | 0.5 / 0.4351 | 5 |
+| Distill-1-a-EMA | `best_ema.pt` | 0.8092 | 0.8190 | 0.4339 | 0.5 / 0.4445 | 4 |
+| Distill-1-b | `best.pt`（raw） | 0.8024 | 0.8069 | 0.4344 | 0.5 / 0.4344 | 5 |
+| Distill-1-b-EMA | `best_ema.pt` | 0.8109 | 0.8172 | 0.4328 | 0.5 / 0.4441 | 4 |
+| D-002-a-EMA（同口径历史基线） | `best_ema.pt` | 0.8100 | 0.8196 | 0.4283 | 0.6 / 0.4422 | 5 |
+| 教师 A-FUSE-5（valid，参考） | 三模型 logit 融合 | 0.8171 | 0.8249 | 0.4333 | 0.61 / 0.4526 | — |
+
+- 判读：
+  1. **主比较未达参考线，增益落在噪声内。** EMA 权重 b−a 的 10 类 Macro-AUC 为 **+0.0017**（患者整簇配对 bootstrap 95% CI [-0.0037, +0.0078]，P(Δ>0)=0.752，有效 2000/2000），低于 +0.010 优先复核参考线且 CI 跨 0；9 类口径 **−0.0018**（CI [-0.0062, +0.0032]）、F1@0.5 **−0.0012**（CI [-0.0068, +0.0056]）方向相反。按 2026-11-04 起的判读协议，这次单 seed 蒸馏既不能读作「有增益」，也不能读作「已证明等价」。
+  2. **+0.0017 与同口径重跑的波动同量级。** a 的 EMA 0.8092、b 的 0.8109 相对历史 D-002-a-EMA 0.8100 分别为 −0.0008 / +0.0009，说明同配置换一次训练的差异已在 ±0.001 量级；本次 b−a 的差落在该量级内，不构成蒸馏有效的证据。
+  3. **组级正向全部来自 class1。** 逐类 Δ 中只有 c1 **+0.0337**（support 24）明显为正，c2 **−0.0118**、c3 **−0.0140** 为负，其余多在 ±0.007 内；剔除 class1 后的 9 类口径由 +0.0017 翻为 −0.0018，与 D-002 系列反复出现的「增益集中 class1、9 类证伪」是同一模式。
+  4. **与教师的压缩损失点估计 0.006–0.008，CI 跨 0。** b-EMA 相对教师 A-FUSE-5 的 10 类为 **−0.0061**（CI [-0.0125, +0.0009]）、9 类 **−0.0078**；单学生低于三模型融合在预期内，但教师是 in-sample 预测且比较只用既有记录值，不能据此宣称学生非劣或教师增益可被压缩保留。
+  5. **软目标信息量有限。** b 的 `train_soft_loss` 由 epoch 1 的 0.5434 降到 epoch 5 的 0.4919、末轮回升至 0.5501，全程仅降 0.05 量级；同期 `train_hard_loss` 由 0.9787 降到 0.4439。软 BCE 下降幅度小且后程回升，与「教师即同分布同数据模型融合、软目标与硬标签高度一致」相符，也解释了为何蒸馏没有带来可测增益。
+  6. **额外成本可忽略。** 两组耗时 34m29s 与 34m36s，差 7s；蒸馏只增加软目标 BCE 项，无额外前向，显存峰值仍在 3.96 / 4.35 GiB 量级。
+- 限制：教师软标签为 in-sample（学生训练集上的教师预测，非 OOF），教师本身也在同一 valid 上选型；单 seed、同一 valid 反复选型，bootstrap 只覆盖患者抽样、不覆盖训练随机性与选择偏差；未做 seed 2026 配对复核。结论限定为「本次单 seed、当前 λ/T 与 8 轮预算下蒸馏未带来可测增益」，不外推到其他温度、权重或更长预算。
+- 未执行：计划 §2.4 的教师 valid 原始预测逐 study 复算（与教师比较仍用 A-FUSE-5 历史 0.8171 / 0.8249）；seed 2026 配对复核；test 集学生预测与 `submission.csv`；学生 checkpoint 的 `cost.py` 耗时对比（无 T4，不能声明 T4 达标）。
+- 产物：`outputs/20261104-135517_Distill-1-a/`、`outputs/20261104-142947_Distill-1-b/`（各含 `best.pt`、`best_ema.pt`、`last.pt`、`config.yaml`、`metrics.csv`、`train.log`、`tb/`、`tb_ema/`）、教师缓存 `outputs/distill/Distill-1_teacher/`、`outputs/predictions/valid/Distill-1-{a,b}-{EMA,raw}.csv`、`outputs/comparisons/Distill-1/{summary.md,per_class.csv,bootstrap.json}`、批次日志 `outputs/distill1_run/{runner.log,eval.log}`。
+
 ## 汇总
 
 | run | 配置 | 关键差异 | epochs | best_epoch | macro-AUC | F1@0.5 | 耗时 | 结论 |
