@@ -48,6 +48,7 @@
 
 
 - `19:22`（新增）`src/train/study_mixup.py`、`tests/test_d006_contract.py`；（变更）`src/common/config.py`、`src/model/network.py`、`src/train/engine.py`、`src/run_train.py`、`configs/exp_D006a.yaml`、`configs/exp_D006b.yaml`、`configs/exp_D006c.yaml`、`docs/20261104-train-plan-01.md`：接入 D-006 的 DropPath、独立 cosine 终点、按视角配对的 study Mixup、EMA 早停及断点监控身份，并为三组强制检查预训练加载；旧早停配置沿用既有语义。GPU smoke 和正式训练尚未执行。
+- `20:20`（变更）`docs/experiments.md`、`docs/training_log.md`、`docs/20261104-train-plan-01.md`：回填 D-006-a（DropPath 0.1）。`experiments.md` 矩阵新增 D-006-a 一行，冻结结论之前新增「D-006：单模型 AUC 三方向初筛」小节并写入 a 的设计、结果、实现核验、判读与结论；`training_log.md` 在 T-001 之后新增 `## D-006-a` 小节，记录完整结果表、显著性、逐类 Δ、耗时口径与产物；`train_plan-01.md` 状态改为「a 已完成、b 训练中、c 待启动」。核心数据：raw 0.8009 / 0.4331（best 6）、EMA 0.8082 / 0.4271（9 类 0.8185，best 5），7/8 轮早停、34m15s；相对 D-002-a-EMA Δ10 −0.0019 / Δ9 −0.0012，患者整簇配对 bootstrap（2000 次、seed 2026、228 患者、2000/2000 有效）CI [-0.0082, +0.0055]、P(Δ>0)=0.330 跨 0；逐类最大跌幅 class3 −0.0142、最大涨幅 class6 +0.0102，均未触 0.02 门；`cost.py` fp32 54.5 ms/study（100 study / 162 图、0 个 study 不一致、init 59.1 ms）；DropPath 实模块核验 17 块概率 0.0059–0.1000、eval 前向确定性一致。
 
 ## 2026-11-03
 

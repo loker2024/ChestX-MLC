@@ -3609,6 +3609,25 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 
 
+## D-006-a：DropPath 0.1（EMA 早停口径）
+
+- 依据 [20261104-train-plan-01.md](20261104-train-plan-01.md)。本批三组（a/b/c）共同把早停依据从历史 D-002-a 的 raw AUC 改成 **EMA AUC**（`train.early_stop_monitor: ema_auc`），其余保持 D-002-a 口径：`convnext_tiny.fb_in1k` 预训练（日志确认已加载）、320 letterbox、hflip 关闭、batch 16 studies、AdamW lr 3e-4、warmup 2、BCE + `pos_weight`、EMA 0.999、8 轮上限、patience 2、seed 42。a 组唯一研究变量是 `model.drop_path_rate` 0→0.1。
+- 执行（2026-11-04 19:31:31 启动，autodl V100-SXM2-32G 独占，20:05:46 结束，**34m15s**）：`PYTHONPATH` 无覆盖，`HF_HUB_OFFLINE` 下命中 `convnext_tiny.fb_in1k` 缓存。实际训练 **7/8 轮**，第 6 轮 EMA 0.8065（stale 1）、第 7 轮 0.8054（stale 2）触发早停。首轮含数据索引与冷缓存约 12 分钟，其后约 3.5–4 分钟/轮。
+- 实现核验：17 个残差块的 `drop_path` 概率 **0.0059–0.1000**（timm 线性递增），`eval()` 下同一输入两次前向 `allclose=True`，输出 `[2,10]`；说明 0.1 确实落到了 ConvNeXt 残差块，不是只写在 YAML 里。
+- 结果：
+
+  | 组 | 权重 | best | 实际轮数 | macro-AUC | 9 类口径 | F1@0.5 | F1 峰位 / 峰值 | 耗时 |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+  | D-002-a-EMA（基线） | `best_ema.pt` | 5 | 7/8 | **0.8100** | 0.8196 | 0.4283 | 0.6 / 0.4422 | 34m57s |
+  | D-006-a | `best.pt` | 6 | 7/8 | 0.8009 | 0.8055 | 0.4331 | 0.6 / 0.4404 | 34m15s |
+  | D-006-a-EMA | `best_ema.pt` | 5 | 同 a | **0.8082** | 0.8185 | 0.4271 | 0.7 / 0.4403 | 同 a，不重复计 |
+
+- 显著性：EMA 相对基线 **Δ10 −0.0019 / Δ9 −0.0012**，患者整簇配对 bootstrap（2000 次、seed 2026、228 患者、**2000/2000 有效**）95% CI **[-0.0082, +0.0055]**、P(Δ>0)=0.330 → **跨 0，不可分辨**。raw 侧 Δ +0.0005 / 9 类 −0.0033，同样落在噪声内。
+- 逐类（EMA，c1→c10）：AUC `.7154 .8485 .7947 .7544 .8785 .8010 .7922 .7185 .9027 .8756`；相对基线 Δ `−0.0081 −0.0079 −0.0142 +0.0092 +0.0022 +0.0102 −0.0058 −0.0013 −0.0012 −0.0017`。最大跌幅 class3 −0.0142、最大涨幅 class6 +0.0102，均未触 0.02 逐类门；7 降 3 升，没有集中在某一类。class4（68 正）与 class8（214 正）这两个历史弱项分别 +0.0092 / −0.0013，无改善。
+- 耗时（`cost.py`，fp32，100 study / 162 图，batch=1 以 study 为单位，连续 3 轮）：**54.5 ms/study**（162 图折算 33.6 ms/图），0 个 study 与 submission 不一致，init 59.1 ms，1 个模型。DropPath 只在训练期生效，推理未增加耗时——与 D-002-a 同参数量级，54.5 ms 也验证了这一点。
+- 判读：**DropPath 0.1 没有可测增益，也没有明确损害。** 方向略负（−0.0019）但远小于单次 859-study macro-AUC 的 SE 0.0094，不能读成「DropPath 有害」。本轮早停依据改为 EMA AUC，且 EMA best epoch（5）与基线相同，两个 EMA 权重在第 5 轮的可比性较好；但单 seed、单次训练不能支持方法级结论，若继续该方向应改多 seed 配对，而不是在同一 valid 上继续调强度。
+- 产物：`outputs/20261104-193131_D-006-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-a-EMA.csv`、`D-006-a.csv`；`outputs/predictions/submissions/submission_D006a_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-a{,-EMA}.txt` 与 `outputs/eval_reports/D-006-a*-analysis.json`；`outputs/cost_reports/D-006-a-EMA.json`。本机副本已同步 `outputs/predictions/valid/` 与 `outputs/eval_reports/`。
+
 判读口径：先看 macro-AUC（不受阈值影响）；再看 `f1@0.5` 与整条阈值曲线（`run_compare` 的 `summary.md`）；`pos_weight` 只有在多数类同时不退化时才算有效。
 
 ## 环境
