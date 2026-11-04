@@ -193,8 +193,8 @@ python src/run_infer.py --config configs/default.yaml --checkpoint outputs/<fina
 
 产出：
 
-- `python src/cost.py <submission.csv> <pictures_100> <pictures_5>`：5 张预热后对 100 张图 `batch=1` 串行跑 3 轮并测量写出；涉及多图 study 时，单图候选结果不等于最终聚合结果，不能据此判定最终耗时，详见 `docs/cost.md`。
-- 复用 `infer.predict` 的 `load_checkpoint_model` / `build_eval_inference_transform` / `predict_image` / `predict_study`，保证与 `run_infer.py` 同一套推理与聚合逻辑；计时后用 `predict_study` 聚合现场预测并与 `submission.csv` 比对。
+- `python src/cost.py <submission.csv> <pictures_100> <pictures_5>`：5 个预热 study 后，对 100 个 study 以 `batch=1`（以 study 为单位）串行跑 3 轮并测量写出；一次检查的全部图片同批前向，单次计时覆盖解码、预处理、前向、聚合、后处理与逐图写出，详见 `docs/cost.md`。
+- 复用 `infer.predict` 的 `load_checkpoint_model` / `build_eval_inference_transform` / `predict_study_images` / `predict_study`，保证与 `run_infer.py` 同一套推理与聚合逻辑；计时后用现场算出的 study 概率与 `submission.csv` 比对。多模型提交需同时加载全部权重并按 `infer.ensemble` 的公式融合。
 - 支持 `--precision fp16`（FP16 须在提交说明中声明）、`--report` 写出 JSON 明细；退出码 0 成功、1 超限或不一致、2 参数/文件/配置错误。
 
 验收：
@@ -204,7 +204,7 @@ python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictu
 python -m pytest -q tests/test_cost.py
 ```
 
-期望（在赛题指定硬件、加载最终权重后执行）：平均单张耗时 ≤100 ms，退出码 0，`[CONCLUSION]` 里与 `submission.csv` 不一致为 0。正式成绩以赛题服务器实测为准，本地数字只用于链路验证。
+期望（在赛题指定硬件、加载最终权重后执行）：单 study 平均耗时 ≤100 ms，退出码 0，`[CONCLUSION]` 里与 `submission.csv` 不一致为 0。正式成绩以赛题服务器实测为准，本地数字只用于链路验证。
 
 ## 测试映射
 
@@ -216,7 +216,7 @@ python -m pytest -q tests/test_cost.py
 | P5 | `test_engine.py` / `test_resume.py` | 单 epoch 参数更新与 loss 有限、warmup、早停、评估指标、全 NaN AUC 报错；断点续训的进度与学习率衔接、CLI 补跑剩余 epoch |
 | P6 | `test_submission.py` / `test_pipeline.py` | 列名与顺序、study 全覆盖、概率范围、阈值范围、缺列报错、端到端闭环 |
 | P7 | `test_config.py` / `test_utils.py` / `test_run_train.py` / `test_run_compare.py` | 配置校验与 `_base` 继承、种子/设备/运行目录、训练 CLI 产物与日志、run 对比表 |
-| P8 | `test_cost.py` | 图片发现与 `<subject_id>/<study_id>` 解析、提交文件列名/取值/重复校验、阈值选择、study 预测比对、计时统计算术与超限、`predict_image`/`predict_study` 与 `predict_loader` 数值一致、CLI 端到端与退出码 |
+| P8 | `test_cost.py` | 图片发现与 `<subject_id>/<study_id>` 解析、study 分组与多图同批、视角元数据、提交文件列名/取值/重复校验、阈值选择、study 预测比对、计时统计算术与轮级 IO 分摊、单模型/多模型融合、`predict_image`/`predict_study_images` 与 `predict_loader` 数值一致、预热不相交、CLI 端到端与退出码 |
 
 ## 退出标准
 
@@ -224,7 +224,7 @@ python -m pytest -q tests/test_cost.py
 - `check_data.py --full` 全部检查通过。
 - valid 上记录至少一组可复现的 macro-AUC / macro-F1。
 - 提交文件通过 `validate_submission`，格式与赛题要求一致。
-- 在赛题指定硬件上运行 `cost.py` 并记录一致性；多图 study 的最终耗时需确认主办方口径后复测，最终以主办方结果为准。
+- 在赛题指定硬件上运行 `cost.py` 并记录一致性；按 2026-11-03 官方答疑的 study 级口径复测，最终以主办方结果为准。
 
 ## 备注
 

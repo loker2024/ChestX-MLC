@@ -47,7 +47,7 @@ python src/cost.py outputs/submission.csv data/cost/pictures_100 data/cost/pictu
 
 `run_infer.py` 默认输出全部 10 类概率；需要按阈值过滤时加 `--threshold 0.5`（阈值必须在 `[0, 1]`）。
 
-`cost.py` 对 100 张图 `batch=1` 串行跑 3 轮并校验与 `submission.csv` 的一致性；单图结果计时包含写出，多图 study 的最终聚合耗时无法按现有规则明确判定。它依赖配置中的完整测试集索引补齐图片，参数与限制见 `docs/cost.md`；`--precision fp16` 时须在提交说明中声明。
+`cost.py` 以单个 study 为最小计时单元（`batch=1` 以 study 为单位，一次检查的全部图片同批前向），连续 3 轮，先对每个 study 取均值、再对全部 study 取平均，与 100 ms 比较；单次计时覆盖解码、预处理、前向、study 聚合、后处理与逐图写出，文件打开/写入/flush/关闭全部计入（每轮只开一次预测文件）。5 个预热 study 不计入成绩且必须与计时 study 不相交；初始化只允许 CSV 元数据、study 分组与路径索引，打印 `init_ms` 并受自设上限校验。提交为多模型融合时须随包提供 `cost_ensemble.json`（权重与融合方式），模型使用 `view_weighted` 时须提供 `cost_views.csv`，否则会低估耗时或无法复现 `submission.csv`。参数与限制见 `docs/cost.md`；`--precision fp16` 时须在提交说明中声明。
 
 ## 编码风格与命名
 

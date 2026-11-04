@@ -86,7 +86,7 @@ outputs/
 |---|---|---|
 | `predict.py` | 加载 checkpoint 对 loader / 单图 / 单 study 推理，聚合为 study 级概率；`predict_loader`、`predict_image`、`predict_study` 共用内部前向 | `load_checkpoint_model(config, path, device)`、`build_eval_inference_transform(config)`、`predict_loader(model, loader, device, config=None) -> pd.DataFrame`（`Study_id, p1..p10`）、`predict_image(model, image_path, transform, device) -> np.ndarray`（单图，计时用）、`predict_study(model, image_paths, transform, device) -> np.ndarray`（study 聚合，一致性校验用） |
 | `submission.py` | 生成提交表、格式与取值校验、UTF-8 写出；阈值必须在 `[0, 1]` | `build_submission_frame(predictions, study_subjects, threshold=None)`、`validate_submission(path, test_csv, require_all_classes=True)`、`write_submission(df, path)` |
-| `profiling.py` | 耗时评测的可测口径：图片发现与身份解析、提交文件读取校验、阈值选择、study 预测比对、计时统计与结论格式化；不含 `torch` | `COST_LIMIT_MS` / `DEFAULT_ROUNDS` / `DEFAULT_WARMUP_IMAGES` / `DEFAULT_TOLERANCE`、`list_images`、`parse_image_identity`、`group_images_by_study`、`read_submission`、`select_prediction_rows`、`compare_study_predictions`、`summarize_timings`、`format_conclusion` |
+| `profiling.py` | 耗时评测的可测口径：图片发现与身份解析、study 分组、视角元数据解析、提交文件读取校验、阈值选择、study 预测比对、计时统计与结论格式化；不含 `torch` | `COST_LIMIT_MS` / `DEFAULT_ROUNDS` / `DEFAULT_WARMUP_STUDIES` / `DEFAULT_TOLERANCE`、`COST_OUTPUT_COLUMNS`、`list_images`、`parse_image_identity`、`group_images_by_study`、`build_study_jobs`、`read_view_map`、`read_submission`、`select_prediction_rows`、`compare_study_predictions`、`summarize_timings`、`format_conclusion` |
 | `aggregation_compare.py` | 聚合空间对照：逐图 logits 缓存导出（含元数据与 SHA-256 指纹）、缓存校验、G0/G1 配对重算与报告；支持 `mean` 与 `view_weighted` 两种聚合，正位权重可覆盖；`compare` 不加载模型、不读图片 | `aggregate_pair(logits, offsets, views=None, frontal_weight=0.7) -> (g0, g1)`、`export_run(run_dir, out_dir, device, frontal_weight=None)`、`load_cache(cache_dir, verify_hash=True)`、`compare_cache(cache_dir, thresholds, frontal_weight=None)` |
 
 ### 3.6 入口脚本
@@ -101,7 +101,7 @@ outputs/
 | `run_ensemble.py` | 多模型融合入口：`--fusion probability`（默认，概率平均）或 `logit`（先平均 study 级 logits 再 sigmoid），按 `Study_id` 对齐后写提交或验证报告 |
 | `run_aggregation_compare.py` | 聚合空间对照入口：`export` 导出固定 checkpoint 的逐图 logits 缓存，`compare` 离线重算 G0（logits 平均后 sigmoid）与 G1（逐图 sigmoid 后平均），只读缓存、不加载模型。设计见 [train_plan_aggregation.md](train_plan_aggregation.md) |
 | `backfill_ema_tb.py` | 补面板入口：按 `metrics.csv` 的 `ema_valid_*` 列给历史 run 生成独立的 `tb_ema/` 面板（tag 与 `tb/` 同名），新建 `.ema_backfill` 事件文件、不动原文件；已有曲线时跳过，`--force` 重写，并清理旧版误写进 `tb/` 的补写文件。用法见 [manual.md](manual.md)「查看训练曲线」 |
-| `src/cost.py` | 耗时自检与提交一致性检查；多图 study 的最终耗时须等待官方明确口径。调用方式、索引降级行为和限制见 [cost.md](cost.md) |
+| `src/cost.py` | 耗时自检与提交一致性检查：以单个 study 为计时单元、多图同批前向，支持多模型融合与视角元数据；初始化打印 `init_ms`、5 个预热 study 不计入成绩。调用方式与限制见 [cost.md](cost.md) |
 
 入口脚本只做参数解析与流程编排，不包含业务逻辑。
 
@@ -123,7 +123,7 @@ outputs/
 4. `train.engine` 按 `train.loss` 以 BCE（可选 `pos_weight`）或 ASL 训练，按 valid macro-AUC 保存最优权重；训练结束后 `run_train` 用 fp32 前向对最优权重复评一次（`evaluate(use_amp=False)`），复评指标写入 `metrics.csv` 的 `*_fp32` 列与 `best.pt` 的 `metrics`。
 5. `infer.predict` 加载 checkpoint，输出 `Study_id + p1..p10`。
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
-7. `src/cost.py` 加载同一份 checkpoint 与配置，按单图串行计时，并在完整测试索引可用时补齐 study 检查提交一致性；多图 study 无法据此判定最终耗时，详见 [cost.md](cost.md)。
+7. `src/cost.py` 加载提交实际使用的单模型或融合权重，按 study 串行计时（一次检查的全部图片同批前向），单次计时覆盖解码、预处理、前向、聚合、后处理与逐图写出；每轮只开一次预测文件，文件 IO 全部计入，最后与 `submission.csv` 比对。详见 [cost.md](cost.md)。
 
 每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。
 

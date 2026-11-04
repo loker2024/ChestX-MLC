@@ -880,8 +880,14 @@ python src/run_ensemble.py --checkpoint outputs/<run_a>/best.pt outputs/<run_b>/
 
 ## 可选 EMA 与 Study 注意力聚合
 
-两个功能默认关闭，旧配置与 checkpoint 无需修改。示例配置分别为 `configs/example_ema.yaml` 和 `configs/example_study_attention.yaml`；示例独立于默认配置，训练前确认数据路径。
+EMA 默认启用，Study 注意力聚合默认关闭。示例配置分别为 `configs/example_ema.yaml` 和 `configs/example_study_attention.yaml`；示例独立于默认配置，训练前确认数据路径。
 
-EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，并在 TensorBoard 里单独写一个 `<run>/tb_ema` 面板（tag 与 raw 同名，可与 `tb/` 同图对比），早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
+EMA 默认启用：未填写 `train.ema_enabled` 的配置也会启用，设为 `false` 可关闭；`train.ema_decay` 默认 `0.999`。旧断点若没有该字段，续训时按历史默认值 `false` 恢复；如需指定续训配置，也须显式设为 `false`。EMA 使用 `train.ema_enabled: true`、`train.ema_decay: 0.999`（范围 `[0, 1)`）；每次成功的优化器更新后更新平均权重，浮点缓冲区也参与平均，整数缓冲区直接复制。逐轮记录 `ema_valid_loss`、`ema_valid_macro_auc`、`ema_valid_macro_f1`，并在 TensorBoard 里单独写一个 `<run>/tb_ema` 面板（tag 与 raw 同名，可与 `tb/` 同图对比），早停仍只依据 raw AUC。`best.pt` 为 raw 最优并进行 fp32 复评，`best_ema.pt` 为 EMA 最优并独立 fp32 复评；`last.pt` 保存 EMA 当前状态、更新次数及最优快照以支持续训。两次独立选最优仍存在验证集选点偏差。EMA 会增加模型内存及每轮验证耗时。
 
 `model.aggregation: study_attention` 使用图像特征和视角嵌入进行 study 内 gated attention，然后复用标准分类头；目前仅支持 `timm` 的 `convnext_tiny.fb_in1k`、标准头、全量微调、`dropout: 0`。单张图自然获得权重 1，未知视角使用独立嵌入；训练和推理使用相同前向。该模式不使用 `frontal_weight`，也不支持 G0/G1 聚合对照导出；设置 `head_lr` 时，注意力模块归入骨干学习率参数组。推理须使用对应 checkpoint 配置。GPU 显存、耗时和效果须实测。
+
+## 固定融合教师离线蒸馏
+
+实验配置 `configs/exp_D006a.yaml` / `configs/exp_D006b.yaml` 分别关闭和启用蒸馏，完整操作、权重核验与比较口径见 [train_plan29.md](train_plan29.md)。使用 `python src/run_distill_teacher.py --checkpoint <D-002-a-EMA> <C-005-c> <E-001> --out outputs/distill/afuse5_train` 为原 train split 生成固定 A-FUSE-5 软标签；目录必须不存在。`train.distill_enabled` 默认为 `false`，启用后仅支持 BCE 和原始划分，`train.distill_cache` 指向缓存目录，`train.distill_weight` 默认 0.5。训练在 study 级 logits 上将原有标签损失与未加类别权重的软目标 BCE 相加，缓存及训练 CSV、study/视角索引不匹配或续训缓存变化时直接中止。教师训练样本预测存在 in-sample 偏差，验证集没有用于蒸馏训练；实际性能和目标 GPU 耗时须另行验证。
+
+首次蒸馏实验统一使用 [Distill-1 计划](train_plan30.md)及 `configs/exp_Distill1a.yaml` / `configs/exp_Distill1b.yaml`；原 D-006 配置保留为实现阶段的历史草案，不单独启动。
