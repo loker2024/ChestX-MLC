@@ -148,3 +148,38 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），包含 `Subject_id`、`Study_id`、`Predict_class`、`Probability` 四列；概率范围 0.001919–0.996157；训练环境内已通过 `validate_submission` 校验。
 - SHA-256：`dcd6e4b5eb2097e418be565a99027b89545941a254e96786146093e7f3bdf6ab`。
 - 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地；训练环境 `/root/ChestX-MLC/outputs/ensemble/test_w111/` 保留原始文件名 `submission.csv`，本机改名后的文件与其 md5 一致（`5ebf49b66fef87dca0e1eef8462c58ed`），与 ENSEMBLE-3M 的 test 文件内容不同。
+
+## D-002-a-EMA（单模型）
+
+来源：本项目训练产物，未重新训练；checkpoint 内嵌完整训练配置，推理时直接以该配置为准。
+
+### 实验名称
+
+单模型提交：ConvNeXt-Tiny（`convnext_tiny.fb_in1k`）@320，`view_weighted` 正位权重 0.7，EMA 权重（decay 0.999）。
+
+### 实验性能
+
+验证集 Study 级 Macro-AUC **0.8100**、Macro-F1@0.5 **0.4283**（859 个 study）；阈值扫描峰值在 0.6，Macro-F1 0.4422。9 类口径 Macro-AUC **0.8196**。最佳 EMA 权重取自第 5 轮（训练上限 8 轮、早停 patience 2，实际 7 轮完训，34m57s）。
+
+### 实验参数
+
+- 模型与权重：`outputs/20261102-145203_D-002-a/best_ema.pt`（与 A-FUSE-5 成本测试所用同一权重，md5 `e97524bb…`）。
+- 训练口径：seed 42、`train.ema_enabled: true` + decay 0.999、lr 3e-4、warmup 2、cosine 至 1e-5、weight decay 0.01、`pos_weight: true`、batch_studies 16、BCE。
+- 推理口径：`image.size: 320`、letterbox、ImageNet 归一化、无 hflip；不设 `--threshold`，输出每个 study 全部 10 类概率。
+
+生成命令（在训练环境 `/root/ChestX-MLC` 执行）：
+
+```bash
+HF_HUB_OFFLINE=1 .venv/bin/python src/run_infer.py \
+  --config outputs/20261102-145203_D-002-a/config.yaml \
+  --checkpoint outputs/20261102-145203_D-002-a/best_ema.pt \
+  --out outputs/submission_D-002-a-EMA/submission.csv
+```
+
+### 提交记录
+
+- 状态：已生成本地文件，**未提交官方平台**。
+- 提交文件：[submission_D-002-a-EMA.csv](outputs/predictions/submissions/submission_D-002-a-EMA.csv)。
+- 文件内容：1,414 个 study、14,140 条预测（136 个 subject），每 study 恰好 10 类；列名 `Subject_id`、`Study_id`、`Predict_class`、`Probability`；概率范围 0.000679–0.997329；无缺失；test study 集合与 `data/test.csv` 完全一致。
+- SHA-256：`d28a872b852335e5b823e3468e2be8029b58f22b6beb6520e44224c1d5c45f29`；md5 `47c597ba59ba02a7497ab940b3f311bf`（与本机下载文件一致）。
+- 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地；训练环境 `/root/ChestX-MLC/outputs/submission_D-002-a-EMA/submission.csv` 保留原始文件名。
