@@ -1,6 +1,7 @@
-# D-008-c：ConvNeXt V2-Tiny fcmae_ft_in1k 研究性教师候选，seed 42。
-# 官方预训练权重为 CC-BY-NC；赛题禁止 NC 权重，研究结果不可视为合规参赛方案。
-# 完整独立配置；EMA AUC 早停、要求预训练加载成功。
+# D-008-c：ConvNeXt-Large fb_in1k 教师候选，seed 42。
+# 基于历史 D-002-a 训练口径，但早停改用 EMA AUC：导出权重是 best_ema.pt，按 EMA 挑轮次才自洽。
+# 注意与 D-002-a（raw AUC 早停）不同口径，不宜直接做「仅换骨干」的单变量对照。要求预训练加载成功。
+# 完整独立配置，不使用 _base。
 data:
   train:
     csv: data/train.csv
@@ -25,7 +26,7 @@ image:
   brightness: 0.15
   contrast: 0.15
 model:
-  backbone: convnextv2_tiny.fcmae_ft_in1k
+  backbone: convnext_large.fb_in1k
   pretrained: true
   num_classes: 10
   dropout: 0.0
