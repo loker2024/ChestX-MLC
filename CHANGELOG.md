@@ -44,6 +44,8 @@
 
 - `23:20`（新增）`outputs/ensemble/test_fuse4_k4_790_800/cost_ensemble.json`、`cost_views.csv`（均被 Git 忽略）：补齐多模型提交的必需件。清单写 `fusion: probability`、`weights: [1,1,1,1]`、四个 checkpoint 用相对清单目录的路径（`../../<run>/best_ema.pt`），**不带 `--checkpoint` 复测通过：94.3 ms、一致性 100/100 study、`cost_views.csv` 自动识别生效**（报告 `cost_run/k4_790_800/cost_report_manifest.json`）。`cost_views.csv` 由 `data/test.csv` 抽 `Study_id/Dicom_id/ViewPosition` 三列生成，2,218 行 / 1,414 study；四个成员均为 `view_weighted` 聚合，缺此文件会回退等权均值并使一致性失败。首次尝试把 checkpoint 写成相对仓库根的路径导致解析到清单同级目录（`[ERROR] 模型权重不存在`），按清单目录解析才是正确口径。
 
+- `23:30`（变更）`docs/experiments.md`、`~/Desktop/loker_exp.xlsx`（表格在仓库外，**不提交 Git**）：补 A-FUSE-6 的记录。experiments.md 在实验矩阵表加一行（第 78 行，列数与邻行一致 6 列）、在执行小节加「A-FUSE-6：25 项池的 k=2..5 全穷举与 k=4 等权融合提交」一节（置于 A-FUSE-5 耗时优化之后、C-001 之前），含目的、搜索规模、结果、判读、对比、产物、耗时、限制八项。实验表格「A系列实验」sheet 同步追加第 34 行（A-FUSE-6），走 OOXML 直改：仅 `xl/worksheets/sheet2.xml` 与 `xl/sharedStrings.xml` 变化、其余 22 个 zip 条目字节完全不变（`count` 524→528、`uniqueCount` 504→508、dimension `A1:H33`→`A1:H34`、mergeCells 94→97，新增 A34:B34 / C34:D34 / E34:G34），新行沿用第 33 行样式 `11,4,11,4,11,3,4,11` 与 `ht=240 customHeight=1`；`xmllint --noout` 通过、Excel 只读打开读回 A33/A34/C34/E34/H34 正常、A35 为空、无修复提示。表格备份 `/tmp/loker_exp.bak_*.xlsx`。
+
 ## 2026-11-05
 
 - `23:10`（变更）`Submission.md`：新增「D-002-a-EMA（单模型）」提交记录。用 `outputs/20261102-145203_D-002-a/best_ema.pt`（md5 `e97524bb…`，与 A-FUSE-5 成本测试同一权重）在 test 上推理，`run_infer.py` 不设阈值、每 study 输出全部 10 类概率，生成 1,414 study / 14,140 行、概率 0.000679–0.997329、test study 集合完全覆盖、无缺失；文件归档为 `outputs/predictions/submissions/submission_D-002-a-EMA.csv`（SHA-256 `d28a872b…`、md5 `47c597ba…`，与远端一致），**尚未提交官方平台**。另记录 valid Study 级 Macro-AUC 0.8100 / F1@0.5 0.4283、9 类 0.8196、EMA best epoch 5 与完整生成命令。
