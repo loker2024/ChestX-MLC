@@ -183,3 +183,44 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_infer.py \
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），每 study 恰好 10 类；列名 `Subject_id`、`Study_id`、`Predict_class`、`Probability`；概率范围 0.000679–0.997329；无缺失；test study 集合与 `data/test.csv` 完全一致。
 - SHA-256：`d28a872b852335e5b823e3468e2be8029b58f22b6beb6520e44224c1d5c45f29`；md5 `47c597ba59ba02a7497ab940b3f311bf`（与本机下载文件一致）。
 - 文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地；训练环境 `/root/ChestX-MLC/outputs/submission_D-002-a-EMA/submission.csv` 保留原始文件名。
+
+## A-FUSE-6（k=4 等权，穷举选出）
+
+来源：本项目训练产物；由 `outputs/analysis/fusion_pool_790_800.json`（25 项候选池）经 `fusion_exhaustive.py` 全穷举选出。实验详情见 [训练记录](docs/training_log.md)。
+
+### 实验名称
+
+A-FUSE-6：ConvNeXt 分档门槛池的 4 模型等权概率融合（D-006-b-EMA + D-002-a-EMA + C-005-c + RUN-009-A）。
+
+### 实验性能
+
+验证集 Study 级 Macro-AUC **0.8168**、Macro-F1 **0.4425**（阈值 0.5），859 个 study。该值由 `run_ensemble.py --split valid` 在远端复算，与穷举搜索的 top-1 完全一致（0.8168 / 0.4425），无偏差。
+
+### 实验参数
+
+- 成员与权重（等权 1:1:1:1，`probability` 融合）：
+  - `outputs/20261104-201457_D-006-b/best_ema.pt`（单模型 valid 0.8108，池内最高）
+  - `outputs/20261102-145203_D-002-a/best_ema.pt`（0.8100）
+  - `outputs/20261101-202325_C-005-c/best.pt`（0.8029，正侧位加权聚合口径）
+  - `outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt`（0.7945，EfficientNetV2-S @384）
+- 候选池口径：ConvNeXt 骨干 ≥ 0.800、其他骨干 ≥ 0.790，非重复、非 B/T 系列、非 ResNet，且同实验有 EMA 时不取 raw。
+- 搜索规模：C(25,2..5) 共 68,380 组等权组合，prob 空间；k=4 的 top-1 即本方案。
+
+### 实验分析
+
+- 相对 A-FUSE-2（A-001 + C-005-c + RUN-009-A，0.8148）**+0.0020**；相对单模型最好 D-006-b-EMA（0.8108）**+0.0060**。
+- 相对 A-FUSE-5（k3 加权 4:2:3，0.8171）**−0.0003**，即等权穷举没打过已有的加权方案；差值远小于单次 macro-AUC 的 bootstrap SE（≈0.0094），不构成性能差异证据。
+- **k 的有效上限是 4**：k=5 穷举 53,130 组后的 top-1 与 k=4 完全相同（0.8168）。前 20 名区间宽度随 k 单调收窄（0.0022 → 0.0014 → 0.0008 → 0.0003），说明 k 增大只是把更多组合推上同一个平台。
+- `C-005-c` 与 `RUN-009-A` 在 k≥3 的 top5 中 100% 出现，是稳定增益来源；`RUN-009-A` 单模型仅 0.7945，靠分数筛选永远进不了池，是「异构互补」而非「强者叠加」的又一例证。
+- 选型偏差：top-1 是从 12,650 组里挑出的最高值，属带选择偏差的点估计，不能当作无偏性能预期；test 侧无标签，融合增益无法验证。
+
+### 提交记录
+
+- 状态：**已生成提交文件，尚未提交官方平台**。
+- 提交文件：[submission_A-FUSE-6_k4_...csv](outputs/predictions/submissions/submission_A-FUSE-6_k4_D006bEMA-D002aEMA-C005c-RUN009A_prob_w1111.csv)。
+- 文件内容：1,414 个 study、14,140 条预测，每 study 恰好 10 类；列名 `Subject_id`、`Study_id`、`Predict_class`、`Probability`；概率范围 0.001579–0.996250；无缺失；test study 集合与 `data/test.csv` 完全一致。
+- SHA-256：`407d29faeacb8cac6163a31abc5c2ed17b6ff145473808165a4f72d53d2447bc`；md5 `9dfcf8fb621a455dea184207faf456dc`（与训练环境文件一致）。
+- 耗时自检（`src/cost.py`，V100-SXM2-32GB，fp32，3 轮，100 study / 162 图）：单 study 均值 **93.6 ms**，中位数 91.7 ms，p95 118.0 ms，最大 134.5 ms，**未超过 100 ms 上限但余量仅 6.3%**；初始化 58.8 ms（仅元数据）；预测一致性命中 100/100 study、最大概率差 4.6e-07。
+- 权重合计 **404.1 MB**（赛题上限 500 MB，余量 95.9 MB）。
+- fp16 备选实测：92.1 ms（仅快 1.6 ms），但与 fp32 提交比对有 **14 个 study 不一致**（最大差 0.0020 > 1e-3 容差），且需在提交说明声明——**不采用**。耗时瓶颈在 JPEG 解码与文件 IO，不在前向。
+- 报告：`cost_run/k4_790_800/cost_report.json`；文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
