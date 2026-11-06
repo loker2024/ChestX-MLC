@@ -223,4 +223,6 @@ A-FUSE-6：ConvNeXt 分档门槛池的 4 模型等权概率融合（D-006-b-EMA 
 - 耗时自检（`src/cost.py`，V100-SXM2-32GB，fp32，3 轮，100 study / 162 图）：单 study 均值 **93.6 ms**，中位数 91.7 ms，p95 118.0 ms，最大 134.5 ms，**未超过 100 ms 上限但余量仅 6.3%**；初始化 58.8 ms（仅元数据）；预测一致性命中 100/100 study、最大概率差 4.6e-07。
 - 权重合计 **404.1 MB**（赛题上限 500 MB，余量 95.9 MB）。
 - fp16 备选实测：92.1 ms（仅快 1.6 ms），但与 fp32 提交比对有 **14 个 study 不一致**（最大差 0.0020 > 1e-3 容差），且需在提交说明声明——**不采用**。耗时瓶颈在 JPEG 解码与文件 IO，不在前向。
-- 报告：`cost_run/k4_790_800/cost_report.json`；文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
+- 清单模式复测（不带 `--checkpoint`，靠 `cost_ensemble.json` 自动发现模型与权重）：**94.3 ms**（vs 显式指定时 93.6 ms，同口径波动），一致性仍为 100/100 study、最大概率差 4.6e-07；`cost_views.csv` 被自动识别并生效。报告 `cost_run/k4_790_800/cost_report_manifest.json`。
+- 提交包必需件：`cost_ensemble.json`（`fusion: probability`、`weights: [1,1,1,1]`、四个 checkpoint 用**相对清单目录**的路径 `../../<run>/best_ema.pt`，故打包时须保持 `outputs/` 目录结构不变）+ `cost_views.csv`（三列元数据 `Study_id/Dicom_id/ViewPosition`，2,218 行 / 1,414 study，取自 `data/test.csv`，不含像素）。四个成员均为 `view_weighted` 聚合，缺该文件会回退等权均值并导致一致性失败。
+- 报告：`cost_run/k4_790_800/cost_report.json`、`cost_report_manifest.json`；文件位于 `outputs/`，按项目规则被 Git 忽略，仅保存在本地。
