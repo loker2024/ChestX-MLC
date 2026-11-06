@@ -4,6 +4,7 @@
 
     python src/run_train.py --config configs/default.yaml --seed 42
     python src/run_train.py --resume outputs/20261027-083159_example
+    python src/run_train.py --config configs/exp_D007a.yaml --no-save-last
 
 每次训练都会在 outputs/ 下新建一个带时间戳的目录，里面固定放这些东西：
 
@@ -11,7 +12,8 @@
     train.log     训练日志（和终端输出一模一样）
     metrics.csv   每个 epoch 的 loss / macro-AUC / macro-F1
     best.pt       valid macro-AUC 最高的那一轮权重
-    last.pt       每个 epoch 结束时的完整状态，用于断点续训
+    last.pt       每个 epoch 结束时的完整状态，用于断点续训；仅在
+                  train.save_last 为 true 时生成（默认 true，设 false 则不落盘）
     tb/           TensorBoard 曲线（仅在装了 tensorboard 且 train.tensorboard
                   不为 false 时生成；没装就跳过，不影响训练）
     tb_ema/       EMA 影子权重的独立曲线面板，只在 train.ema_enabled 时生成
@@ -21,6 +23,7 @@
 
 `--resume` 既可以给 run 目录，也可以直接给其中的 last.pt。续训会复用原 run
 目录、追加写 train.log、沿用已完成的 epoch 与最优权重，不会新建目录重头再来。
+train.save_last 为 false（或加 `--no-save-last`）的 run 没有断点，训练中断只能从头重跑。
 """
 
 from __future__ import annotations
@@ -76,6 +79,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--init-from",
         default=None,
         help="warm start：用某个 checkpoint（如 best.pt）的模型权重初始化后重新训练，与 --resume 互斥",
+    )
+    parser.add_argument(
+        "--no-save-last",
+        action="store_true",
+        help=f"不写 {LAST_CHECKPOINT_NAME} 断点（覆盖配置里的 train.save_last），省磁盘但训练中断后只能重跑",
     )
     return parser.parse_args(argv)
 
@@ -186,6 +194,8 @@ def _validate_resume_config(config: Config, saved: Config) -> None:
         values["train"].pop("num_workers")
         # tensorboard 只是观测开关，改它不会影响训练轨迹，不该拦续训。
         values["train"].pop("tensorboard")
+        # save_last 只控制断点落盘（--no-save-last 可覆盖），同样不影响训练轨迹。
+        values["train"].pop("save_last", None)
         values["eval"].pop("batch_studies")
     differences = []
     for section, value in current_values.items():
@@ -522,7 +532,10 @@ def run_training(
 
     def on_epoch_end(current: TrainProgress, runtime: TrainRuntime) -> None:
         # 先写指标再存权重：两个文件都以“当前 epoch 已完成”为准。
+        # metrics.csv 每轮必写；last.pt 受 train.save_last 控制，关掉时整份断点都不落盘。
         _write_metrics(run_dir / "metrics.csv", current.history)
+        if not config.train.save_last:
+            return
         _save_last_checkpoint(
             run_dir / LAST_CHECKPOINT_NAME,
             model,
@@ -627,6 +640,10 @@ def main(argv: list[str] | None = None) -> None:
     if checkpoint is not None:
         _validate_resume_config(config, _resume_checkpoint_config(checkpoint))
 
+    if args.no_save_last:
+        # 放在续训校验之后覆盖：save_last 不改变训练轨迹，不该影响断点兼容性判断。
+        config = replace(config, train=replace(config.train, save_last=False))
+
     seed_everything(config.seed)
     device = resolve_device(config.device)
 
@@ -657,15 +674,23 @@ def main(argv: list[str] | None = None) -> None:
             print(f"配置文件: {config_source}")
             print(f"运行目录: {run_dir}")
             print(f"设备: {device} | 随机种子: {config.seed}")
+            if not config.train.save_last:
+                print(
+                    f"断点保存: 已关闭（train.save_last=false），不写 {LAST_CHECKPOINT_NAME}，"
+                    "训练中断后无法 --resume"
+                )
             if init_from is not None:
                 print(f"warm start 来源: {init_from[0]} (sha256 {init_from[2]})")
             try:
                 result = run_training(config, device, run_dir, checkpoint=checkpoint, init_from=init_from)
             except KeyboardInterrupt:
-                print(
-                    f"训练被中断：每个 epoch 结束都会保存 {run_dir / LAST_CHECKPOINT_NAME}，"
-                    f"已完成的轮次不会丢；用 --resume {run_dir} 继续"
-                )
+                if config.train.save_last:
+                    print(
+                        f"训练被中断：每个 epoch 结束都会保存 {run_dir / LAST_CHECKPOINT_NAME}，"
+                        f"已完成的轮次不会丢；用 --resume {run_dir} 继续"
+                    )
+                else:
+                    print("训练被中断：train.save_last=false，本次训练没有落过断点，只能从头重跑")
                 raise
             print(
                 f"训练结束：最优 epoch {result['best_epoch']}，"

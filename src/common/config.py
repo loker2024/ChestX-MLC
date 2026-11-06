@@ -220,6 +220,7 @@ class TrainConfig:
     amp: bool = True  # 混合精度；仅 CUDA 上生效
     grad_clip: float = 5.0  # 梯度范数裁剪上限，<=0 表示不裁剪
     num_workers: int = 8
+    save_last: bool = True  # 每个 epoch 结束是否写 last.pt 断点；false 则不落盘，中断后无法 --resume
     tensorboard: str = "auto"  # "auto"=装了 tensorboard 就写 run 目录下 tb/；"true"=必须写；"false"=关闭
     early_stop_monitor: str | None = None  # None 沿用旧 early_stop_metric
     cosine_end_epoch: int | None = None
@@ -281,6 +282,8 @@ class TrainConfig:
             raise ValueError(f"train.grad_clip 必须 >= 0，当前为 {self.grad_clip}")
         if self.num_workers < 0:
             raise ValueError(f"train.num_workers 必须 >= 0，当前为 {self.num_workers}")
+        if self.save_last is not True and self.save_last is not False:
+            raise ValueError("train.save_last 只能是 true 或 false")
         if self.tensorboard not in TENSORBOARD_MODES:
             raise ValueError(
                 "train.tensorboard 只能是 "

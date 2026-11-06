@@ -8,6 +8,20 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-11-06
+
+- `13:22`（新增）`configs/exp_D007a.yaml`–`configs/exp_D007e.yaml`：准备提前完成 cosine 的配对复核，新增 seed 42 基线及 seed 2026、216 的各一组基线和候选；seed 42 候选复用 D-006-b，统一 EMA 早停，其余训练设置保持一致。尚未训练。
+
+- `13:33`（新增）`configs/exp_D008a.yaml`、`configs/exp_D008b.yaml`：准备 ConvNeXt-Small 和 Base 的 ImageNet-1K 预训练教师候选，沿用 D-002-a 的 seed 42 及历史 raw AUC 早停口径，强制预训练加载；尚未训练或评测。
+
+- `13:42`（新增）`configs/exp_D008c.yaml`、`configs/exp_D008d.yaml`、`configs/exp_D008e.yaml`：按 Tiny、Base、Large 顺序准备 ConvNeXt V2 研究性教师配置，使用官方 fcmae_ft_in1k 权重，保留 seed 42 与 D-002-a 历史早停口径；标注 CC-BY-NC 与赛题限制，尚未训练或验证权重加载。
+
+- `13:49`（新增）`src/common/config.py`、`configs/default.yaml`、`src/run_train.py`、`docs/architecture.md`：新增 `train.save_last` 开关与 `run_train.py --no-save-last` 命令行覆盖，默认 `true` 保持每轮写 `last.pt` 的断点行为；关闭时 `on_epoch_end` 在写完 `metrics.csv` 后直接返回，整份断点不落盘，`best.pt` 与 `best_ema.pt` 照常在训练结束后生成。CLI 覆盖放在续训校验之后，且 `_validate_resume_config` 把 `save_last` 与 `tensorboard` 同等归入「不影响训练轨迹」的免比对项，故 `--resume --no-save-last` 组合不会被拦。启动日志与 `KeyboardInterrupt` 提示按配置分支输出，明确「无断点、只能从头重跑」；配置侧校验只接受布尔值，写字符串会报错。已验证：99 个 `configs/exp_*.yaml` 均可正常加载（继承 `default.yaml` 自动带上新字段）、CLI 解析与覆盖生效、`save_last` 差异不拦续训而 `train.lr` 差异仍被拦截；未执行训练验证。
+
+## 2026-11-05
+
+- `23:10`（变更）`Submission.md`：新增「D-002-a-EMA（单模型）」提交记录。用 `outputs/20261102-145203_D-002-a/best_ema.pt`（md5 `e97524bb…`，与 A-FUSE-5 成本测试同一权重）在 test 上推理，`run_infer.py` 不设阈值、每 study 输出全部 10 类概率，生成 1,414 study / 14,140 行、概率 0.000679–0.997329、test study 集合完全覆盖、无缺失；文件归档为 `outputs/predictions/submissions/submission_D-002-a-EMA.csv`（SHA-256 `d28a872b…`、md5 `47c597ba…`，与远端一致），**尚未提交官方平台**。另记录 valid Study 级 Macro-AUC 0.8100 / F1@0.5 0.4283、9 类 0.8196、EMA best epoch 5 与完整生成命令。
+
 ## 2026-11-04
 
 - `19:26`（变更）`AGENTS.md`：明确本项目默认禁止运行测试（太浪费时间），改为在代码提交与拉取后只做代码检查——读 `git diff`、审阅改动逻辑与影响范围、核对 `CHANGELOG.md` 与文档同步，不执行 `pytest` 及训练/评测/耗时自检脚本；确有必须运行才能确认的疑点时先说明再征得用户同意。

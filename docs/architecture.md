@@ -94,7 +94,7 @@ outputs/
 | 文件 | 职责 |
 |---|---|
 | `check_data.py` | 数据体检：CSV 字段、ID 前导零、图片齐全、跨 split 无重叠、标签分布；`--full` 检查全量数据 |
-| `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit`；每轮结束写 `last.pt`，`--resume <run 目录或 last.pt>` 可从断点接着训练 |
+| `run_train.py` | 训练入口：读配置、构建 loader 与模型、调用 `train.engine.fit`；每轮结束写 `last.pt`（`train.save_last=false` 或 `--no-save-last` 时跳过），`--resume <run 目录或 last.pt>` 可从断点接着训练 |
 | `run_eval.py` | 验证入口：加载 checkpoint，在 valid（或 `--split train`）上输出 macro-AUC/F1 与逐类明细 |
 | `run_infer.py` | 推理入口：test 推理并生成 `submission.csv`；默认输出全部 10 类，`--threshold`（须在 `[0, 1]`）可按概率过滤 |
 | `run_compare.py` | 对比入口：按各 run 存档的配置重算 valid 指标，写出 `summary.csv` / `per_class.csv` / `summary.md`；`--thresholds` 一次算多个阈值 |
@@ -125,7 +125,7 @@ outputs/
 6. `infer.submission` 生成并校验 `submission.csv`（1,414 个 study × 10 类）。
 7. `src/cost.py` 加载提交实际使用的单模型或融合权重，按 study 串行计时（一次检查的全部图片同批前向），单次计时覆盖解码、预处理、前向、聚合、后处理与逐图写出；每轮只开一次预测文件，文件 IO 全部计入，最后与 `submission.csv` 比对。详见 [cost.md](cost.md)。
 
-每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。
+每次训练生成一个 `outputs/<timestamp>_<tag>/` 目录，包含 `best.pt`、`metrics.csv`、`config.yaml`、`train.log` 与断点文件 `last.pt`。`last.pt` 每轮结束写入一次（模型、优化器、学习率调度器、AMP scaler、已完成轮次、最优快照与历史记录），训练被人为中断时最多丢当前这一轮的进度，`--resume` 会复用同一目录并追加写 `train.log`。`last.pt` 受 `train.save_last` 控制：默认 `true`，每轮覆盖写同一个文件，单个 run 的磁盘占用固定在约 637 MB；设为 `false`（或加命令行 `--no-save-last`）时整份断点都不落盘（`metrics.csv` 与 `best.pt` 照常生成），可省掉该文件，代价是训练中断后只能从头重跑。两种写法都不影响训练轨迹，续训配置校验不比对这一项，因此 `--resume --no-save-last` 不会被拦截。
 
 `metrics.csv` 的 `valid_*` 列是训练期验证的实测值（CUDA 上跟着 `train.amp` 走 fp16 前向），只有最优那一轮额外带 `valid_loss_fp32` / `valid_macro_auc_fp32` / `valid_macro_f1_fp32`，是训练结束后用 fp32 前向复评的结果——与 `run_eval.py`、`run_infer.py` 走同一条数值路径，可以直接当提交口径引用。两者相差千分位属正常（阈值边界上的少量样本翻转），不是 bug。`run_compare.py` 在 `outputs/compare/` 下写 `summary.csv`、`per_class.csv` 与 `summary.md`。`data/` 与 `outputs/` 均在 `.gitignore` 中，不入库。
 
