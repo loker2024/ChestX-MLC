@@ -26,6 +26,10 @@
 
 - `15:21`（变更／移除）`configs/exp_D008c.yaml`、`configs/exp_D008d.yaml`、`configs/exp_D008e.yaml`：移除原 ConvNeXt V2 三组候选，D-008-c 改为 ConvNeXt V1 Large `convnext_large.fb_in1k`，其余训练设置沿用 D-008-b；尚未训练或验证预训练权重。
 
+- `18:00`（新增）`outputs/experiments/`（仓库外，`.gitignore` 第 48 行已忽略整个 `outputs/`）：从远端拉取 D-005-a/b、D-006-a/b/c、D-007-a/b、D-008-a/b 共 9 组的 `config.yaml`／`metrics.csv`／`train.log` 三件套（27 个文件），md5 双向校验 27/27 一致。此前 D-005 与 D-006 只在 `predictions/` 与 `eval_reports/` 留有产物，`experiments/` 下缺三件套。同期落地 D-007/D-008 的 8 份 `eval_reports`（raw 与 EMA 各 4）与 8 份 `predictions/valid` CSV。
+
+- `18:02`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 D-007（cosine 终点 6 的三 seed 复核）与 D-008（骨干容量阶梯 Small/Base/Large）两组记录，含执行时间、结果表、患者整簇配对 bootstrap、逐类 Δ 与判读。D-007 三 seed 的 Δ10 为 +0.0008 / −0.0046 / −0.0057，均值 −0.0032、三个 CI 全跨 0 → 「提前衰减无可复现增益」，D-006 汇总的 3 seed 复核项结项；副产品是同配置换 seed 的配对差 CI 宽 0.0134，再次实测 seed 噪声量级。D-008-a（Small）Δ −0.0043 跨 0；**D-008-b（Base）Δ −0.0079、CI [−0.0131, −0.0025]、P=0.002，是本项目首个 CI 不跨 0 的负向结果**（9 类 −0.0075 同向、逐类 1 升 9 降、class2 −0.0327），判读同时标注三项限制：早停口径与基线不同（`ema_auc` vs raw）、单 seed、Base 最优轮次提前到第 4 轮。D-008-c（Large）首跑 16:50 在 epoch 3 被容器 cgroup 43 GiB 内存上限 SIGKILL（`rc=137`，根因为 47 GiB train 图片的 page cache 计入 cgroup），改用 `posix_fadvise(DONTNEED)` 驱逐后 17:06 重跑，尚未完成。实验表格 `~/Desktop/loker_exp.xlsx` 的「D系列实验」sheet 同步追加 8 行（D-007-a/b 及其 EMA、D-008-a/b 及其 EMA，行 36–43），走 OOXML 直改：仅 `sheet6.xml` 与 `sharedStrings.xml` 变化、其余 zip 条目字节不变（`count` 484→516、`uniqueCount` 464→496、dimension `A1:H35`→`A1:H43`），Excel 只读打开读回单元格正常、无修复提示；c 完成后补行。
+
 ## 2026-11-05
 
 - `23:10`（变更）`Submission.md`：新增「D-002-a-EMA（单模型）」提交记录。用 `outputs/20261102-145203_D-002-a/best_ema.pt`（md5 `e97524bb…`，与 A-FUSE-5 成本测试同一权重）在 test 上推理，`run_infer.py` 不设阈值、每 study 输出全部 10 类概率，生成 1,414 study / 14,140 行、概率 0.000679–0.997329、test study 集合完全覆盖、无缺失；文件归档为 `outputs/predictions/submissions/submission_D-002-a-EMA.csv`（SHA-256 `d28a872b…`、md5 `47c597ba…`，与远端一致），**尚未提交官方平台**。另记录 valid Study 级 Macro-AUC 0.8100 / F1@0.5 0.4283、9 类 0.8196、EMA best epoch 5 与完整生成命令。
