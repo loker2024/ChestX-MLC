@@ -1,5 +1,6 @@
 # D-008-b：ConvNeXt-Base fb_in1k 教师候选，seed 42。
-# 基于历史 D-002-a 训练口径；显式使用 raw AUC 早停并要求预训练加载成功。
+# 基于历史 D-002-a 训练口径，但早停改用 EMA AUC：导出权重是 best_ema.pt，按 EMA 挑轮次才自洽。
+# 注意与 D-002-a（raw AUC 早停）不同口径，不宜直接做「仅换骨干」的单变量对照。要求预训练加载成功。
 # 完整独立配置，不使用 _base。
 data:
   train:
@@ -41,7 +42,7 @@ model:
   xrv_sha256: null
 train:
   require_pretrained: true
-  early_stop_monitor: raw_auc
+  early_stop_monitor: ema_auc
   ema_enabled: true
   ema_decay: 0.999
   epochs: 8

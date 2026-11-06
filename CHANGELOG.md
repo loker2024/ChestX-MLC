@@ -22,6 +22,8 @@
 
 - `14:03`（变更）`Submission.md`：根据用户反馈，更新 D-002-a-EMA 的官方提交状态和得分 76.91；提交日期为 2026-11-05。
 
+- `14:22`（变更）`configs/exp_D008a.yaml`–`configs/exp_D008e.yaml`：早停监控由 `raw_auc` 改为 `ema_auc`。原因是 D-008 系列导出与提交用的是 `best_ema.pt`，而 `raw_auc` 早停按 raw 曲线挑轮次，两者不对齐；D-002-a 的实测可作反例——raw 峰值在 epoch 5、EMA 峰值在 epoch 4，按 raw 早停会把 EMA 最优轮次放过。副作用：D-008 与 D-002-a 的早停口径自此不同，不能再当「仅换骨干」的单变量对照，要做骨干容量对照须另开 `raw_auc` 版本。配置头注释同步改写，五组 `ema_enabled` 均为 `true`，本地 `load_config` 全部通过（monitor 字段读回 `ema_auc`）；D-008 尚未开始训练，改动在启动前生效。
+
 ## 2026-11-05
 
 - `23:10`（变更）`Submission.md`：新增「D-002-a-EMA（单模型）」提交记录。用 `outputs/20261102-145203_D-002-a/best_ema.pt`（md5 `e97524bb…`，与 A-FUSE-5 成本测试同一权重）在 test 上推理，`run_infer.py` 不设阈值、每 study 输出全部 10 类概率，生成 1,414 study / 14,140 行、概率 0.000679–0.997329、test study 集合完全覆盖、无缺失；文件归档为 `outputs/predictions/submissions/submission_D-002-a-EMA.csv`（SHA-256 `d28a872b…`、md5 `47c597ba…`，与远端一致），**尚未提交官方平台**。另记录 valid Study 级 Macro-AUC 0.8100 / F1@0.5 0.4283、9 类 0.8196、EMA best epoch 5 与完整生成命令。

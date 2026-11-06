@@ -1,6 +1,6 @@
 # D-008-d：ConvNeXt V2-Base fcmae_ft_in1k 研究性教师候选，seed 42。
 # 官方预训练权重为 CC-BY-NC；赛题禁止 NC 权重，研究结果不可视为合规参赛方案。
-# 完整独立配置；raw AUC 早停、要求预训练加载成功。
+# 完整独立配置；EMA AUC 早停、要求预训练加载成功。
 data:
   train:
     csv: data/train.csv
@@ -41,7 +41,7 @@ model:
   xrv_sha256: null
 train:
   require_pretrained: true
-  early_stop_monitor: raw_auc
+  early_stop_monitor: ema_auc
   ema_enabled: true
   ema_decay: 0.999
   epochs: 8
