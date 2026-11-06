@@ -178,7 +178,7 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_infer.py \
 
 ### 提交记录
 
-- 状态：已生成本地文件，**未提交官方平台**。
+- 状态：已提交官方平台；官方得分 **76.91**（根据用户反馈，提交日期为 2026-11-05）。
 - 提交文件：[submission_D-002-a-EMA.csv](outputs/predictions/submissions/submission_D-002-a-EMA.csv)。
 - 文件内容：1,414 个 study、14,140 条预测（136 个 subject），每 study 恰好 10 类；列名 `Subject_id`、`Study_id`、`Predict_class`、`Probability`；概率范围 0.000679–0.997329；无缺失；test study 集合与 `data/test.csv` 完全一致。
 - SHA-256：`d28a872b852335e5b823e3468e2be8029b58f22b6beb6520e44224c1d5c45f29`；md5 `47c597ba59ba02a7497ab940b3f311bf`（与本机下载文件一致）。

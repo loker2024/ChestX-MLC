@@ -20,6 +20,8 @@
 
 - `13:59`（变更／移除）`configs/exp_D007a.yaml`–`configs/exp_D007e.yaml`：按要求仅保留原 D-007-c、D-007-e 提前衰减候选，分别重编号为 D-007-a（seed 2026）和 D-007-b（seed 216）；移除原 a/b/d 基线及旧 c/e 路径，训练参数不变。
 
+- `14:03`（变更）`Submission.md`：根据用户反馈，更新 D-002-a-EMA 的官方提交状态和得分 76.91；提交日期为 2026-11-05。
+
 ## 2026-11-05
 
 - `23:10`（变更）`Submission.md`：新增「D-002-a-EMA（单模型）」提交记录。用 `outputs/20261102-145203_D-002-a/best_ema.pt`（md5 `e97524bb…`，与 A-FUSE-5 成本测试同一权重）在 test 上推理，`run_infer.py` 不设阈值、每 study 输出全部 10 类概率，生成 1,414 study / 14,140 行、概率 0.000679–0.997329、test study 集合完全覆盖、无缺失；文件归档为 `outputs/predictions/submissions/submission_D-002-a-EMA.csv`（SHA-256 `d28a872b…`、md5 `47c597ba…`，与远端一致），**尚未提交官方平台**。另记录 valid Study 级 Macro-AUC 0.8100 / F1@0.5 0.4283、9 类 0.8196、EMA best epoch 5 与完整生成命令。
