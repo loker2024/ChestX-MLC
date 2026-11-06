@@ -1,4 +1,4 @@
-# D-007-b：标准 8 轮 cosine 基线；训练 seed 2026。
+# D-007-b：第 6 轮到达最低学习率的候选；训练 seed 216。
 # D-006-b 为 seed 42 候选；完整独立配置，不使用 _base。
 data:
   train:
@@ -66,7 +66,7 @@ train:
   distill_cache: null
   distill_weight: 0.5
   early_stop_monitor: ema_auc
-  cosine_end_epoch: null
+  cosine_end_epoch: 6
   mixup_alpha: 0.0
   mixup_prob: 0.0
 eval:
@@ -74,5 +74,5 @@ eval:
   threshold: 0.5
 output:
   run_dir: outputs
-seed: 2026
+seed: 216
 device: auto
