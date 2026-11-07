@@ -434,7 +434,7 @@ def fit(
     config: Config,
     model: nn.Module,
     train_loader: DataLoader,
-    val_loader: DataLoader,
+    val_loader: DataLoader | None,
     device: torch.device,
     *,
     progress: TrainProgress | None = None,
@@ -470,6 +470,8 @@ def fit(
     混在一起。它只在 `train.ema_enabled` 且本轮确实算了 EMA 时才有输出。
     """
     criterion = build_loss(config, _train_labels(train_loader), device=device).to(device)
+    if config.data.full_train and getattr(criterion, "pos_weight", None) is not None:
+        print(f"全量训练 pos_weight: {criterion.pos_weight.detach().cpu().tolist()}")
     if criterion_state is not None:
         criterion.load_state_dict(criterion_state)
     if isinstance(criterion, AUCMLoss):
@@ -531,6 +533,18 @@ def fit(
             train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, **distill_kwargs)
         else:
             train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, ema=ema, **distill_kwargs)
+        if config.data.full_train:
+            progress.ema_state = {"model": _snapshot(ema.model), "updates": ema.updates}
+            progress.history.append({"epoch": epoch, "lr": lr, "train_loss": train_loss})
+            progress.epoch = epoch
+            print(f"epoch {epoch:2d}/{config.train.epochs} | lr {lr:.2e} | train_loss {train_loss:.4f} | EMA 更新 {ema.updates} 次 | 全量训练，无验证")
+            scheduler.step()
+            if on_epoch_end is not None:
+                on_epoch_end(progress, runtime)
+            if writer is not None:
+                writer.add_scalar("train/loss", train_loss, epoch)
+                writer.add_scalar("train/lr", lr, epoch)
+            continue
         # 只有真要写曲线时才多算一遍逐类明细，默认路径的开销保持不变。
         valid_metrics = evaluate(
             config, model, val_loader, criterion, device, with_per_class=writer is not None,
@@ -641,6 +655,11 @@ def fit(
         if not stop_improved and patience and progress.stale_epochs >= patience:
             print(f"连续 {progress.stale_epochs} 个 epoch 没有提升，提前结束训练")
             break
+
+    if config.data.full_train:
+        if progress.epoch != config.train.epochs or progress.ema_state is None:
+            raise RuntimeError("全量训练未完成或缺少末轮 EMA")
+        return {"history": progress.history, "progress": progress}
 
     if progress.best_epoch == 0:
         raise RuntimeError(

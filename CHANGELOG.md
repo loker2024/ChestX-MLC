@@ -22,6 +22,10 @@
 
 - `20:05`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 4 行（行 46–49，D-009-a、D-009-a-EMA、D-009-b、D-009-b-EMA），沿用 A:B / C:D / E:G 合并、H 独立分析与邻行样式。走 OOXML 直改：仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化、其余 zip 条目字节不变（`count` 528→544、`uniqueCount` 508→524、dimension `A1:H45`→`A1:H49`、mergeCells 97→109），`xmllint --noout` 通过，读回 A46–A49 / C46 / H49 正常。
 
+- `20:22`（新增／变更）`src/common/config.py`、`src/data/dataset.py`、`src/train/engine.py`、`src/run_train.py`：新增 train+valid 全量训练模式，关闭重划分、验证选优与早停，按固定轮数导出末轮 EMA；记录数据清单及哈希、pos_weight 与断点续训状态，允许全量训练的 cosine 终点晚于训练结束。历史训练默认行为保持原样。未运行测试或训练。
+
+- `20:22`（新增）`configs/exp_D010a.yaml`、`configs/exp_D010b.yaml`、`configs/exp_D010c.yaml`、`configs/exp_D010d.yaml`、`docs/D010-full-training.md`：准备三种 ConvNeXt-Tiny seed 与一组 EfficientNetV2-S 的全量训练配置和操作说明；固定 5 轮并保留 8 轮 cosine 日程，尚未训练或评测。
+
 ## 2026-11-06
 
 - `13:22`（新增）`configs/exp_D007a.yaml`–`configs/exp_D007e.yaml`：准备提前完成 cosine 的配对复核，新增 seed 42 基线及 seed 2026、216 的各一组基线和候选；seed 42 候选复用 D-006-b，统一 EMA 早停，其余训练设置保持一致。尚未训练。

@@ -161,7 +161,10 @@ def build_loader(
         )
         batch_size = cfg.eval.batch_studies
 
-    if cfg.data.resplit.enabled and split in {"train", "valid"}:
+    if cfg.data.full_train and split == "train":
+        from data.resplit import _records
+        records, _ = _records(cfg)
+    elif cfg.data.resplit.enabled and split in {"train", "valid"}:
         from data.resplit import load_resplit_records
         records = load_resplit_records(cfg, split, manifest_path)
     else:

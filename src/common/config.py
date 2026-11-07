@@ -53,6 +53,7 @@ class DataConfig:
     valid: SplitConfig
     test: SplitConfig
     resplit: ResplitConfig = field(default_factory=ResplitConfig)
+    full_train: bool = False  # 合并 train + valid，不建立验证集
 
 
 @dataclass(frozen=True)
@@ -242,7 +243,7 @@ class TrainConfig:
             raise ValueError("train.early_stop_monitor 无效")
         if self.early_stop_monitor == "ema_auc" and not self.ema_enabled:
             raise ValueError("ema_auc 需要开启 EMA")
-        if self.cosine_end_epoch is not None and (isinstance(self.cosine_end_epoch, bool) or not isinstance(self.cosine_end_epoch, int) or self.lr_scheduler != "cosine" or not self.warmup_epochs + 2 <= self.cosine_end_epoch <= self.epochs):
+        if self.cosine_end_epoch is not None and (isinstance(self.cosine_end_epoch, bool) or not isinstance(self.cosine_end_epoch, int) or self.lr_scheduler != "cosine" or not self.warmup_epochs + 2 <= self.cosine_end_epoch):
             raise ValueError("train.cosine_end_epoch 无效")
         if not math.isfinite(self.mixup_alpha) or self.mixup_alpha < 0 or not math.isfinite(self.mixup_prob) or not 0 <= self.mixup_prob <= 1:
             raise ValueError("Mixup 参数无效")
@@ -368,6 +369,10 @@ class Config:
             raise ValueError("Mixup 需要 standard 分类头和 view_weighted 聚合")
         if self.train.distill_enabled and self.data.resplit.enabled:
             raise ValueError("蒸馏暂不支持 resplit")
+        if not self.data.full_train and self.train.cosine_end_epoch is not None and self.train.cosine_end_epoch > self.train.epochs:
+            raise ValueError("普通训练的 cosine_end_epoch 不得超过 epochs")
+        if self.data.full_train and (self.data.resplit.enabled or not self.train.ema_enabled or self.train.early_stop_patience != 0 or self.train.distill_enabled or self.train.loss != "bce"):
+            raise ValueError("full_train 要求关闭 resplit、早停和蒸馏，开启 EMA 并使用 BCE")
         if self.seed < 0:
             raise ValueError(f"seed 必须 >= 0，当前为 {self.seed}")
         if not self.device:

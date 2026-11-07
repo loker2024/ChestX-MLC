@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hashlib
+import json
 import math
 import random
 import sys
@@ -404,6 +405,8 @@ def run_training(
     """
     if checkpoint is not None:
         _validate_resume_config(config, _resume_checkpoint_config(checkpoint))
+    if config.data.full_train and init_from is not None:
+        raise ValueError("全量训练必须从预训练权重初始化，不接受 --init-from")
     if config.train.aucm_require_bce_init and checkpoint is None:
         if init_from is None:
             raise ValueError("本 AUCM 配置需要 --init-from 指定 BCE checkpoint")
@@ -442,7 +445,28 @@ def run_training(
         if checkpoint is not None:
             checkpoint_manifest_path(config, checkpoint, run_dir / "last.pt")
     train_loader = build_loader(config, "train", train=True, pin_memory=pin_memory, manifest_path=manifest_path)
-    val_loader = build_loader(config, "valid", pin_memory=pin_memory, manifest_path=manifest_path)
+    val_loader = None if config.data.full_train else build_loader(config, "valid", pin_memory=pin_memory, manifest_path=manifest_path)
+    if config.data.full_train:
+        records = train_loader.dataset.records
+        sources = {}
+        for name in ("train", "valid"):
+            path = getattr(config.data, name).csv
+            sources[name] = {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        train_ids = set(pd.read_csv(config.data.train.csv, dtype=str, keep_default_na=False, encoding=CSV_ENCODING)["Study_id"])
+        manifest = {"version": 1, "sources": sources, "studies": [
+            {"source": "train" if r.study_id in train_ids else "valid", "study_id": r.study_id, "subject_id": r.subject_id, "dicom_ids": [p.stem for p in r.image_paths], "labels": r.labels.tolist(), "views": list(r.views)}
+            for r in records
+        ]}
+        manifest_bytes = (json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        full_digest = hashlib.sha256(manifest_bytes).hexdigest()
+        full_path = run_dir / "full_train_manifest.json"
+        if checkpoint is not None:
+            expected = (checkpoint.get("metadata") or {}).get("full_train_manifest_sha256")
+            if expected != full_digest or not full_path.is_file() or hashlib.sha256(full_path.read_bytes()).hexdigest() != full_digest:
+                raise ValueError("全量训练数据清单或 CSV 已改变，不能续训")
+        else:
+            full_path.write_bytes(manifest_bytes)
+        print(f"全量训练清单 SHA-256: {full_digest}")
     if config.train.distill_enabled:
         from train.distillation import TeacherCache, records_digest, sha256_file
         cache = TeacherCache.load(Path(config.train.distill_cache),
@@ -462,7 +486,7 @@ def run_training(
             negative = len(labels) - int(positives)
             print(f"验证集类别 {i}: 正 {int(positives)} / 负 {negative}" +
                   ("（AUC 无定义）" if positives == 0 or negative == 0 else ""))
-    print(f"训练 study 数: {len(train_loader.dataset)} | 验证 study 数: {len(val_loader.dataset)}")
+    print(f"训练 study 数: {len(train_loader.dataset)} | " + ("无验证集" if val_loader is None else f"验证 study 数: {len(val_loader.dataset)}"))
 
     # 续训或 warm start 时权重马上会被覆盖，构建模型不必再加载（或联网下载）预训练权重。
     build_config = (
@@ -520,12 +544,15 @@ def run_training(
         print(f"权重文件: {info['weights_path']}")
     print(f"预训练权重: {'已加载' if pretrained_loaded else '未加载（随机初始化或配置关闭）'}")
     if progress is not None:
-        print(
-            f"从断点继续：已完成 {progress.epoch}/{config.train.epochs} 个 epoch，"
-            f"最优 epoch {progress.best_epoch}（valid macro-AUC {progress.best_auc:.4f}）"
-        )
+        if config.data.full_train:
+            print(f"从断点继续：已完成 {progress.epoch}/{config.train.epochs} 个 epoch（全量训练，无验证）")
+        else:
+            print(f"从断点继续：已完成 {progress.epoch}/{config.train.epochs} 个 epoch，最优 epoch {progress.best_epoch}（valid macro-AUC {progress.best_auc:.4f}）")
         if progress.epoch >= config.train.epochs:
-            print(f"该 run 已跑满 {config.train.epochs} 个 epoch，只重新导出 best.pt")
+            print("该 run 已跑满，将重新导出 " + ("final_ema.pt" if config.data.full_train else "best.pt"))
+
+    if config.data.full_train:
+        warm_metadata = {**(warm_metadata or {}), "full_train_manifest_sha256": full_digest}
 
     if cache is not None:
         warm_metadata = {**(warm_metadata or {}), "distill_cache_sha256": cache.digest}
@@ -571,6 +598,20 @@ def run_training(
             writer.close()
         if ema_writer is not None:
             ema_writer.close()
+
+    if config.data.full_train:
+        progress = result["progress"]
+        model.load_state_dict(progress.ema_state["model"])
+        path = save_checkpoint(
+            run_dir / "final_ema.pt", model, epoch=progress.epoch, config=config, seed=config.seed,
+            metadata={**_merge_metadata(_checkpoint_metadata(model, config, device, pretrained_loaded, checkpoint.get("metadata") if checkpoint is not None else None), warm_metadata), "weights_kind": "final_ema", "ema_updates": progress.ema_state["updates"]},
+        )
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+        print(f"全量训练末轮 EMA 已保存: {path} | SHA-256: {digest.hexdigest()}")
+        return result
 
     # best_state 是所有 epoch 里由 fit 挑出来的最优权重，最后才落盘，
     # 这样 best.pt 永远是完整文件，不会出现“写到一半”的坏权重。
@@ -692,11 +733,14 @@ def main(argv: list[str] | None = None) -> None:
                 else:
                     print("训练被中断：train.save_last=false，本次训练没有落过断点，只能从头重跑")
                 raise
-            print(
-                f"训练结束：最优 epoch {result['best_epoch']}，"
-                f"valid macro-AUC {result['best_metrics']['macro_auc']:.4f}"
-                f"（fp32 复评口径；权重挑选时 AMP 为 {result['best_macro_auc']:.4f}）"
-            )
+            if config.data.full_train:
+                print(f"全量训练结束：固定 {result['progress'].epoch} 轮，已导出末轮 EMA，无验证指标")
+            else:
+                print(
+                    f"训练结束：最优 epoch {result['best_epoch']}，"
+                    f"valid macro-AUC {result['best_metrics']['macro_auc']:.4f}"
+                    f"（fp32 复评口径；权重挑选时 AMP 为 {result['best_macro_auc']:.4f}）"
+                )
 
 
 if __name__ == "__main__":
