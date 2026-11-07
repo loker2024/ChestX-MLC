@@ -3804,7 +3804,8 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 训练 loss 四组均单调下降，末轮相对首轮降幅 a −0.2368 / b −0.2269 / c −0.2320 / d −0.2844；**跨组 loss 不可横向比较**（不同骨干的容量、损失尺度与正负样本难度不同），d 组末轮 0.7037 最低不能读成「d 最好」。
 - 耗时四组 14m05s–15m12s（均值约 14m30s），比 D-002-a 的 34m57s（7 轮、含每轮验证）短，原因是只跑 5 轮且跳过验证；合并训练集后每轮步数由 1,157 增至 1,210（+4.6%），单轮约 2m50s，未出现显存或数据加载瓶颈。
 - 限制：①5 轮是预先选定的预算，**不证明是最优轮数**；②没有验证曲线，无法从数据侧判断过拟合点，只能依赖预设预算与后续 test 反馈；③单次训练/组，seed 间差异没有验证集可量化；④产物大小 `final_ema.pt` 107 MB（Tiny）/ 86 MB（EffNetV2-S），`last.pt` 532 MB / 426 MB，四组磁盘合计约 2.5 GB。
-- 产物：`outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`（每组 `config.yaml`、`train.log`、`metrics.csv`、`full_train_manifest.json`、`last.pt`、`final_ema.pt`、TensorBoard）；无 valid predictions / eval_reports（全量训练无验证集）。
+- 产物：`outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`（每组 `config.yaml`、`train.log`、`metrics.csv`、`full_train_manifest.json`、`last.pt`、`final_ema.pt`、TensorBoard）；无 valid predictions / eval_reports（全量训练无验证集）；test 推理、融合产物与耗时见下条。
+- 推理与耗时（2026-11-07）：四组 `final_ema.pt` 13:30:20–13:33:00 跑 test（1414 studies / 14,140 行、全部 10 类概率），推理耗时 a 46s / b 47s / c 46s / d 21s，`rc=0`；单组端到端计费均值 a 45.99 / b 45.57 / c 46.07 / d 59.86 ms（batch=1、100 个计时 study + 5 个预热 study、连续 3 轮、fp32，与各自 submission 比对 0 个 study 不一致）。最终提交采用 **a + d 概率等权融合**（`fusion: probability`、`weights [1, 1]`）：`outputs/ensemble/D-010-ad/submission.csv`（1414 studies / 14,140 行）与 `cost_ensemble.json`；融合计费均值 **60.7 ms**（3 轮 60.10 / 60.07 / 61.73，中位数 60.97、p95 69.20、最大 72.12，上限 100 ms），与提交概率最大差 2.96e-4、0 个 study 不一致。两模型均为 320 letterbox + `view_weighted` 0.7、预处理签名相同，计时循环对同一 study 只解码一次并复用预处理，故融合耗时接近单组 d 而非两组之和；权重合计 193 MB < 500 MB、fp32。
 
 ## 环境
 

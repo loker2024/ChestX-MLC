@@ -42,3 +42,20 @@ python src/run_infer.py --config outputs/<run>/config.yaml --checkpoint outputs/
 | D-010-d | 13:08:04–13:23:16 | 15m12s | 0.9881 → 0.9247 → 0.8692 → 0.8104 → 0.7037 | `3806f8c50d8521b785ec0839ff0acefc94176ce4803e54ae47c53b23fc0bb061` |
 
 产物在 `outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`。四组均确认「预训练权重: 已加载」，训练 19,372 studies、无验证集，每轮 1,210 batch；`full_train_manifest.json` 清单 SHA-256 四组一致 `0766a71e5fd5745da6cea3c0e263f60f19011cb11bc94804d2c86f36a917b45c`。没有独立验证分数；原 valid 已进入训练，不能以原 valid 分数比较 D-002-a-EMA，也不能根据平台反馈反复挑模型。详细记录见 `docs/training_log.md` 的 D-010 章节。
+
+## 推理与耗时自检（2026-11-07）
+
+四组 `final_ema.pt` 于 13:30:20–13:33:00 在 sjy RTX 3090 24G 上跑 test（1414 studies / 14,140 行、全部 10 类概率），`rc=0`：
+
+| 组 | test 推理耗时 | cost 计费均值 | 中位数 | p95 | 最大 | 一致性 |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| D-010-a | 46s | 45.99 ms | 46.62 | 52.71 | 61.22 | 0 不一致 |
+| D-010-b | 47s | 45.57 ms | 46.35 | 51.79 | 57.50 | 0 不一致 |
+| D-010-c | 46s | 46.07 ms | 46.88 | 52.80 | 57.98 | 0 不一致 |
+| D-010-d | 21s | 59.86 ms | 61.36 | 68.96 | 75.15 | 0 不一致 |
+
+cost 口径：batch=1、以 study 为单位、100 个计时 study + 5 个预热 study（不计入）、连续 3 轮、fp32、单模型，初始化 48–57 ms 不计入。
+
+最终提交为 **D-010-a + D-010-d 概率等权融合**（`fusion: probability`、`weights [1, 1]`）：`outputs/ensemble/D-010-ad/submission.csv`（1414 studies / 14,140 行）、`outputs/ensemble/D-010-ad/cost_ensemble.json`、`outputs/cost_reports/D-010-ad.json`。融合计费均值 **60.7 ms**（3 轮 60.10 / 60.07 / 61.73，中位数 60.97、p95 69.20、最大 72.12），与提交概率最大差 2.96e-4、0 个 study 不一致；两模型预处理签名相同，同一 study 只解码一次并复用预处理，故耗时接近单组 d 而非两组之和；权重合计 193 MB < 500 MB、fp32、100 ms 上限余量约 39 ms。
+
+单组推理产物见 `outputs/predictions/test/D-010-{a,b,c,d}.csv`，单组成本报告见 `outputs/cost_reports/D-010-{a,b,c,d}.json`。

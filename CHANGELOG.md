@@ -29,6 +29,10 @@
 
 - `21:28`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 4 行（行 50–53，D-010-a/b/c/d），沿用 A:B / C:D / E:G 合并、H 独立分析与邻行样式。走 OOXML 直改：仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化、其余 zip 条目字节不变（`count` 544→560、`uniqueCount` 524→540、dimension `A1:H49`→`A1:H53`、mergeCells 139→151），`xmllint --noout` 通过，读回 A50–A53 / C50 / H53 正常（行高 240、黄色底纹、宋体 11）。
 
+- `21:39`（新增）`docs/training_log.md`、`docs/experiments.md`、`docs/D010-full-training.md`：回填 D-010 推理与耗时自检记录。四组 test 推理（1414 studies / 14,140 行）耗时 a 46s / b 47s / c 46s / d 21s，单组端到端计费均值 45.99 / 45.57 / 46.07 / 59.86 ms；最终提交采用 D-010-a + D-010-d 概率等权融合（`fusion probability`、`weights [1,1]`），`outputs/ensemble/D-010-ad/submission.csv`，融合计费均值 60.7 ms（p95 69.20、最大 72.12），0 个 study 与提交不一致；`cost_ensemble.json` 随提交包提供，权重合计 193 MB。
+
+- `21:39`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 1 行（行 54，D-010-a+d 融合提交），沿用合并与邻行样式；OOXML 直改仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化，`xmllint --noout` 通过。
+
 
 ## 2026-11-06
 
