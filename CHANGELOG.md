@@ -33,6 +33,10 @@
 
 - `21:39`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 1 行（行 54，D-010-a+d 融合提交），沿用合并与邻行样式；OOXML 直改仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化，`xmllint --noout` 通过。
 
+- `21:43`（新增）`docs/experiments.md`、`docs/training_log.md`：登记 A-FUSE-7（D-010-a + D-010-d 双骨干等权概率融合的 test 提交）。两成员均为 train+valid 全量训练（19,372 studies、无独立验证集），故无 valid Macro-AUC / F1；test 1414 studies / 14,140 行，融合端到端 60.7 ms/study（3 轮 60.10 / 60.07 / 61.73、p95 69.20、最大 72.12、上限 100 ms），0 个 study 与提交不一致，权重 193 MB；归档 `outputs/submission_A-FUSE-7_D010a-D010d_prob_w11.csv`（SHA-256 `73b60421…`）。training_log 汇总表同时补 A-FUSE-6 行（此前只记在 experiments.md）。尚未提交平台。
+
+- `21:43`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：A系列实验 sheet 追加 1 行（行 35，A-FUSE-7），沿用 A:B / C:D / E:G 合并与 H 独立分析；OOXML 直改仅目标 worksheet 与 `xl/sharedStrings.xml` 变化，`xmllint --noout` 通过。
+
 
 ## 2026-11-06
 
