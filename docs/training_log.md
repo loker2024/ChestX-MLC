@@ -3786,6 +3786,26 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 判读：**在 8 轮、lr 3e-4、EMA 0.999 预算下，按患者检查次数重加权采样明确有害，且其设计目标（改善多检查患者的 AUC）没有兑现。** 三点限制须一起引用：①早停口径与基线不同（`ema_auc` vs raw），但 D-008 的同口径对照只有 −0.0043 / −0.0079，不足以解释 −0.02；②单次训练、双 seed（a/b），不是 3 seed 复核，且 b 的 Δ 比 a 更大，seed 间差异提示效应量本身有波动；③两组都只跑 4 轮、最优轮次前移到第 1–2 轮，结论严格限于该预算——不排除更短训练、更强正则或更小目标占比下重采样有用。此外**未逐 epoch 记录实际多检查占比**（配置期望 0.665，有放回采样每轮有波动），实际占比未核验，这一点已披露。
 - 产物：`outputs/20261107-112733_D-009-a/`、`outputs/20261107-114205_D-009-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`，无 `last.pt`）；`outputs/predictions/valid/D-009-{a,b}{,-EMA}.csv`；`outputs/eval_reports/D-009-{a,b}{,-EMA}.txt` 与 `D-009-{a,b}{,-EMA}_analysis.json`。本机 `outputs/experiments/D-009-{a,b}/` 三件套已同步。
 
+## D-010：train + valid 合并全量训练（固定 5 轮，a/b/c Tiny 三 seed + d EfficientNetV2-S）
+
+- 设计：D-010 不做对照实验，目标是用**全部官方训练数据**（官方 train 30,345 行 + valid 1,423 行合并为 19,372 studies）训练最终提交候选。四组配置 `configs/exp_D010{a,b,c,d}.yaml`：a/b/c 为 ConvNeXt-Tiny `fb_in1k`、seed 42 / 2026 / 216（三 seed 集成与一致性检验），d 为 EfficientNetV2-S `ra2_in1k`、seed 42（换骨干对照）。训练口径同 D-002-a：320 letterbox、view_weighted 0.7、batch 16 studies、BCE + **按合并标签重算**的 `pos_weight`、AdamW lr 3e-4、warmup 2、EMA 0.999；`data.full_train: true` 关闭 `resplit`、早停与训练期验证，固定 5 轮（cosine 终点仍第 8 轮），导出末轮 EMA 为 `final_ema.pt`。四组均要求实际加载 ImageNet 预训练权重，禁止 `--init-from`。
+- 数据与清单（训练前核对）：`data/train.csv` 30,345 行 + `data/valid.csv` 1,423 行 → 19,372 studies；合并时复用跨来源患者、study 与 Dicom ID 的重复检查。每组生成 `full_train_manifest.json`（6.9 MB，含各 study 来源、标签、图片 ID 与两个 CSV 的 sha256），清单 SHA-256 **0766a71e5fd5745da6cea3c0e263f60f19011cb11bc94804d2c86f36a917b45c**，四组一致并写入 `train.log` 与 checkpoint metadata（续训校验）。pos_weight 按合并后 19,372 studies 重算：首类 28.99、末类 1.77（类别阳性数差异造成，与 D-002-a 的 18,513 studies 口径不同）。
+- 执行（2026-11-07，sjy RTX 3090 24G 独占，`setsid nohup` 串行四组、`HF_HUB_OFFLINE=1`）：a 12:25:17–12:39:39（**14m26s**）、b 12:39:39–12:53:44（**14m05s**）、c 12:53:44–13:08:04（**14m20s**）、d 13:08:04–13:23:16（**15m12s**）。四组启动日志均确认「预训练权重: 已加载」，训练 study 19,372、无验证集，每轮 1,210 个 batch（`drop_last`，末 12 张不足一批丢弃，日志 EMA 更新 1,210 次/轮）；四组 `rc=0`，日志无 warning / error / traceback。
+- 结果（无独立验证集，只有训练期指标）：
+
+  | 组 | 骨干 | seed | 起止 | 耗时 | 5 轮 train_loss | final_ema.pt SHA-256 |
+  | --- | --- | ---: | --- | ---: | --- | --- |
+  | D-010-a | `convnext_tiny.fb_in1k` | 42 | 12:25:17–12:39:39 | 14m26s | 0.9892 → 0.9364 → 0.8893 → 0.8410 → **0.7524** | `5d70af6e16e37ebb655ffc8b3c57179f89ec10a74c9caa0b1b24bd1521ebac48` |
+  | D-010-b | `convnext_tiny.fb_in1k` | 2026 | 12:39:39–12:53:44 | 14m05s | 0.9837 → 0.9303 → 0.8880 → 0.8397 → **0.7568** | `de97126925cebbe0582dab5ae5086a038bb4d7c33ebc526fc63a9cdd8f45ef69` |
+  | D-010-c | `convnext_tiny.fb_in1k` | 216 | 12:53:44–13:08:04 | 14m20s | 0.9952 → 0.9382 → 0.8956 → 0.8460 → **0.7632** | `8ff8b95b8976bf17dc514e2844a9c9f5c620b457ff9c33ed80c410dd4eaff9c1` |
+  | D-010-d | `efficientnetv2_rw_s.ra2_in1k` | 42 | 13:08:04–13:23:16 | 15m12s | 0.9881 → 0.9247 → 0.8692 → 0.8104 → **0.7037** | `3806f8c50d8521b785ec0839ff0acefc94176ce4803e54ae47c53b23fc0bb061` |
+
+- 判读：**全量训练没有独立验证分数**。原 valid 已进入训练，不能以原 valid 分数比较 D-002-a-EMA（0.8100），也不能根据平台反馈反复挑模型——四组之间、以及与历史对照的优劣只能靠 test 提交反馈或事先固定的融合策略判断，不能拿 `metrics.csv` 的训练 loss 选模型。
+- 训练 loss 四组均单调下降，末轮相对首轮降幅 a −0.2368 / b −0.2269 / c −0.2320 / d −0.2844；**跨组 loss 不可横向比较**（不同骨干的容量、损失尺度与正负样本难度不同），d 组末轮 0.7037 最低不能读成「d 最好」。
+- 耗时四组 14m05s–15m12s（均值约 14m30s），比 D-002-a 的 34m57s（7 轮、含每轮验证）短，原因是只跑 5 轮且跳过验证；合并训练集后每轮步数由 1,157 增至 1,210（+4.6%），单轮约 2m50s，未出现显存或数据加载瓶颈。
+- 限制：①5 轮是预先选定的预算，**不证明是最优轮数**；②没有验证曲线，无法从数据侧判断过拟合点，只能依赖预设预算与后续 test 反馈；③单次训练/组，seed 间差异没有验证集可量化；④产物大小 `final_ema.pt` 107 MB（Tiny）/ 86 MB（EffNetV2-S），`last.pt` 532 MB / 426 MB，四组磁盘合计约 2.5 GB。
+- 产物：`outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`（每组 `config.yaml`、`train.log`、`metrics.csv`、`full_train_manifest.json`、`last.pt`、`final_ema.pt`、TensorBoard）；无 valid predictions / eval_reports（全量训练无验证集）。
+
 ## 环境
 
 | 项 | 值 |

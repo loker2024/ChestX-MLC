@@ -25,6 +25,10 @@
 - `20:22`（新增／变更）`src/common/config.py`、`src/data/dataset.py`、`src/train/engine.py`、`src/run_train.py`：新增 train+valid 全量训练模式，关闭重划分、验证选优与早停，按固定轮数导出末轮 EMA；记录数据清单及哈希、pos_weight 与断点续训状态，允许全量训练的 cosine 终点晚于训练结束。历史训练默认行为保持原样。未运行测试或训练。
 
 - `20:22`（新增）`configs/exp_D010a.yaml`、`configs/exp_D010b.yaml`、`configs/exp_D010c.yaml`、`configs/exp_D010d.yaml`、`docs/D010-full-training.md`：准备三种 ConvNeXt-Tiny seed 与一组 EfficientNetV2-S 的全量训练配置和操作说明；固定 5 轮并保留 8 轮 cosine 日程，尚未训练或评测。
+- `21:28`（新增）`docs/training_log.md`、`docs/experiments.md`：回填 D-010（train+valid 合并全量训练，固定 5 轮；a/b/c 为 ConvNeXt-Tiny `fb_in1k` seed 42/2026/216，d 为 EfficientNetV2-S `ra2_in1k` seed 42）记录。四组 2026-11-07 12:25–13:23 串行执行，耗时 14m26s / 14m05s / 14m20s / 15m12s；训练 19,372 studies、无验证集，每轮 1,210 batch，四组均确认预训练权重已加载、`rc=0`；5 轮 train_loss 末值 a 0.7524 / b 0.7568 / c 0.7632 / d 0.7037，`final_ema.pt` SHA-256 `5d70af6e…` / `de971269…` / `8ff8b95b…` / `3806f8c5…`，全量清单 SHA-256 四组一致 `0766a71e…`。判读：全量训练无独立验证分数，原 valid 已并入训练，不能比较 D-002-a-EMA，也不能按平台反馈反复挑模型；train_loss 跨骨干不可横向比较；5 轮为预设预算、单次训练/组，无验证曲线不能判断过拟合点。
+
+- `21:28`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 4 行（行 50–53，D-010-a/b/c/d），沿用 A:B / C:D / E:G 合并、H 独立分析与邻行样式。走 OOXML 直改：仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化、其余 zip 条目字节不变（`count` 544→560、`uniqueCount` 524→540、dimension `A1:H49`→`A1:H53`、mergeCells 139→151），`xmllint --noout` 通过，读回 A50–A53 / C50 / H53 正常（行高 240、黄色底纹、宋体 11）。
+
 
 ## 2026-11-06
 
