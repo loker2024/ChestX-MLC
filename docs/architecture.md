@@ -80,6 +80,8 @@ outputs/
 |---|---|---|
 | `engine.py` | 单 epoch 训练与验证、AMP（`evaluate` 的 `use_amp=False` 可强制 fp32 前向）、梯度裁剪、学习率调度、早停、逐 epoch 记录、断点续训 | `fit(cfg, model, train_loader, val_loader, device, *, progress, optimizer_state, scheduler_state, scaler_state, on_epoch_end) -> dict`（`history / best_epoch / best_macro_auc / best_metrics / best_state / progress`）；`TrainProgress` 存进度与最优快照，`TrainRuntime` 暴露优化器/调度器/AMP 供回调落盘 |
 
+训练时，在不启用 `data.resplit` 的配置下，逐轮 raw 和 EMA 验证还会统计该验证 CSV 中患者的不同 `Study_id` 数，对检查次数 ≥5、≥10 的 study 子集分别输出 Macro-AUC、study 数和有效类别数，并写入 `metrics.csv` 与 TensorBoard。若某类在子集内只有单一标签，该类不参与平均；没有有效类别时 AUC 为 NaN。检查次数不按图片数计算，也不包含其他数据划分。使用官方 valid 时才是官方验证集分层；启用 resplit 时不输出此分层。两项分层只作诊断，不影响现有早停和 checkpoint 选择。
+
 ### 3.5 infer：推理与提交
 
 | 文件 | 职责 | 关键接口 |

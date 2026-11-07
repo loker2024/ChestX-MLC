@@ -233,6 +233,9 @@ class TrainConfig:
     asl_gamma_pos: float = 0.0  # ASL 正样本聚焦指数；论文默认 0，即不衰减正样本
     asl_gamma_neg: float = 4.0  # ASL 负样本聚焦指数；越大，简单负样本被压制得越狠
     asl_clip: float = 0.05  # ASL 概率移位量 m：负样本概率先推低 m 再取对数
+    study_sampler: str = "uniform"  # "uniform"=按 CSV 顺序打乱；"patient_count"=按患者检查次数重加权有放回采样
+    study_sampler_threshold: int = 5  # 患者在训练集中的检查次数 >= 此值归入“多检查”组
+    study_sampler_target_share: float | None = None  # 目标：每个 epoch 抽到“多检查”组 study 的期望占比，仅 patient_count 使用
 
     def __post_init__(self) -> None:
         if self.early_stop_monitor not in {None, "raw_auc", "ema_auc"}:
@@ -300,6 +303,16 @@ class TrainConfig:
             raise ValueError(f"train.loss 只能是 'bce'、'asl' 或 'aucm'，当前为 {self.loss!r}")
         if self.loss == "aucm" and (self.pos_weight or self.head_lr is not None or self.batch_studies < 2 or self.batch_studies % 2):
             raise ValueError("aucm 要求 pos_weight=false、head_lr=null 且 batch_studies 为至少 2 的偶数")
+        if self.study_sampler not in {"uniform", "patient_count"}:
+            raise ValueError(f"train.study_sampler 只能是 'uniform' 或 'patient_count'，当前为 {self.study_sampler!r}")
+        if self.study_sampler == "patient_count":
+            if self.loss == "aucm":
+                raise ValueError("patient_count 采样不能与 AUCM 的 batch 采样器同用")
+            if isinstance(self.study_sampler_threshold, bool) or not isinstance(self.study_sampler_threshold, int) or self.study_sampler_threshold < 2:
+                raise ValueError("train.study_sampler_threshold 必须是 >= 2 的整数")
+            share = self.study_sampler_target_share
+            if share is None or not math.isfinite(share) or not 0 < share < 1:
+                raise ValueError("patient_count 采样需要 train.study_sampler_target_share，且须在 (0, 1) 内")
         if self.aucm_require_bce_init and self.loss != "aucm":
             raise ValueError("aucm_require_bce_init 仅适用于 AUCM")
         if self.asl_gamma_pos < 0 or self.asl_gamma_neg < 0:

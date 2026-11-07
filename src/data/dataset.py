@@ -12,12 +12,14 @@
 没有一张假图，也与「同一 study 内多图 logits 取均值」的聚合口径一致。
 """
 
+from collections import Counter
 from pathlib import Path
 from typing import Any, Callable
 
+import numpy as np
 import torch
 from PIL import Image
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 from common.config import Config
 from data.index import StudyRecord, read_split
@@ -106,6 +108,23 @@ def collate_studies(batch: list[dict[str, Any]]) -> dict[str, Any]:
     return collated
 
 
+def patient_count_weights(records: list[StudyRecord], threshold: int, target_share: float) -> torch.Tensor:
+    """按患者在本训练集中的检查次数给每个 study 一个采样权重。
+
+    组一：患者检查次数 >= threshold（“多检查”）；组二：其余。
+    每组的权重总和等于目标占比，因此期望上抽到多检查组的 study 比例为 target_share，
+    组内各 study 权重相同，组内顺序不变。只使用训练集记录，不读取 valid 或 test。
+    """
+    counts = Counter(record.subject_id for record in records)
+    multi = np.array([counts[record.subject_id] >= threshold for record in records], dtype=np.float64)
+    total = len(records)
+    if multi.sum() == 0 or multi.sum() == total:
+        raise ValueError("patient_count 采样要求训练集中两组 study 都非空")
+    current = multi.sum() / total
+    weights = np.where(multi > 0, target_share / current, (1.0 - target_share) / (1.0 - current))
+    return torch.as_tensor(weights, dtype=torch.float64)
+
+
 def build_loader(
     cfg: Config, split: str, train: bool = False, pin_memory: bool = False,
     manifest_path: str | Path | None = None,
@@ -154,6 +173,21 @@ def build_loader(
         labels = np.stack([record.labels for record in records])
         return DataLoader(dataset, batch_sampler=AUCMBatchSampler(labels, batch_size, cfg.seed),
                           num_workers=cfg.train.num_workers, collate_fn=collate_studies, pin_memory=pin_memory)
+    if train and cfg.train.study_sampler == "patient_count":
+        # 有放回的加权采样：每个 epoch 仍抽 len(records) 个 study，与 uniform 的步数一致。
+        sampler = WeightedRandomSampler(
+            patient_count_weights(records, cfg.train.study_sampler_threshold, cfg.train.study_sampler_target_share),
+            num_samples=len(records), replacement=True,
+            generator=torch.Generator().manual_seed(cfg.seed),
+        )
+        return DataLoader(
+            dataset,
+            batch_size=batch_size,
+            sampler=sampler,
+            num_workers=cfg.train.num_workers,
+            collate_fn=collate_studies,
+            pin_memory=pin_memory,
+        )
     return DataLoader(
         dataset,
         batch_size=batch_size,

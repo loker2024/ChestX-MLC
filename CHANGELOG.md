@@ -8,6 +8,16 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-11-07
+
+- `13:22`（新增）`src/common/config.py`、`src/data/dataset.py`：新增训练采样选项 `train.study_sampler: patient_count`，按训练集中患者的检查次数（阈值 `study_sampler_threshold`，默认 5）给每个 study 加权，用有放回加权采样使“多检查”组的期望占比等于 `study_sampler_target_share`；每个 epoch 仍抽 study 数个样本，步数与 `uniform` 一致。默认 `uniform` 保持原行为；与 AUCM 采样器互斥，并校验阈值与目标占比范围。权重只读训练集记录，不读 valid 或 test。尚未训练或验证。
+
+- `13:22`（新增）`configs/exp_D009a.yaml`：D-002-a 的唯一变量对照，仅增加 `study_sampler: patient_count`、阈值 5、目标占比 0.665（valid 中 571/859 study 来自多检查患者，与测试集多检查比例一致）；seed、轮数、EMA 与早停口径同 D-002-a。尚未训练。
+
+- `13:27`（新增）`src/train/engine.py`、`docs/architecture.md`：每轮 raw/EMA 验证新增患者在配置的 valid 中检查数 ≥5、≥10 的 study 级 Macro-AUC，记录 study 数及 AUC 有效类别数至日志和 metrics.csv，并写入 TensorBoard；resplit 不输出官方分层指标。未运行测试或训练。
+
+- `13:38`（新增）`configs/exp_D009b.yaml`：新增 D-009-a 的 seed 2026 独立配置，采样阈值、目标占比与其余训练参数不变；尚未训练。
+
 ## 2026-11-06
 
 - `13:22`（新增）`configs/exp_D007a.yaml`–`configs/exp_D007e.yaml`：准备提前完成 cosine 的配对复核，新增 seed 42 基线及 seed 2026、216 的各一组基线和候选；seed 42 候选复用 D-006-b，统一 EMA 早停，其余训练设置保持一致。尚未训练。

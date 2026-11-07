@@ -284,6 +284,7 @@ def evaluate(
     *,
     with_per_class: bool = False,
     use_amp: bool | None = None,
+    study_patient_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """在带标签的数据集（也是 valid）上跑一遍，返回 loss 与按 study 计算的指标。
 
@@ -305,6 +306,7 @@ def evaluate(
     total_studies = 0
     logits_list: list[torch.Tensor] = []
     labels_list: list[torch.Tensor] = []
+    study_ids: list[str] = []
 
     for batch in loader:
         images = batch["images"].to(device, non_blocking=True)
@@ -321,6 +323,8 @@ def evaluate(
             )
 
         num_studies = len(batch["study_ids"])
+        if study_patient_counts is not None:
+            study_ids.extend(batch["study_ids"])
         valid_criterion = nn.BCEWithLogitsLoss() if isinstance(criterion, AUCMLoss) else criterion
         total_loss += valid_criterion(study_logits.float(), labels.float()).item() * num_studies
         total_studies += num_studies
@@ -338,6 +342,19 @@ def evaluate(
         "macro_auc": macro_auc(y_true, y_score),
         "macro_f1": macro_f1(y_true, y_score, config.eval.threshold),
     }
+    if study_patient_counts is not None:
+        if len(study_ids) != len(y_true) or any(study_id not in study_patient_counts for study_id in study_ids):
+            raise ValueError("验证批次的 Study_id 与患者检查次数映射不一致")
+        counts = np.array([study_patient_counts[study_id] for study_id in study_ids])
+        for minimum in (5, 10):
+            mask = counts >= minimum
+            size = int(mask.sum())
+            labels = y_true[mask]
+            valid_classes = int(np.sum((labels.sum(axis=0) > 0) & (labels.sum(axis=0) < size))) if size else 0
+            key = f"patient_ge{minimum}"
+            metrics[f"{key}_studies"] = size
+            metrics[f"{key}_auc_classes"] = valid_classes
+            metrics[f"{key}_macro_auc"] = macro_auc(labels, y_score[mask]) if valid_classes else float("nan")
     if with_per_class:
         metrics["per_class"] = per_class_report(y_true, y_score, config.eval.threshold)
     return metrics
@@ -373,6 +390,10 @@ def _log_valid_curves(
     writer.add_scalar("valid/loss", metrics["loss"], epoch)
     writer.add_scalar("valid/macro_auc", metrics["macro_auc"], epoch)
     writer.add_scalar("valid/macro_f1", metrics["macro_f1"], epoch)
+    for minimum in (5, 10):
+        key = f"patient_ge{minimum}_macro_auc"
+        if key in metrics and math.isfinite(metrics[key]):
+            writer.add_scalar(f"valid/{key}", metrics[key], epoch)
     # EMA 面板首轮之前没有最优值（NaN），写进去只会留一段无意义的断点。
     if math.isfinite(best_auc):
         writer.add_scalar("valid/best_macro_auc", best_auc, epoch)
@@ -482,6 +503,15 @@ def fit(
             ema.load_state_dict(progress.ema_state)
     if scheduler_state is not None and scheduler.last_epoch == progress.epoch - 1:
         scheduler.step()  # 旧版 last.pt 是在 scheduler.step() 之前保存的。
+    # 仅按当前验证划分内唯一 study 计数；resplit 不是官方验证集，不能误称为官方口径。
+    study_patient_counts = None
+    records = getattr(getattr(val_loader, "dataset", None), "records", None)
+    if records is not None and not config.data.resplit.enabled:
+        patient_studies: dict[str, set[str]] = {}
+        for record in records:
+            patient_studies.setdefault(record.subject_id, set()).add(record.study_id)
+        study_patient_counts = {record.study_id: len(patient_studies[record.subject_id]) for record in records}
+        print(f"患者检查分层：以配置的 valid CSV 为范围（{config.data.valid.csv}），按不同 Study_id 计数")
     # best_state 记录当前最优权重；续训时沿用存档里的，不能拿当前权重覆盖。
     # 若整场 AUC 都无效，函数末尾会显式报错，而不是保存随机权重。
     if progress.best_state is None:
@@ -503,7 +533,8 @@ def fit(
             train_loss = train_one_epoch(config, model, train_loader, criterion, optimizer, scaler, device, ema=ema, **distill_kwargs)
         # 只有真要写曲线时才多算一遍逐类明细，默认路径的开销保持不变。
         valid_metrics = evaluate(
-            config, model, val_loader, criterion, device, with_per_class=writer is not None
+            config, model, val_loader, criterion, device, with_per_class=writer is not None,
+            **({"study_patient_counts": study_patient_counts} if study_patient_counts is not None else {}),
         )
         auc = valid_metrics["macro_auc"]
         ema_metrics = None
@@ -514,6 +545,7 @@ def fit(
                 ema_metrics = evaluate(
                     config, ema.model, val_loader, criterion, device,
                     with_per_class=ema_writer is not None,
+                    **({"study_patient_counts": study_patient_counts} if study_patient_counts is not None else {}),
                 )
         ema_improved = False
         if ema_metrics is not None:
@@ -540,6 +572,17 @@ def fit(
                 "valid_macro_f1": valid_metrics["macro_f1"],
             }
         )
+        for name, metrics in (("raw", valid_metrics), ("ema", ema_metrics)):
+            if metrics is None or "patient_ge5_macro_auc" not in metrics:
+                continue
+            details = []
+            for minimum in (5, 10):
+                key = f"patient_ge{minimum}"
+                for suffix in ("macro_auc", "studies", "auc_classes"):
+                    progress.history[-1][f"{name}_valid_{key}_{suffix}"] = metrics[f"{key}_{suffix}"]
+                details.append(f">={minimum}: AUC {metrics[f'{key}_macro_auc']:.4f} "
+                               f"(study {metrics[f'{key}_studies']}, 有效类 {metrics[f'{key}_auc_classes']}/10)")
+            print(f"  {name.upper()} 患者检查分层 | " + " | ".join(details))
         if "hard" in loss_stats:
             progress.history[-1].update(train_hard_loss=loss_stats["hard"], train_soft_loss=loss_stats["soft"])
         if "mixup_fraction" in loss_stats:
