@@ -3809,6 +3809,32 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 产物：`outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`（每组 `config.yaml`、`train.log`、`metrics.csv`、`full_train_manifest.json`、`last.pt`、`final_ema.pt`、TensorBoard）；无 valid predictions / eval_reports（全量训练无验证集）；test 推理、融合产物与耗时见下条。
 - 推理与耗时（2026-11-07）：四组 `final_ema.pt` 13:30:20–13:33:00 跑 test（1414 studies / 14,140 行、全部 10 类概率），推理耗时 a 46s / b 47s / c 46s / d 21s，`rc=0`；单组端到端计费均值 a 45.99 / b 45.57 / c 46.07 / d 59.86 ms（batch=1、100 个计时 study + 5 个预热 study、连续 3 轮、fp32，与各自 submission 比对 0 个 study 不一致）。最终提交采用 **a + d 概率等权融合**（`fusion: probability`、`weights [1, 1]`）：`outputs/ensemble/D-010-ad/submission.csv`（1414 studies / 14,140 行）与 `cost_ensemble.json`；融合计费均值 **60.7 ms**（3 轮 60.10 / 60.07 / 61.73，中位数 60.97、p95 69.20、最大 72.12，上限 100 ms），与提交概率最大差 2.96e-4、0 个 study 不一致。两模型均为 320 letterbox + `view_weighted` 0.7、预处理签名相同，计时循环对同一 study 只解码一次并复用预处理，故融合耗时接近单组 d 而非两组之和；权重合计 193 MB < 500 MB、fp32。
 
+## D-011：骨干与输入分辨率扫描（a/b/e 中断，c/d 完成）
+
+- 设计：以 D-002-a（ConvNeXt-Tiny `fb_in1k` @320、EMA 0.8100）为对照，逐组只改「骨干 + 输入尺寸」：a DINOv2 ViT-S/14 `vit_small_patch14_reg4_dinov2.lvd142m` @336、b EVA02-S `eva02_small_patch14_336.mim_in22k_ft_in1k` @336、c ConvNeXt-T `fb_in1k` @448、d 同 c @512、e CLIP ViT-B/16 `vit_base_patch16_clip_224.laion2b` @224。其余口径逐字段沿用 D-002-a：8 轮、batch 16 studies、AdamW lr 3e-4 + warmup 2 + cosine 至 1e-5、BCE + pos_weight、EMA 0.999、early_stop_patience 2、view_weighted 0.7、letterbox、ImageNet 归一化、`hflip: false`、`require_pretrained: true`。新增 `model.use_configured_img_size`（默认关闭），a/b/e 置 true 后把 `image.size` 作为 `img_size` 传给 timm。**c/d 是干净单变量（只改尺寸），a/b/e 同时换骨干与尺寸。**
+- 执行（2026-11-08，V100-SXM2-32G 独占，`setsid` 串行，`HF_ENDPOINT=https://hf-mirror.com` 走镜像拉权重，`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`）：
+  - a 11:38:46–12:13:14（**34m28s**，8 轮跑满、未早停），`rc=0`。
+  - b 12:13:14 起跑，2 轮后按用户指令于 12:29 前后停止（**中断组**，无 END 标记）。
+  - c 12:31:38–13:13:15（**41m37s**，7 轮，连续 2 轮无提升早停），`rc=0`。此前 12:29:26 首次启动时与并行运行的 fp32 探针抢显存触发 CUDA OOM（`Process 257085 has 24.41 GiB, Process 263426 has 7.30 GiB`），停止探针后重跑，产物残骸移入 `outputs/_aborted/`。
+  - d 13:13:15–13:52:42（**39m27s**，6 轮早停），`rc=0`。
+  - e 13:53:44 起跑，1 轮后按用户指令于 14:03 前后停止（**中断组**）。
+  - 五组启动日志均确认「预训练权重: 已加载」，训练 18,513 studies / valid 859 studies；全程 page cache 驱逐守护按 150 s 一轮运行，未出现 rc=137。
+- 结果（EMA 峰值权重，fp32 推理；分层口径按 `data/valid.csv` 患者去重 study 计数切分，ge5 = 571 studies、ge10 = 409 studies）：
+
+  | 组 | 骨干 @尺寸 | 参数量 | EMA 全集 | raw 全集 | 9 类 | ge5（10 类） | ge10（10 类） | F1@0.5 | 轮次 / 耗时 |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+  | D-002-a（对照） | ConvNeXt-T @320 | 27.8M | **0.8100** | 0.8004 | 0.8196 | 0.7663 | 0.7599 | 0.4283 | 7 / 34m57s |
+  | D-011-a | DINOv2-S/14 @336 | 21.8M | 0.6345 | 0.6353 | 0.6349 | 0.5935 | 0.5975 | 0.3081 | 8 / 34m28s |
+  | D-011-b（中断） | EVA02-S @336 | 21.7M | 0.6226（ep2） | 0.6431 | — | 0.6043 | 0.6117 | — | 2 / ~16m |
+  | D-011-c | ConvNeXt-T @448 | 27.8M | 0.8077 | 0.7995 | 0.8172 | 0.7668 | 0.7602 | 0.4282 | 7 / 41m37s |
+  | D-011-d | ConvNeXt-T @512 | 27.8M | 0.8068 | 0.7958 | 0.8177 | 0.7638 | 0.7605 | 0.4260 | 6 / 39m27s |
+  | D-011-e（中断） | CLIP ViT-B/16 @224 | 85.8M | 0.5505（ep1） | 0.5569 | — | 0.5235 | 0.5406 | 0.1515 | 1 / ~9m |
+
+- 判读一（分辨率）：**448 / 512 相对 320 无收益**。c 相对 D-002-a-EMA 为 **−0.0023**、d 为 **−0.0032**；7 个口径（全集 / 9 类 / ge5 / ge10，各含 10 类与 9 类，加 F1@0.5）差异全部落在 ±0.004 内，且**方向不一致**——ge10 的 10 类口径 c/d 反而 +0.0003 / +0.0006，同一组的 9 类口径转为 −0.0040 / −0.0026。逐类仅 c 的 class4 达 +0.0138，但该类 valid 只有 68 个正样本（单类 SE 约 0.03），不构成证据。代价是 c 耗时 +19%、d +13%，显存由约 11 GiB 升至约 25 GiB。**分辨率不是当前瓶颈。**
+- 判读二（ViT 系）：**a/b/e 三组在 D-002-a 配方下训练失效，且已排除混合精度**。a 的 8 轮 train_loss 仅 1.1741→1.0951，同轮 ConvNeXt 为 0.9916→0.4692；首轮 raw AUC 0.5806 对 0.7737，缺口从第 1 轮就存在，说明预训练特征没有被有效利用而非后期过拟合。b 首两轮 raw 0.6063 / 0.6431、e 首轮 0.5569，三组首轮全部落在 0.55–0.61。为定位原因另跑 fp32 探针（a 配置、`amp: false`、2 轮、warmup 1，lr 3e-4）：ep1 train_loss 1.1734 / raw 0.5635，与 AMP 的 1.1741 / 0.5806 同档 → **不是 fp16 数值问题**。timm 侧核对：`vit_small_patch14_reg4_dinov2` 传 `img_size=336` 后 pos_embed 由 (37,37) 正确插值为 (24,24)、仅 `head.weight/bias` 为新初始化、前向输出 (N,10) 正常，**不是尺寸适配的实现缺陷**。低分应归因于配方层（ViT 需要更低骨干 lr、更长 warmup 或先 frozen probe 再解冻），但**该归因是推断，未做配方级验证**。
+- 限制：①全部单 seed（42），与对照的差异都小于单次 study 级 bootstrap SE 0.0094，任何「更好 / 更差」都不成立；②b/e 分别只有 2 轮与 1 轮且为主动中断，**不能作为「EVA02 / CLIP 不行」的证据**；③a/b/e 同时变动骨干与分辨率，无法分离两者贡献；④D-002-a 当年未埋 ge5/ge10，本次用 `run_eval.py --pred-out` 导出其 EMA 逐 study 预测后按 `engine.py` 同一逻辑补算（全集复现 0.8100，口径一致），9 类口径同样由预测重算；⑤c 首启 OOM 后重跑，配置未变。
+- 产物：`outputs/20261108-113851_D-011-a/`、`-121329_D-011-b/`、`-123143_D-011-c/`、`-131319_D-011-d/`、`-135349_D-011-e/`（各含 `config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`tb/`、`tb_ema/`；`--no-save-last` 故无 `last.pt`）；补算预测在训练环境 `/tmp/d002a_valid.csv`、`/tmp/d011{a,c,d}_valid.csv`（未入库）；`outputs/_aborted/` 留有 c 首启 OOM 与 fp32 探针残骸。**五组均不进入提交候选。**
+
 ## 环境
 
 | 项 | 值 |

@@ -20,6 +20,10 @@
 
 - `11:22`（新增）`configs/exp_D011a.yaml`、`configs/exp_D011b.yaml`、`configs/exp_D011c.yaml`、`configs/exp_D011d.yaml`、`configs/exp_D011e.yaml`：分别准备 DINOv2-S/14@336、EVA02-S@336、ConvNeXt-T@448/512、CLIP ViT-B/16@224 的独立实验配置；沿用 D-002-a 训练口径，要求预训练加载，权重合规和运行表现尚待核验。
 
+- `14:18`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 D-011 骨干与分辨率扫描记录。执行 2026-11-08 11:38:46 起于 V100-SXM2-32G 串行：a DINOv2-S/14@336 34m28s（8 轮跑满）、b EVA02-S@336 跑 2 轮后按用户指令停止、c ConvNeXt-T@448 41m37s（7 轮早停，首启因与 fp32 探针并行触发 CUDA OOM，产物移入 `outputs/_aborted/` 后重跑）、d ConvNeXt-T@512 39m27s（6 轮早停）、e CLIP ViT-B/16@224 跑 1 轮后停止。结果：c EMA 0.8077、d 0.8068，相对 D-002-a-EMA 0.8100 为 −0.0023 / −0.0032，且全集 / 9 类 / ge5 / ge10（各含 10 类与 9 类）与 F1@0.5 共 7 个口径差异全在 ±0.004 内、方向互相翻转 → **分辨率 448/512 无收益**；a EMA 0.6345、b 2 轮 0.6431、e 1 轮 0.5569，三组 ViT 首轮全部落在 0.55–0.61，而同配方 ConvNeXt 首轮 0.7737 → **ViT 系训练失效**。另跑 fp32 探针（a 配置、`amp: false`、2 轮、warmup 1）ep1 train_loss 1.1734 / raw 0.5635，与 AMP 的 1.1741 / 0.5806 同档，排除混合精度；timm 侧确认 pos_embed 由 (37,37) 正确插值到 (24,24)、仅 head 新初始化，排除尺寸适配缺陷。D-002-a 当年未埋 ge5/ge10，本次用 `run_eval.py --pred-out` 导出其 EMA 逐 study 预测后按 `engine.py` 同一逻辑补算（全集复现 0.8100）。五组均单 seed、b/e 为中断组，均不进入提交候选。
+
+- `14:18`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 5 行（行 55–59，D-011-a..e），沿用 A:B / C:D / E:G 合并、H 独立分析与邻行样式。走 OOXML 直改：仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化、其余 22 个 zip 条目字节不变（`count` 568→588、`uniqueCount` 550→570、dimension `A1:H54`→`A1:H59`、mergeCells count 109→124），`xmllint --noout` 通过，Excel 只读打开无修复提示，读回 A55 / H59 正常且 A60 为空。
+
 ## 2026-11-07
 
 - `13:22`（新增）`src/common/config.py`、`src/data/dataset.py`：新增训练采样选项 `train.study_sampler: patient_count`，按训练集中患者的检查次数（阈值 `study_sampler_threshold`，默认 5）给每个 study 加权，用有放回加权采样使“多检查”组的期望占比等于 `study_sampler_target_share`；每个 epoch 仍抽 study 数个样本，步数与 `uniform` 一致。默认 `uniform` 保持原行为；与 AUCM 采样器互斥，并校验阈值与目标占比范围。权重只读训练集记录，不读 valid 或 test。尚未训练或验证。
