@@ -116,6 +116,7 @@ class ModelConfig:
     # timm 的 patch_embed 默认断言输入尺寸等于预训练尺寸。Swin 一类模型换分辨率
     # （例如 256 预训练、320 微调）必须置 false，否则前向直接抛 AssertionError。
     strict_img_size: bool = True
+    use_configured_img_size: bool = False  # 显式将 image.size 传给支持 img_size 的 timm 骨干
     pretrained: bool = True  # 是否加载预训练权重（timm 为 ImageNet；B 组为 TxRV 医学预训练）
     num_classes: int = NUM_CLASSES  # 输出维度，赛题固定 10
     drop_path_rate: float = 0.0

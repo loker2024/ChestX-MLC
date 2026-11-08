@@ -81,6 +81,8 @@ def build_model(cfg: Config) -> nn.Module:
     # 只有显式关闭时才把参数递给 timm：ConvNeXt / ResNet 等构造函数没有这个
     # 关键字，无脑透传会直接 TypeError。
     model_kwargs: dict[str, object] = {}
+    if cfg.model.use_configured_img_size:
+        model_kwargs["img_size"] = cfg.image.size
     if cfg.model.drop_path_rate:
         model_kwargs["drop_path_rate"] = cfg.model.drop_path_rate
     if not cfg.model.strict_img_size:
