@@ -1,0 +1,80 @@
+# S-001-a：参考工作簿 SW-02 的 Swin V2-Tiny 独立实验，非严格复现。
+# 必须先用 src/import_backbone.py 导入 torchvision swin_v2_t IMAGENET1K_V1，
+# 再以 run_train.py --init-from 指定导入结果；直接启动将因缺少预训练而停止。
+# 本仓库按 study 级 logits 聚合、16 studies/batch；与工作簿约 32 张图的 batch 不同。
+# 几何增强幅度及早停 min_delta 与工作簿未完全对齐；来源和实现差异须核验。
+data:
+  train:
+    csv: data/train.csv
+    images: data/images/train
+  valid:
+    csv: data/valid.csv
+    images: data/images/valid
+  test:
+    csv: data/test.csv
+    images: data/images/test
+  resplit:
+    enabled: false
+    valid_fraction: 0.1
+    seed: 42
+image:
+  size: 384
+  letterbox: true
+  normalize: imagenet
+  hflip: false
+  in_channels: 3
+  xrv_maxval: 255
+  brightness: 0.15
+  contrast: 0.15
+model:
+  backbone: swinv2_tiny_window8_256
+  use_configured_img_size: true
+  # timm 的 SwinV2 在 strict_img_size=true 且分辨率不是权重默认 256 时，构造静态
+  # mask 会报 RuntimeError（shape '[1,1,8,1,8,1]' invalid for input of size 144）；
+  # 置 false 改走动态 mask，384 输入可正常前向。relative position bias 只依赖
+  # window=8，与输入分辨率无关，不做 pos_embed 插值。
+  strict_img_size: false
+  pretrained: false
+  num_classes: 10
+  dropout: 0.0
+  head: standard
+  csra_residual_weight: 0.4
+  csra_temperature: 1.0
+  freeze_backbone: false
+  aggregation: view_weighted
+  frontal_weight: 0.7
+  arch: timm
+  xrv_weights: densenet121-res224-all
+  xrv_cache_dir: null
+  xrv_sha256: null
+train:
+  require_pretrained: true
+  ema_enabled: true
+  ema_decay: 0.999
+  epochs: 20
+  batch_studies: 16
+  lr: 0.00002
+  head_lr: 0.0002
+  weight_decay: 0.01
+  pos_weight: false
+  pos_weight_power: 1.0
+  warmup_epochs: 2
+  lr_scheduler: cosine
+  lr_min: 1.0e-05
+  amp: true
+  grad_clip: 5.0
+  num_workers: 16
+  tensorboard: auto
+  early_stop_monitor: ema_auc
+  early_stop_patience: 3
+  loss: asl
+  asl_gamma_pos: 1.0
+  asl_gamma_neg: 4.0
+  asl_clip: 0.05
+eval:
+  batch_studies: 32
+  threshold: 0.5
+output:
+  run_dir: outputs
+seed: 42
+device: auto
