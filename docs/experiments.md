@@ -108,6 +108,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | E-001-a | `E-001-a` | `configs/exp_E001a.yaml`（完整展开） | 8（早停 2，实际 3） | 是 | 同 E-001 骨干，`image.size` 320→384；已完成（原始 0.7865 / 0.4000，EMA 0.7969 / 0.4137，vs 基线 −0.0131，明显退化） |
 | Distill-1-a | `Distill-1-a` | `configs/exp_Distill1a.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | 固定融合教师离线蒸馏的配对基线：同代码、同预算、`distill_enabled: false`，seed 42；已完成（raw 0.7987 / 0.4351，EMA 0.8092 / 0.4339，9 类 0.8190） |
 | Distill-1-b | `Distill-1-b` | `configs/exp_Distill1b.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | 同 a 仅开 `distill_enabled: true`（λ=0.5、T=1，教师 A-FUSE-5 裁剪 logit 4:2:3 缓存）；已完成（raw 0.8024 / 0.4344，EMA 0.8109 / 0.4328，9 类 0.8172；vs a EMA +0.0017，CI [-0.0037, +0.0078] 跨 0，未达 +0.010） |
+| Distill-2-a | `Distill-2-a` | `configs/exp_Distill2a.yaml`（独立完整配置） | 6（固定预算，全量训练无早停） | 是 | 三模型概率融合教师（SW-02 + D-010-a + D-010-d，等权）在 train+valid 19,372 studies 上离线蒸馏；已完成（无干净 valid，in-sample valid 0.9253 / 0.5647）；test 提交已生成（1,414 studies，未上平台） |
 | D-006-a | `D-006-a` | `configs/exp_D006a.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | EMA 早停口径下的 DropPath 对照：`model.drop_path_rate` 0→0.1（其余同 D-002-a）；已完成（raw 0.8009 / 0.4331，EMA 0.8082 / 0.4271，9 类 0.8185；vs D-002-a-EMA −0.0019 / 9 类 −0.0012，CI [-0.0082, +0.0055] 跨 0） |
 | D-006-b | `D-006-b` | `configs/exp_D006b.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | EMA 早停口径下的学习率终点对照：`train.cosine_end_epoch` null→6，第 6 轮 LR 到 1e-5 并保持；已完成（raw 0.8071 / 0.4425，EMA **0.8108** / 0.4297，9 类 0.8189；vs 基线 EMA +0.0008、raw +0.0067，EMA CI [-0.0042, +0.0059] 跨 0） |
 | D-006-c | `D-006-c` | `configs/exp_D006c.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | EMA 早停口径下的 Study Mixup 对照：`mixup_alpha` 0.2、`mixup_prob` 0.3，同批内按视角签名配对（**实际覆盖率 0.2448**，低于配置概率）；已完成（raw 0.7988 / 0.4262，EMA 0.8076 / 0.4306，9 类 0.8159；vs 基线 −0.0017 / −0.0024，CI [-0.0077, +0.0038] 跨 0） |
@@ -821,6 +822,15 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   - **压缩损失点估计 0.006–0.008**：b-EMA 对教师 0.8171 / 0.8249 为 −0.0061（CI [-0.0125, +0.0009]）/ −0.0078；教师为 in-sample 三模型融合，单学生落后符合预期，但比较仅用历史记录值，不宣称非劣。
   - **软目标信息量有限**：b 的 `train_soft_loss` 0.5434→0.4919（epoch 5）→0.5501（epoch 7），全程仅降 0.05 量级，而 `train_hard_loss` 0.9787→0.4439；软 BCE 后程回升与 valid_loss 上升同步，说明教师与硬标签高度一致、软标签未提供额外排序信息。
 - 限制：教师软标签为 in-sample 且教师也在同一 valid 上选型；单 seed；同一 valid 反复选型；bootstrap 不覆盖训练随机性与选择偏差；未做 seed 2026 配对、test 评估、教师 valid 独立复算与学生耗时对比。结论限于「当前 λ/T、8 轮预算、单 seed 下无可测增益」，不外推到其他温度、权重或更长训练。
+
+**Distill-2：三模型概率融合教师的 train+valid 全量蒸馏**（配置 `configs/exp_Distill2a.yaml`，产物 `outputs/20261108-111052_Distill-2-a`，教师缓存 `outputs/distill/FUSE3_teacher`，2026-11-08）
+
+- 设计：以用户指定的三模型为教师——SW-02 `best_ema.pth`（torchvision `swin_v2_t` @384，ASL + EMA，官方 valid 0.8087）、D-010-a `final_ema.pt`（ConvNeXt-Tiny @320）、D-010-d `final_ema.pt`（EfficientNetV2-S RW-S @320）——各自按 checkpoint 配置做 study 聚合后等权概率平均，落盘 19,372 个 train+valid study 的软标签（`fusion=probability_mean`、`weights=[1,1,1]`、`split=train_full`；缓存 SHA-256 `59bd0142…`、predictions `b6f154d5…`，in-sample 非 OOF）。学生 `convnext_tiny.fb_in1k` @320，seed 42，batch 16 studies，lr 3e-4，warmup 2，cosine 6 轮，`lr_min=1e-5`，BCE + `pos_weight`，EMA 0.999，λ=0.5，AMP，`grad_clip=5.0`；`data.full_train: true`、无 resplit、无早停。
+- 执行：2026-11-08 19:10:52–19:27:49（16m57s，6/6 轮）。train_loss 逐轮 1.2763 / 1.2125 / 1.1601 / 1.0889 / 0.9516 / 0.8499；`final_ema.pt` SHA-256 `ba09c21f…fc89e`。
+- 结果：全量训练无独立验证集，未产生干净 valid 指标。补算 **in-sample** valid（859 studies，valid 已入训）10 类 Macro-AUC **0.9253** / F1@0.5 **0.5647**（0.6→0.6161、0.7→0.6307），逐类 AUC 0.8038（c8）–0.9931（c2）。该数字只能与同样全量训练的 D-010-a 0.8937 / D-010-d 0.9242 对照，不能与干净口径 D-002-a-EMA 0.8100、SW-02 0.8087 并列。
+- test 提交：`outputs/20261108-111052_Distill-2-a/submission.csv`，1,414 studies / 14,140 行、10 类齐全、无 NaN、概率 [0.0019, 0.9978]，SHA-256 `64fe190c…14e8`。未上传平台。
+- 判读：管线（full_train + 蒸馏 + 外部 Swin 教师）首次跑通，但没有任何干净验证证据支持「蒸馏/融合有效」；in-sample 指标升高是同一个 859 个 study 被学生拟合的结果。教师混合了 320 与 384 两种输入尺寸和 G0 / view_weighted 两种聚合口径，等权概率平均未校准。6 轮末 train_loss 仍下降，预算偏短，但全量训练无法用 valid 判断过拟合，只能等平台分数。
+- 限制与未执行：单 seed；教师 in-sample 且 SW-02 为外部权重；未做多 seed、平台提交、`cost.py` 测时、bootstrap、教师 valid 复算；in-sample valid 指标含泄漏，不可作选型依据。
 
 **D-006：单模型 AUC 三方向初筛（已完成）**（配置 `configs/exp_D006a.yaml`、`configs/exp_D006b.yaml`、`configs/exp_D006c.yaml`，产物 `outputs/20261104-193131_D-006-a`、`outputs/20261104-201457_D-006-b`、`outputs/20261104-205718_D-006-c`，2026-11-04）
 

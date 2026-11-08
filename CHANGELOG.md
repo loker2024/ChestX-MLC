@@ -34,6 +34,8 @@
 
 - `19:35`（新增）`src/run_distill_teacher_fuse.py`、`configs/exp_Distill2a.yaml`；（变更）`src/common/config.py`、`src/train/distillation.py`：支持 train+valid 全量离线蒸馏并接入三教师融合。新脚本对 SW-02 `best_ema.pth`（torchvision `swin_v2_t` @384，SHA-256 `262e7d36…`）、D-010-a / D-010-d 的 `final_ema.pt`（`5d70af6e…` / `3806f8c5…`）分别做 study 聚合后等权概率平均，落盘 `outputs/distill/FUSE3_teacher/`（19,372 studies，`fusion=probability_mean`、`weights=[1,1,1]`、`split=train_full`、predictions SHA-256 `b6f154d5…`、缓存 SHA-256 `59bd0142…`）；配置允许 `full_train` 与 `distill_enabled` 同时开启（仍要求关闭 resplit/早停、开启 EMA、使用 BCE），`TeacherCache.load` 的融合来源改为白名单 `TEACHER_FUSIONS`、weights 校验改为非负且与教师数一致。训练 `Distill-2-a` 19:10:52–19:27:49（16m57s，6/6 轮，lr 1.5e-4→1e-5，train_loss 1.2763→0.8499，EMA 7,263 次），`final_ema.pt` SHA-256 `ba09c21f…`；test 推理 1,414 studies / 14,140 行生成 `outputs/20261108-111052_Distill-2-a/submission.csv`（SHA-256 `64fe190c…`），未上传平台。
 
+- `19:35`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 Distill-2 全量蒸馏记录。`training_log.md` 在 Distill-1 之后、汇总之前新增 `## Distill-2` 小节（教师身份与缓存哈希、管线改动、执行事实、in-sample valid 0.9253 / 0.5647、test 提交校验、判读与限制）；`experiments.md` 矩阵新增 Distill-2-a 行，并在 Distill-1 执行小节之后新增同名执行小节。核心判读：**管线跑通、提交已生成，但没有干净验证证据支持蒸馏/融合带来泛化增益**；in-sample 指标只能与同样全量训练的 D-010-a/d 对照，不能与干净口径 D-002-a-EMA 0.8100 / SW-02 0.8087 并列。
+
 ## 2026-11-07
 
 - `13:22`（新增）`src/common/config.py`、`src/data/dataset.py`：新增训练采样选项 `train.study_sampler: patient_count`，按训练集中患者的检查次数（阈值 `study_sampler_threshold`，默认 5）给每个 study 加权，用有放回加权采样使“多检查”组的期望占比等于 `study_sampler_target_share`；每个 epoch 仍抽 study 数个样本，步数与 `uniform` 一致。默认 `uniform` 保持原行为；与 AUCM 采样器互斥，并校验阈值与目标占比范围。权重只读训练集记录，不读 valid 或 test。尚未训练或验证。
