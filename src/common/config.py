@@ -372,8 +372,8 @@ class Config:
             raise ValueError("蒸馏暂不支持 resplit")
         if not self.data.full_train and self.train.cosine_end_epoch is not None and self.train.cosine_end_epoch > self.train.epochs:
             raise ValueError("普通训练的 cosine_end_epoch 不得超过 epochs")
-        if self.data.full_train and (self.data.resplit.enabled or not self.train.ema_enabled or self.train.early_stop_patience != 0 or self.train.distill_enabled or self.train.loss != "bce"):
-            raise ValueError("full_train 要求关闭 resplit、早停和蒸馏，开启 EMA 并使用 BCE")
+        if self.data.full_train and (self.data.resplit.enabled or not self.train.ema_enabled or self.train.early_stop_patience != 0 or self.train.loss != "bce"):
+            raise ValueError("full_train 要求关闭 resplit 和早停，开启 EMA 并使用 BCE")
         if self.seed < 0:
             raise ValueError(f"seed 必须 >= 0，当前为 {self.seed}")
         if not self.device:

@@ -16,6 +16,9 @@ import torch.nn.functional as F
 
 COLUMNS = ["Study_id", *[f"p{i}" for i in range(1, 11)]]
 
+# 教师缓存的融合来源白名单：新增融合方式时在这里登记，加载端只做审计校验。
+TEACHER_FUSIONS = frozenset({"logit_clipped_probability", "probability_mean"})
+
 
 def sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
@@ -74,8 +77,18 @@ class TeacherCache:
             raise ValueError("教师缓存摘要不匹配")
         if manifest.get("train_csv_sha256") != train_csv_sha256:
             raise ValueError("教师缓存训练数据摘要不匹配")
-        if index_sha256 is not None and (manifest.get("index_sha256") != index_sha256 or manifest.get("fusion") != "logit_clipped_probability" or manifest.get("weights") != [4, 2, 3] or manifest.get("split") != "train"):
-            raise ValueError("教师缓存索引或融合来源不匹配")
+        if index_sha256 is not None and manifest.get("index_sha256") != index_sha256:
+            raise ValueError("教师缓存索引不匹配")
+        fusion = manifest.get("fusion")
+        if fusion is not None and fusion not in TEACHER_FUSIONS:
+            raise ValueError(f"教师缓存融合来源未知: {fusion!r}")
+        weights = manifest.get("weights")
+        checkpoints = manifest.get("checkpoints")
+        if weights is not None:
+            if not isinstance(weights, list) or not all(isinstance(value, (int, float)) and value >= 0 for value in weights):
+                raise ValueError("教师缓存权重必须是非负数字列表")
+            if isinstance(checkpoints, list) and len(weights) != len(checkpoints):
+                raise ValueError("教师缓存权重数量与教师数量不一致")
         frame = pd.read_csv(csv, dtype={"Study_id": str}, keep_default_na=False)
         _validate(frame)
         ids = frame["Study_id"].tolist()
