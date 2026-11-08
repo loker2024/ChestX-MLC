@@ -24,6 +24,14 @@
 
 - `14:18`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 5 行（行 55–59，D-011-a..e），沿用 A:B / C:D / E:G 合并、H 独立分析与邻行样式。走 OOXML 直改：仅 `xl/worksheets/sheet6.xml` 与 `xl/sharedStrings.xml` 变化、其余 22 个 zip 条目字节不变（`count` 568→588、`uniqueCount` 550→570、dimension `A1:H54`→`A1:H59`、mergeCells count 109→124），`xmllint --noout` 通过，Excel 只读打开无修复提示，读回 A55 / H59 正常且 A60 为空。
 
+- `14:46`（新增）`configs/exp_F001a.yaml`：新增 F-001-a ASL 损失对照配置，同 D-002-a 的 ConvNeXt-Tiny `fb_in1k` @320，只把 BCE + `pos_weight` 换成 ASL（γ+=0、γ−=4、clip 0.05），8 轮、lr 3e-4、早停 `raw_auc` patience 2、seed 42。
+
+- `15:56`（变更）`docs/training_log.md`、`docs/experiments.md`：回填 F-001-a 与 S-001-a 训练记录。F-001-a 14:46:23–15:07:34（21m11s，6/8 轮早停，显存 14.4 GB）：best raw 0.7962 / F1 0.4115（ep4）、EMA 0.8008 / 0.4346（ep4–5），相对 D-002-a-EMA 0.8100 为 −0.0092（≈单次 SE 0.0094）→ **ASL 替换 BCE + pos_weight 无收益**。S-001-a 15:08:06–15:55:30（47m24s，11/20 轮早停，显存 21.2 GB）：best raw 0.7190 / 0.3156（ep7）、EMA 0.7194 / 0.3183（ep8），ge5 0.6710 / ge10 0.6633，相对 F-001-a-EMA 差 0.081、相对 D-002-a-EMA 差 0.091 → **失败组**；但未重演 D-011 的 ViT 训练失效（ep1 EMA 0.6456、11 轮持续爬升），归因推断为分组 lr 低一个量级 + patience 3 在 lr 高位截断，未做配方级验证。两组均单 seed，均不进入提交候选。同时修正实验矩阵两行并新增两节执行记录。
+
+- `15:57`（变更）`~/Desktop/loker_exp.xlsx`（仓库外，个人台账，不提交）：D系列实验 sheet 追加 F-001-a、S-001-a 两行（行 60–61），沿用 A:B / C:D / E:G 合并与邻行样式；走 OOXML 直改，不入库。
+
+- `15:58`（移除）`/root/ChestX-MLC/logs/chain_s001a.sh`（训练环境临时脚本，未入库）：F-001-a → S-001-a 的串行接棒守护脚本，两组均结束后删除。
+
 ## 2026-11-07
 
 - `13:22`（新增）`src/common/config.py`、`src/data/dataset.py`：新增训练采样选项 `train.study_sampler: patient_count`，按训练集中患者的检查次数（阈值 `study_sampler_threshold`，默认 5）给每个 study 加权，用有放回加权采样使“多检查”组的期望占比等于 `study_sampler_target_share`；每个 epoch 仍抽 study 数个样本，步数与 `uniform` 一致。默认 `uniform` 保持原行为；与 AUCM 采样器互斥，并校验阈值与目标占比范围。权重只读训练集记录，不读 valid 或 test。尚未训练或验证。

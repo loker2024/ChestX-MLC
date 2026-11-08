@@ -127,6 +127,8 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | D-011-c | `D-011-c` | `configs/exp_D011c.yaml`（独立完整配置） | 8（早停 2，实际 7） | 是 | 同 D-002-a，仅换分辨率为 448：EMA **0.8077**（ep5）/ raw 0.7995，9 类 0.8172、ge5 0.7668、ge10 0.7602、F1@0.5 0.4282；vs D-002-a-EMA 0.8100 为 **−0.0023**，7 个口径（全集/9 类/ge5/ge10 × 10 类 9 类、F1）差异全在 ±0.004 内；41m37s |
 | D-011-d | `D-011-d` | `configs/exp_D011d.yaml`（独立完整配置） | 8（早停 2，实际 6） | 是 | 同 c，仅换分辨率为 512：EMA **0.8068**（ep4）/ raw 0.7958，9 类 0.8177、ge5 0.7638、ge10 0.7605、F1@0.5 0.4260；vs 基线 **−0.0032**；39m27s；与 c 同为「无差异」，分辨率不构成收益来源 |
 | D-011-e | `D-011-e` | `configs/exp_D011e.yaml`（独立完整配置） | 1（用户指令停止） | 是 | 同 a 口径，骨干换 CLIP ViT-B/16 `laion2b` @224；1 轮 EMA 0.5505 / raw 0.5569、train_loss 1.1873，ViT 三组首轮全部落在 0.55–0.61；**中断组，不构成完整结论** |
+| F-001-a | `F-001-a` | `configs/exp_F001a.yaml`（独立完整配置） | 8（早停 2，实际 6） | 否（ASL γ+=0 γ−=4） | 损失函数对照：同 D-002-a 的 ConvNeXt-Tiny `fb_in1k` @320、lr 3e-4、seed 42，只把 BCE + `pos_weight` 换成 ASL（γ+=0、γ−=4、clip 0.05）；**无收益**——best raw 0.7962（ep4，F1 0.4115）、EMA 0.8008（ep4–5，F1 0.4267/0.4346），vs D-002-a-EMA 0.8100 为 −0.0092；21m11s；不进入提交候选 |
+| S-001-a | `S-001-a` | `configs/exp_S001a.yaml`（独立完整配置） | 20（早停 3，实际 11） | 否（ASL γ+=1 γ−=4） | Swin 骨干尝试：`swinv2_tiny_window8_256` @384，`use_configured_img_size: true` + `strict_img_size: false`（否则 timm 在 384 下建静态 attn mask 报 `shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`），ImageNet 权重经 `import_backbone.py` 映射（219 张量、仅 `head.fc` 随机）warm start；分组 lr backbone 2e-5 / head 2e-4；**失败**——best raw 0.7190（ep7，F1 0.3156）、EMA 0.7194（ep8，F1 0.3183），vs F-001-a-EMA 0.8008 差 0.081、vs D-002-a-EMA 0.8100 差 0.091；21.2 GB 显存、47m24s；不进入提交候选 |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -919,6 +921,42 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：①全部单 seed（42），与 D-002-a 的差异都小于单次 SE 0.0094，任何「更好/更差」的判读都不成立；②b/e 为中断组、分别只有 2 轮与 1 轮，**不能作为「该骨干不行」的证据**，只能说明前两轮未脱离低分区；③a/b/e 同时变动骨干与分辨率，无法分离两者贡献；④D-002-a 的 ge5/ge10 与 9 类口径当年未埋点，本次用 `run_eval.py --pred-out` 导出其 EMA 逐 study 预测后按同一逻辑补算（全集复现 0.8100，口径一致）；⑤c 组首次启动遇到 OOM，重跑后配置未变，不影响可比性。
 - 产物：五组 run 目录各含 `config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、TensorBoard（`--no-save-last`，无 `last.pt`）；补算用的逐 study 预测为训练环境 `/tmp/d002a_valid.csv`、`/tmp/d011{a,c,d}_valid.csv`；`outputs/_aborted/` 留有 c 首次 OOM 与 fp32 探针两处残骸。**五组均不进入提交候选。**
 
+
+**F-001-a：ASL 损失（γ+=0、γ−=4）替换 BCE + pos_weight**（配置 `configs/exp_F001a.yaml`，产物 `outputs/20261108-064623_F-001-a`，2026-11-08，sjy RTX 3090 24G 独占）
+
+- 设计：以 D-002-a（ConvNeXt-Tiny `fb_in1k` @320、BCE + `pos_weight`、EMA 0.8100）为对照，唯一研究变量是损失——换成 asymmetric loss（`asl_gamma_neg: 4`、`asl_gamma_pos: 0`、`asl_clip: 0.05`），其余逐字段沿用 D-002-a（8 轮、batch 16 studies、AdamW lr 3e-4 + warmup 2 + cosine 到 1e-5、EMA 0.999、早停 `raw_auc` patience 2、`view_weighted` 0.7、320 letterbox、ImageNet 归一化、`hflip: false`、seed 42、要求预训练加载）。γ+=0 时 ASL 不含正样本聚焦项，等价于「负样本按 `(1−p)^4` 抑制并 clip」的 focal 式损失，因此本组测的是负样本抑制替代 `pos_weight` 的净效果。
+- 执行（14:46:23–15:07:34，**21m11s**，sjy RTX 3090 24G 独占，`HF_HUB_OFFLINE=1` 命中 `convnext_tiny.fb_in1k` 缓存，日志确认「预训练权重: 已加载」）：训练 18,513 studies / valid 859 studies；实际训练 **6/8 轮**，第 4 轮 raw 0.7962 后连续 2 轮无提升（ep5 0.7877、ep6 0.7845）触发早停。首轮约 5m40s（含数据索引与冷缓存），其后约 4.3 分钟/轮；单组显存 14.4 GB、GPU 利用率约 68%。
+- 结果：
+
+  | 组 | 权重 | best | 实际轮数 | macro-AUC | F1@0.5 | 耗时 |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: |
+  | D-002-a-EMA（对照） | `best_ema.pt` | 5 | 7/8 | **0.8100** | 0.4283 | 34m57s |
+  | F-001-a | `best.pt` | 4 | 6/8 | 0.7962 | 0.4115 | 21m11s |
+  | F-001-a-EMA | `best_ema.pt` | 4 | 同 F-001-a | **0.8008** | 0.4346 | 同组，不重复计 |
+
+  逐轮（raw AUC / raw F1 / EMA AUC / EMA F1）：ep1 0.7880/0.3838/0.7640/0.3664；ep2 0.7811/0.3988/0.7915/0.4098；ep3 0.7884/0.4119/0.7988/0.4246；ep4 0.7962/0.4114/0.8008/0.4267；ep5 0.7877/0.4265/0.8008/0.4346；ep6 0.7845/0.4379/0.7944/0.4394。
+- 判读：**ASL 替换 BCE + pos_weight 无收益。** EMA 0.8008 相对 D-002-a-EMA 0.8100 为 **−0.0092**，与单次 859-study macro-AUC 的 bootstrap SE 0.0094 同量级；raw 侧 0.7962 对 0.8004 为 −0.0042。注意本组 train_loss 与 D-002-a 不可横向比较（γ−=4 的抑制项把 loss 压到 0.08 量级，D-002-a 末轮约 0.46），不能据 loss 更低判为收敛更好。F1@0.5 由 0.4283 降到 0.4115，但 EMA 侧 0.4346 反而略高于基线 0.4283，属阈值处的形态差异，不作为选型依据。损失层面的负样本抑制（`(1−p)^4` + clip）与 D-009 的 patient_count 重采样方向不同，不能互相替代。
+- 限制：①单 seed、单次训练，−0.0092 无法与噪声分离，只能作为「未见增益」的初筛；②早停口径是 raw AUC，而 EMA 权重同时导出，两者 best epoch 一致（4）使比较相对干净；③未导出 valid 逐 study 预测、未跑 `cost.py`；④本组与 S-001-a 串行（F 先起），F 组独占 GPU，S 组未并行争抢。
+- 产物：`outputs/20261108-064623_F-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）。**不进入提交候选。**
+
+**S-001-a：SwinV2-T @384 骨干替换尝试**（配置 `configs/exp_S001a.yaml`，产物 `outputs/20261108-070806_S-001-a`，2026-11-08，sjy RTX 3090 24G 独占）
+
+- 设计：把骨干从 ConvNeXt-T 换成 `swinv2_tiny_window8_256`（27.59M 参数）并把输入提到 384。**与 D-002-a 的差异不止骨干**：分辨率 320→384、损失 BCE+pos_weight→ASL（γ+=1、γ−=4、clip 0.05）、优化器分组（backbone 2e-5 / head 2e-4，对比 ConvNeXt 的 3e-4）、预算 8→20 轮、早停口径 raw→EMA（patience 3）、`hflip: false` 不变。**因此不是骨干单变量对照，只能整体判读。** SwinV2 的 relative position bias 只依赖 window=8、与分辨率无关，不需要 pos_embed 插值。
+- 权重与配置修复：timm 在 `strict_img_size=true` 下按 384 构造静态 attention mask 时崩溃（`RuntimeError: shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`），改 `strict_img_size: false` 走动态 mask 后前向正常；torchvision 的 ImageNet 权重 `swin_v2_t-b137f0e2.pth` 经 `src/import_backbone.py` 映射到本项目 head，**219 个张量映射成功、仅 `head.fc.bias/weight` 随机初始化**，产出 `outputs/S-001-a_init/swinv2t_in1k_loker.pt`（sha256 `17fddd03…`），训练以 `--init-from` warm start。
+- 执行（15:08:06–15:55:30，**47m24s**，F-001-a 退出后 20 秒由守护脚本串行接棒）：实际训练 **11/20 轮**，EMA AUC 在 ep8 达峰 0.7194 后 ep9–11 连续 3 轮未超过（0.7158 / 0.7150 / 0.7157），patience 3 触发早停，此时 lr 仍有 1.55e-5、cosine 远未走完。每轮约 4.6 分钟，单组显存 21.2 GB、GPU 利用率 95%。
+- 结果：
+
+  | 组 | 权重 | best | 实际轮数 | macro-AUC | F1@0.5 | ge5（10 类） | ge10（10 类） | 耗时 |
+  | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+  | F-001-a-EMA（同批对照） | `best_ema.pt` | 4 | 6/8 | 0.8008 | 0.4346 | — | — | 21m11s |
+  | S-001-a | `best.pt` | 7 | 11/20 | 0.7190 | 0.3156 | 0.6699 | 0.6624 | 47m24s |
+  | S-001-a-EMA | `best_ema.pt` | 8 | 同 S-001-a | **0.7194** | 0.3183 | 0.6710 | 0.6633 | 同组，不重复计 |
+
+  逐轮（raw AUC / raw F1 / EMA AUC / EMA F1）：ep1 0.6657/0.2799/0.6456/0.2965；ep2 0.7009/0.2824/0.6852/0.3038；ep3 0.7093/0.3025/0.7027/0.2973；ep4 0.7127/0.3214/0.7102/0.3142；ep5 0.7173/0.3331/0.7119/0.3248；ep6 0.7172/0.3297/0.7165/0.3249；ep7 0.7190/0.3157/0.7191/0.3226；ep8 0.7187/0.3111/0.7194/0.3183；ep9 0.7157/0.3005/0.7158/0.3064；ep10 0.7145/0.2795/0.7150/0.2892；ep11 0.7161/0.2983/0.7157/0.3030。
+- 判读：**训练可用但明显低于 ConvNeXt 同批水平，属失败组。** EMA 0.7194 相对 F-001-a-EMA 0.8008 差 **0.081**、相对 D-002-a-EMA 0.8100 差 **0.091**，远超单次 SE 0.0094；分层 ge5 0.6710 / ge10 0.6633 与全集同向。有利的一面是**没有出现 D-011 里 ViT 系的「训练失效」**：ep1 即到 EMA 0.6456，11 轮持续爬升，train_loss 0.0673→0.0635 单调下降，说明 SwinV2 + 映射权重在 384 下前向与梯度都正常，问题在收敛速度与最终平台而非实现缺陷。
+- 归因（推断，未做配方级验证）：①分组 lr 比 ConvNeXt 配方低一个量级（backbone 2e-5 / head 2e-4 对 3e-4），11 轮后 lr 仍 1.55e-5，模型停在半收敛区；②patience 3 配 20 轮预算，ep8 达峰后立即被截断，没有机会在 lr 降到底后回升；③SwinV2 的 384 输入与 ImageNet 256 预训练的窗口统计存在偏移，`strict_img_size: false` 的动态 mask 虽能跑通，但未验证与静态 mask 的数值等价性。三条都可能，**现有实验无法区分**。
+- 限制：①单 seed、单次训练；②同时改了骨干 / 分辨率 / 损失 / lr / 预算 / 早停口径六项，与任何历史组的差异都不能单独归因；③未导出 valid 逐 study 预测、未跑 `cost.py`；④动态 attention mask 带来额外显存与耗时，21.2 GB 已接近 24 GB 上限，再加宽输入不可行。
+- 产物：`outputs/20261108-070806_S-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；初始化权重 `outputs/S-001-a_init/swinv2t_in1k_loker.pt`；训练环境 `/root/weights/swin_v2_t-b137f0e2.pth`（未入库）。**不进入提交候选。**
 
 ## 冻结结论
 
