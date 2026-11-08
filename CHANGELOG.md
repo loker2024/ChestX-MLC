@@ -8,6 +8,18 @@
 - 排序规则：跨天时最新一天在最上；同一天内由早到晚，自上而下。
 - 每条改动标注类型：新增 / 变更 / 修复 / 移除。
 
+## 2026-11-08
+
+- `10:51`（变更）`docs/experiments.md`、`docs/training_log.md`、`~/Desktop/loker_exp.xlsx`（仓库外，不提交）：按用户提供的成绩记录 A-FUSE-7 平台 test 77.37，更新此前未提交状态；保留全量训练无独立 valid 分数的说明。
+
+- `11:11`（变更）`outputs/fusion_exhaustive.py`（`outputs/` 已被 Git 忽略，不提交）：新增 `--min-patient-studies N`，按「所属患者在 `--subjects-csv`（默认 `data/valid.csv`）中检查次数 ≥N」的 study 子集计 AUC 排序，默认 0 保持原全集行为；每个 top 组与单模型候选追加全集、全集 9 类、ge5、ge10、子集 9 类（剔除类别 1）、逐类子集 AUC 与 F1@0.5；新增 `--baseline`（等权对照成员）、`--bootstrap-top`、`--n-boot`，对前 M 名在子集内做患者整簇配对 bootstrap（10 类与 9 类各一次）。依据：test 1414 studies 中 92% 来自检查 ≥5 次的患者、72% 来自 ≥10 次的患者，valid 对应为 66.5% / 47.6%。
+
+- `11:11`（新增）`outputs/analysis/fusion_exhaustive_790_800_ge10.json`（不提交）：25 项池、prob 等权、k=2..5 共 68,380 组，按 valid ge10 子集（409 studies / 20 名患者）排序，对照 D-002-a-EMA + E-001-EMA（A-FUSE-7 的 valid 对应组合，ge10 0.7598），本机单核 88 秒。k=2..5 头名 ge10 为 0.7689 / 0.7696 / 0.7693 / 0.7690，k≥3 无增益；每个 k 的前 20 名全部含 C-005-c；k=2 头名 D-002-a-EMA + C-005-c 相对对照 Δ10 +0.0099（CI [+0.0013, +0.0213]）、Δ9 +0.0069（CI 跨 0）。**反证**：已上平台的 A-FUSE-5（D-002-a-EMA / C-005-c / E-001，logit 4:2:3）ge10 为 0.7699，高于本次所有头名，但平台只有 77.34，低于 ge10 0.7633 的 A-FUSE-4（77.36）与 0.7598 的 A-FUSE-7 对应组合（77.37，成员为全量训练版本，不可严格对照）→ ge10 子集排序同样不能预测平台成绩，本次结果不作为提交依据。
+
+- `11:22`（新增）`src/common/config.py`、`src/model/network.py`：增加 `model.use_configured_img_size`，按需将 `image.size` 传给支持该参数的 timm 骨干，默认关闭，供 Transformer 输入尺寸适配；未运行测试或前向验证。
+
+- `11:22`（新增）`configs/exp_D011a.yaml`、`configs/exp_D011b.yaml`、`configs/exp_D011c.yaml`、`configs/exp_D011d.yaml`、`configs/exp_D011e.yaml`：分别准备 DINOv2-S/14@336、EVA02-S@336、ConvNeXt-T@448/512、CLIP ViT-B/16@224 的独立实验配置；沿用 D-002-a 训练口径，要求预训练加载，权重合规和运行表现尚待核验。
+
 ## 2026-11-07
 
 - `13:22`（新增）`src/common/config.py`、`src/data/dataset.py`：新增训练采样选项 `train.study_sampler: patient_count`，按训练集中患者的检查次数（阈值 `study_sampler_threshold`，默认 5）给每个 study 加权，用有放回加权采样使“多检查”组的期望占比等于 `study_sampler_target_share`；每个 epoch 仍抽 study 数个样本，步数与 `uniform` 一致。默认 `uniform` 保持原行为；与 AUCM 采样器互斥，并校验阈值与目标占比范围。权重只读训练集记录，不读 valid 或 test。尚未训练或验证。
