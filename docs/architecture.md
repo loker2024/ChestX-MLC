@@ -143,3 +143,9 @@ outputs/
 - 新增、修改或删除任何文件，都必须同步记录到 `CHANGELOG.md`（Asia/Shanghai，精确到分钟）。
 - 仅使用主办方允许的数据；禁止提交数据集、权重、密钥与训练产物。
 - 模型或训练策略调整需记录随机种子、数据划分、设备、Macro-AUC 与 Macro-F1。
+
+## 8. 患者检查次数后处理（离线研究）
+
+`data.patient_counts` 由当前完整输入的 Subject_id/Study_id 自动去重计数，不需要人工计数文件；`infer.patient_count_prior` 对 study 聚合及融合后的十类概率统一施加冻结偏置。`run_eval.py --patient-count-prior` 和 `run_ensemble.py --split train/valid --patient-count-prior` 接入该模块，保留原始结果，并输出调整后的指标。默认关闭，不改变模型 forward、训练 loss 或采样。
+
+`run_patient_oof.py` 仅用官方 train 准备五外折/三内折，并编排固定第5轮 EMA 的训练与预测；`run_patient_count_prior.py` 提供 describe/explore/scan/select/apply、来源核验与嵌套复核报告。`explore` 直接读取历史概率与当前带标签元数据，在 CPU 上自动计数和比较四个 beta，不要求 OOF 或参数 JSON；输出明确标为探索，不导出冻结参数。正式 test 的跨检查计数尚未获主办方许可，指定参数时明确拒绝，`cost.py` 也未接入。使用流程、当前验证边界见 [patient_count_prior.md](patient_count_prior.md)。

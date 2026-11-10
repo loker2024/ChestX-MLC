@@ -20,6 +20,7 @@ from common.utils import resolve_device
 from data.dataset import build_loader
 from infer.predict import load_checkpoint_model, predict_loader, validate_submission_model
 from infer.submission import build_submission_frame, validate_submission, write_submission
+from infer.patient_count_prior import require_research_split
 
 
 def _probability(value: str) -> float:
@@ -47,11 +48,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="只输出概率 >= 该阈值的类别；默认输出全部 10 类概率",
     )
+    parser.add_argument("--patient-count-prior", help="患者次数后处理参数；当前 test 尚未获跨检查计数许可，启用会报错")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.patient_count_prior:
+        require_research_split("test")
     config = load_config(args.config)
     validate_submission_model(config, args.checkpoint)
     device = resolve_device(config.device)

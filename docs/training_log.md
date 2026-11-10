@@ -69,7 +69,7 @@ train:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261027-050417_short_baseline/`（远端 `/root/ChestX-MLC`，UTC 05:04:17 / 北京 13:04 启动） |
+| 产物 | `outputs/short_baseline/`（远端 `/root/ChestX-MLC`，UTC 05:04:17 / 北京 13:04 启动） |
 | 耗时 | 28m41s（05:04:17 → 05:32:58 UTC，每轮约 4m47s，含验证与落盘） |
 
 metrics.csv（原样复制）：
@@ -96,7 +96,7 @@ metrics.csv（原样复制）：
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261028-002013_short_baseline_r2/` |
+| 产物 | `outputs/short_baseline_r2/` |
 | 耗时 | 38m05s（00:20:13 → 00:58:18 Asia/Shanghai，与 RUN-002 并行；每轮约 6m20s） |
 
 metrics.csv（原样复制）：
@@ -137,7 +137,7 @@ train:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261028-002512_short_pos_weight/` |
+| 产物 | `outputs/short_pos_weight/` |
 | 耗时 | 33m06s（00:25:12 → 00:58:18 Asia/Shanghai，与 RUN-001R 并行；每轮约 5m31s） |
 
 metrics.csv（原样复制）：
@@ -227,7 +227,7 @@ device: auto
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261028-013241_full_baseline/`（`best.pt` 44.8 MB / `last.pt` 179 MB / `metrics.csv` / `train.log`）；提交文件 `outputs/submission_run003.csv`（1,414 studies × 10 类 = 14,140 行） |
+| 产物 | `outputs/full_baseline/`（`best.pt` 44.8 MB / `last.pt` 179 MB / `metrics.csv` / `train.log`）；提交文件 `outputs/submission_run003.csv`（1,414 studies × 10 类 = 14,140 行） |
 | 耗时 | 2026-10-28 09:32:41 → 10:11 CST，**13 轮即早停**（未跑满 25 轮），共约 **38 分钟**；单轮约 3.3 分钟（`num_workers: 16`，较 8 worker 的并行口径快约 20%） |
 
 metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）：
@@ -292,7 +292,7 @@ train:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261028-035123_run003a_cosine/`（远端 `/root/ChestX-MLC`，UTC 03:51:23 / 北京 11:51 启动） |
+| 产物 | `outputs/run003a_cosine/`（远端 `/root/ChestX-MLC`，UTC 03:51:23 / 北京 11:51 启动） |
 | 耗时 | 29m47s（UTC 03:51:23 → 04:21:10，北京 11:51 → 12:21）；**10 轮即早停**，单轮约 3.3 分钟 |
 
 metrics.csv（10 轮原样复制，epoch 10 后因连续 5 轮无提升早停）：
@@ -363,7 +363,7 @@ seed: 42
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-041949_run003b_cosine_pos_weight/`（`best.pt` 42.7 MiB / `last.pt` 170.8 MiB / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/run003b_cosine_pos_weight/`（`best.pt` 42.7 MiB / `last.pt` 170.8 MiB / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 12:19:49 → 12:53:33 CST，**13 轮即早停**（未跑满 25 轮），共 **33 分 44 秒**；单轮约 2.6 分钟 |
 
 metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）：
@@ -440,7 +440,7 @@ train:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261028-042115_pos_weight_s42/`（远端 `/root/ChestX-MLC`，UTC 04:21:15 / 北京 12:21 启动） |
+| 产物 | `outputs/pos_weight_s42/`（远端 `/root/ChestX-MLC`，UTC 04:21:15 / 北京 12:21 启动） |
 | 耗时 | 30m34s（UTC 04:21:15 → 04:51:49，北京 12:21 → 12:51）；**10 轮即早停**，单轮约 3.3 分钟 |
 
 metrics.csv（10 轮原样复制）：
@@ -471,7 +471,7 @@ metrics.csv（10 轮原样复制）：
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet18.a1_in1k` |
-| 产物 | `outputs/20261028-045153_pos_weight_s2026/`（远端 `/root/ChestX-MLC`，UTC 04:51:53 / 北京 12:51 启动） |
+| 产物 | `outputs/pos_weight_s2026/`（远端 `/root/ChestX-MLC`，UTC 04:51:53 / 北京 12:51 启动） |
 | 耗时 | 45m58s（UTC 04:51:53 → 05:37:51，北京 12:51 → 13:37）；**12 轮早停**，单轮约 3.3 分钟（最后一轮含验证略长） |
 
 metrics.csv（12 轮原样复制）：
@@ -516,7 +516,7 @@ model:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `resnet50.a1_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-022055_resnet50_s42/`（`best.pt` 91 MB / `last.pt` 360 MB / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/resnet50_s42/`（`best.pt` 91 MB / `last.pt` 360 MB / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 10:20:50 → 11:04:13 CST，**14 轮即早停**（未跑满 25 轮），共 **43 分 23 秒**；单轮约 3.1 分钟 |
 
 metrics.csv（14 轮原样复制，epoch 14 后因连续 5 轮无提升早停）：
@@ -563,7 +563,7 @@ model:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-030417_densenet121_s42/`（`best.pt` 28 MB / `last.pt` 108 MB / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/RUN/densenet121_s42/`（`best.pt` 28 MB / `last.pt` 108 MB / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 11:04:13 → 11:48:45 CST，**13 轮即早停**（未跑满 25 轮），共 **44 分 32 秒**；单轮约 3.4 分钟 |
 
 metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）：
@@ -634,7 +634,7 @@ seed: 2026
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `a41033d`（含视图元信息支持，`aggregation: mean` 路径与 RUN-006 的 `da8fef7` 数值等价，`tests` 覆盖） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies |
 | 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-051514_densenet121_s2026/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/RUN/densenet121_s2026/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 13:15:14 → 13:49:28 CST，**10 轮即早停**（未跑满 25 轮），共 **34 分 14 秒**；与 experiment4 的 EfficientNet-B2 实验并行执行（共用 3090 与 16 核 CPU），耗时不可与 RUN-006 的独占 44m32s 直接比较 |
 
 metrics.csv（10 轮原样复制，epoch 10 后因连续 5 轮无提升早停）：
@@ -703,7 +703,7 @@ model:
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 42；代码 `53568fe`（RUN-006 为 `da8fef7`，`62b6464` 起增加视角元信息贯通与 `view_weighted` 聚合；`mean` 路径由 `tests` 与 RUN-006-A 在 `a41033d` 上的实测确认数值等价，但两组并非同代码版本的严格单变量对照） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-006 同一份 split；`check_data.py --full` 全量通过，跨 split 无 Subject / Study / Dicom 重叠） |
 | 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-062002_densenet121_viewweighted_s42/`（`best.pt` 28 MB / `last.pt` 108 MB / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/RUN/densenet121_viewweighted_s42/`（`best.pt` 28 MB / `last.pt` 108 MB / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 14:20:02 → 14:54:58 CST，**13 轮即早停**（未跑满 25 轮），共 **34 分 56 秒**；单轮约 2.7 分钟（独占运行，GPU 利用率约 46–48%） |
 
 metrics.csv（13 轮原样复制，epoch 13 后因连续 5 轮无提升早停）：
@@ -786,7 +786,7 @@ seed: 2026
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `27dbe56`（在 `53568fe` 基础上仅新增本配置、测试与计划；`src/` 未变） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-006-A 同一份 split；`check_data.py --full` 全量通过） |
 | 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-070733_densenet121_viewweighted_s2026/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/RUN/densenet121_viewweighted_s2026/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 15:07:33 → 15:42:34 CST，**12 轮即早停**（未跑满 25 轮），共 **35 分 01 秒**；单轮约 2.9 分钟（独占运行） |
 
 metrics.csv（12 轮原样复制，epoch 12 后因连续 5 轮无提升早停）：
@@ -881,7 +881,7 @@ warmup 2 轮后余弦衰减、CUDA AMP、早停 5、`num_workers` 16、seed 2026
 | 设备 / 环境 | RTX 3090 24G / torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `bfa6d45`（在 `27dbe56` 基础上仅新增 RUN-008 评估工具，训练路径未变） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A 同一份 split） |
 | 预训练 | 已加载 `densenet121.ra_in1k`（checkpoint `metadata.pretrained_loaded = true`） |
-| 产物 | `outputs/20261029-123158_densenet121_viewweighted_s2026_384/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/RUN/densenet121_viewweighted_s2026_384/`（`best.pt` / `last.pt` / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-29 20:31:58 → 20:55:40 CST，6 轮跑满（未早停），共 **23 分 42 秒**；单轮约 3.9 分钟；显存峰值约 10.2–10.5 GB（独占运行） |
 
 metrics.csv（6 轮原样复制）：
@@ -975,7 +975,7 @@ train:
 | 运行命令 | `python src/run_train.py --config configs/exp_run008a.yaml --seed 2026 --tag run008a_effb2_s2026` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A 同一份） |
 | 预训练 | 已加载 `efficientnet_b2.ra_in1k`（SHA-256 `e9adbcce…`，Apache-2.0） |
-| 产物 | `outputs/20261029-125907_run008a_effb2_s2026/`（`best.pt` 31,314,907 B） |
+| 产物 | `outputs/experiments/RUN/run008a_effb2_s2026/`（`best.pt` 31,314,907 B） |
 | 耗时 | 2026-10-29 20:59:07 → 21:33:40 CST，共 **34 分 33 秒**；前约 3 分钟独占、其余与 RUN008-B 并行，耗时不可横向比较 |
 
 metrics.csv（6 轮原样复制）：
@@ -1015,7 +1015,7 @@ train:
 | 运行命令 | `python src/run_train.py --config configs/exp_run008b.yaml --seed 2026 --tag run008b_effv2s_s2026` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A 同一份） |
 | 预训练 | 已加载 `efficientnetv2_rw_s.ra2_in1k`（SHA-256 `81379566…`，Apache-2.0） |
-| 产物 | `outputs/20261029-130144_run008b_effv2s_s2026/`（`best.pt` 89,597,451 B） |
+| 产物 | `outputs/experiments/RUN/run008b_effv2s_s2026/`（`best.pt` 89,597,451 B） |
 | 耗时 | 2026-10-29 21:01:44 → 21:36:48 CST，共 **35 分 04 秒**；与 RUN008-A 并行，耗时不可横向比较 |
 
 metrics.csv（6 轮原样复制）：
@@ -1055,7 +1055,7 @@ train:
 | 运行命令 | `python src/run_train.py --config configs/exp_run008c.yaml --seed 2026 --tag run008c_convnext_tiny_s2026` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（SHA-256 `08b9dc9c…`，Apache-2.0） |
-| 产物 | `outputs/20261029-133817_run008c_convnext_tiny_s2026/`（`best.pt` 111,384,747 B） |
+| 产物 | `outputs/experiments/RUN/run008c_convnext_tiny_s2026/`（`best.pt` 111,384,747 B） |
 | 耗时 | 2026-10-29 21:38:17 → 22:02:35 CST，共 **24 分 18 秒**；前 13 分 43 秒与 RUN008-D 并行、之后独占，耗时不可横向比较 |
 
 metrics.csv（6 轮原样复制）：
@@ -1096,7 +1096,7 @@ train:
 | 运行命令 | `python src/run_train.py --config configs/exp_run008d.yaml --seed 2026 --tag run008d_convnextv2_nano_s2026` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A 同一份） |
 | 预训练 | 已加载 `convnextv2_nano.fcmae_ft_in1k`（SHA-256 `c9b5106b…`，**CC BY-NC 4.0**；骨干 158 个张量逐一核对与权重文件数值一致） |
-| 产物 | `outputs/20261029-140248_run008d_convnextv2_nano_s2026/`（`best.pt` 60,021,051 B） |
+| 产物 | `outputs/experiments/RUN/run008d_convnextv2_nano_s2026/`（`best.pt` 60,021,051 B） |
 | 耗时 | 2026-10-29 22:02:48 → 22:25:27 CST，共 **22 分 39 秒**（单独运行；此前 21:38–21:52 的并行运行按用户要求停止并删除） |
 
 metrics.csv（6 轮原样复制）：
@@ -1196,7 +1196,7 @@ seed 2026。）
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / 375 GB 内存 / seed 2026；代码 `bf7e276` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A / RUN-008 同一份；`check_data.py --full` 全部通过） |
 | 预训练 | 已加载 `efficientnetv2_rw_s.ra2_in1k`（HF commit `ee38fe1c…`、96,483,448 B、SHA-256 `81379566…`、Apache-2.0；本地缓存校验通过后离线加载，`train.log` 打印「预训练权重: 已加载」） |
-| 产物 | `outputs/20261030-140736_run009a_effv2s_384_s2026/`（`best.pt` 89,586,379 B / `last.pt` / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/RUN/run009a_effv2s_384_s2026/`（`best.pt` 89,586,379 B / `last.pt` / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-30 14:07:36 → 14:50 CST，**6/25 轮后按用户要求停止**（非早停、非跑满），共约 **41 分钟**；单轮约 6.7 分钟；显存峰值约 15.9 GB（独占运行） |
 
 启动前一次失败与处理：首次 14:03 启动时 HuggingFace 直连失败（`[Errno 99] Cannot assign
@@ -1269,7 +1269,7 @@ macro-AUC 仅高 +0.0038，没有达到判读门，也没有单类大幅退化�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `0475bc7` + 本 run 的配置与测试改动 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 RUN-007-A / RUN-008 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（HF commit `b43a6303…`、114,374,272 B、SHA-256 `08b9dc9c…`、Apache-2.0）；本环境无法直连 HuggingFace 与 hf-mirror，从 ModelScope 下载 `timm/convnext_tiny.fb_in1k` 后按 HF 缓存结构放置（SHA-256 与 RUN008-C 记录一致），`HF_HUB_OFFLINE=1` 离线加载 |
-| 产物 | `outputs/20261030-150749_A-001_convnext_tiny_s42/`（`best.pt` 111,384,683 B / `last.pt` / `metrics.csv` / `train.log`） |
+| 产物 | `outputs/experiments/A/A-001_convnext_tiny_s42/`（`best.pt` 111,384,683 B / `last.pt` / `metrics.csv` / `train.log`） |
 | 耗时 | 2026-10-30 15:07:49 → 15:41:50 CST，共 **34 分 01 秒**（6 轮后早停触发，单轮约 5.7 分钟）；显存峰值约 11.7 GB（独占运行） |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1339,7 +1339,7 @@ class3 −0.0080 回落；没有单类大幅退化。**判读**：A-001 在更�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `9bde5a8` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 / RUN-008 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（HF commit `b43a6303…`、114,374,272 B、SHA-256 `08b9dc9c…`、Apache-2.0）；`HF_HUB_OFFLINE=1` 离线加载 |
-| 产物 | `outputs/20261030-165734_A-001b_convnext_tiny_asl_s42/`（`best.pt` 111,384,875 B / `last.pt` 445,536,235 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `outputs/experiments/A/A-001b_convnext_tiny_asl_s42/`（`best.pt` 111,384,875 B / `last.pt` 445,536,235 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 16:57:34 → 17:32:15 CST，共 **34 分 41 秒**（6 轮后早停触发，单轮约 5.8 分钟）；训练期间 `nvidia-smi` 抽样显存约 13.8–14.3 GB（独占运行） |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1409,7 +1409,7 @@ support 更充分的骨干或更长轮数另开对照，而不是在单 seed 上
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / seed 42；代码 `0475bc7` + 本 run 的配置改动 |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（SHA-256 `08b9dc9c…`、Apache-2.0）；`HF_HUB_OFFLINE=1` 离线加载 |
-| 产物 | `outputs/20261030-154652_A-001-a_convnext_tiny_s42/`（`best.pt` 111,384,683 B / `last.pt` 445,536,107 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `outputs/experiments/A/A-001-a_convnext_tiny_s42/`（`best.pt` 111,384,683 B / `last.pt` 445,536,107 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 15:46:52 → 16:23:50 CST，共 **36 分 58 秒**（6 轮后早停触发，单轮约 6.2 分钟，略慢于 A-001 的 5.7 分钟/轮，与随机翻转的额外增强开销一致）；训练期间未抽样显存 |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1479,7 +1479,7 @@ A-001-a 在 0.2–0.6 段均低于 A-001（−0.0057~−0.0210），0.7 处反�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / seed 42；代码 `1acc229` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（SHA-256 `08b9dc9c…`、Apache-2.0）；`HF_HUB_OFFLINE=1` 离线加载 |
-| 产物 | `outputs/20261030-173249_A-001c_convnext_tiny_freeze_s42/`（`best.pt` 111,384,939 B / `last.pt` 222,818,891 B——只存分类头的优化器状态，明显小于全量微调 run 的 445 MB / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `outputs/experiments/A/A-001c_convnext_tiny_freeze_s42/`（`best.pt` 111,384,939 B / `last.pt` 222,818,891 B——只存分类头的优化器状态，明显小于全量微调 run 的 445 MB / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 17:32:49 → 18:10:50 CST，共 **38 分 01 秒**（8/8 轮跑满、未触发早停，单轮约 4.8 分钟，快于 A-001 的 5.7 分钟/轮，与骨干不反向传播一致）；训练期间未抽样显存 |
 
 metrics.csv（8 轮原样复制，8/8 轮跑满）：
@@ -1549,7 +1549,7 @@ A-001-B 单 seed 的 AUC −0.0068 与判读门 ±0.005 只差 0.0018，落在 s
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / seed 2026；代码 `e25d73e` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001-B 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（SHA-256 `08b9dc9c…`、Apache-2.0）；`HF_HUB_OFFLINE=1` 离线加载 |
-| 产物 | `outputs/20261030-181110_A-001b_convnext_tiny_asl_s2026/`（`best.pt` 111,384,939 B / `last.pt` 445,536,363 B / `metrics.csv` / `train.log` / `config.yaml`）；metadata `freeze_backbone: false`、`total_params` = `trainable_params` = 27,827,818 |
+| 产物 | `outputs/experiments/A/A-001b_convnext_tiny_asl_s2026/`（`best.pt` 111,384,939 B / `last.pt` 445,536,363 B / `metrics.csv` / `train.log` / `config.yaml`）；metadata `freeze_backbone: false`、`total_params` = `trainable_params` = 27,827,818 |
 | 耗时 | 2026-10-30 18:11:10 → 18:48:39 CST，共 **37 分 29 秒**（7 轮后早停触发，单轮约 5.4 分钟，与 A-001-B 的 5.8 分钟/轮接近）；训练期间未抽样显存 |
 
 metrics.csv（7 轮原样复制，epoch 7 结束后连续 2 轮无提升、触发早停）：
@@ -1619,7 +1619,7 @@ study 内全部图片的 logits 改为等权均值；`frontal_weight: 0.7` 保�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / seed 42；代码 `64a6525` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（`HF_HUB_OFFLINE=1` 离线加载） |
-| 产物 | `outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/`（`best.pt` 111,384,875 B / `last.pt` 445,536,427 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `outputs/experiments/A/A-001d_convnext_tiny_mean_s42/`（`best.pt` 111,384,875 B / `last.pt` 445,536,427 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 19:06:45 → 19:46:48 CST，共 **40 分 03 秒**（8/8 轮跑满、未触发早停，单轮约 5.0 分钟）；训练末段抽样显存约 14.0 GB（14,344–14,350 MiB） |
 
 metrics.csv（8 轮原样复制，8/8 轮跑满）：
@@ -1712,7 +1712,7 @@ test_a001g_experiment_config_loads` 对五组做该断言。
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `78ce901` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 / A-001-B 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（与 A-001-B 同一份缓存，`HF_HUB_OFFLINE=1` 离线加载） |
-| 产物 | `20261030-201129_A-001-G1_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `A-001-G1_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 20:11:24 → 20:41:41 CST，共 **30 分 17 秒**（6 轮后早停，单轮约 5.0 分钟）；训练期间未逐组抽样显存（G1 抽样约 14,346 MiB，与 A-001-B 的 13.8–14.3 GB 同量级） |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1741,7 +1741,7 @@ metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `78ce901` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 / A-001-B 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（与 A-001-B 同一份缓存，`HF_HUB_OFFLINE=1` 离线加载） |
-| 产物 | `20261030-204225_A-001-G2_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `A-001-G2_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 20:42:21 → 21:14:03 CST，共 **31 分 42 秒**（6 轮后早停，单轮约 5.3 分钟）；训练期间未逐组抽样显存（G1 抽样约 14,346 MiB，与 A-001-B 的 13.8–14.3 GB 同量级） |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1770,7 +1770,7 @@ metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `78ce901` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 / A-001-B 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（与 A-001-B 同一份缓存，`HF_HUB_OFFLINE=1` 离线加载） |
-| 产物 | `20261030-211449_A-001-G3_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `A-001-G3_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 21:14:44 → 21:45:35 CST，共 **30 分 51 秒**（6 轮后早停，单轮约 5.1 分钟）；训练期间未逐组抽样显存（G1 抽样约 14,346 MiB，与 A-001-B 的 13.8–14.3 GB 同量级） |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1799,7 +1799,7 @@ metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `78ce901` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 / A-001-B 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（与 A-001-B 同一份缓存，`HF_HUB_OFFLINE=1` 离线加载） |
-| 产物 | `20261030-214622_A-001-G4_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,043 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `A-001-G4_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,043 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 21:46:17 → 22:04:31 CST，共 **18 分 14 秒**（3 轮后早停，单轮约 6.1 分钟）；训练期间未逐组抽样显存（G1 抽样约 14,346 MiB，与 A-001-B 的 13.8–14.3 GB 同量级） |
 
 metrics.csv（3 轮原样复制，epoch 2、3 连续低于 epoch 1，第 3 轮后触发早停）：
@@ -1825,7 +1825,7 @@ metrics.csv（3 轮原样复制，epoch 2、3 连续低于 epoch 1，第 3 轮�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / 96 核 CPU / seed 42；代码 `78ce901` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 / A-001-B 同一份） |
 | 预训练 | 已加载 `convnext_tiny.fb_in1k`（与 A-001-B 同一份缓存，`HF_HUB_OFFLINE=1` 离线加载） |
-| 产物 | `20261030-220518_A-001-G5_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
+| 产物 | `A-001-G5_convnext_tiny_asl_s42/`（`best.pt` 111,384,939 B / `last.pt` 445,536,299 B / `metrics.csv` / `train.log` / `config.yaml`） |
 | 耗时 | 2026-10-30 22:05:14 → 22:35:47 CST，共 **30 分 33 秒**（6 轮后早停，单轮约 5.1 分钟）；训练期间未逐组抽样显存（G1 抽样约 14,346 MiB，与 A-001-B 的 13.8–14.3 GB 同量级） |
 
 metrics.csv（6 轮原样复制，epoch 6 结束后连续 2 轮无提升、触发早停）：
@@ -1910,7 +1910,7 @@ A-003 做 `run_compare` 配对比较；本小节只把 A-002 的 5 轮指标作�
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08）/ torch 2.10.0+cu128 / timm 1.0.30 / seed 42；代码 `2fea31a` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份） |
 | 预训练 | 已加载 `mobilenetv3_small_050.lamb_in1k`（`HF_HUB_OFFLINE=1` 离线缓存加载），10 类模型 578,474 参数 |
-| 产物 | `outputs/20261030-223911_A-002_mobilenetv3_small050_s42/`（`last.pt` 9,592,203 B / `metrics.csv` / `train.log` / `config.yaml`；**无 `best.pt`**） |
+| 产物 | `outputs/experiments/A/A-002_mobilenetv3_small050_s42/`（`last.pt` 9,592,203 B / `metrics.csv` / `train.log` / `config.yaml`；**无 `best.pt`**） |
 | 耗时 | 22:39:11 → 23:03:03 CST，约 24 分钟（5 轮写盘，单轮约 4.8 分钟）；显存抽样约 1.2 GB |
 
 metrics.csv（5 轮原样复制，第 5 轮写盘后中止）：
@@ -1938,8 +1938,8 @@ metrics.csv（5 轮原样复制，第 5 轮写盘后中止）：
 | 运行命令 | `HF_HUB_OFFLINE=1 python src/run_train.py --config configs/exp_A003.yaml --seed 42 --tag A-003_mobilenetv3_small100_s42` |
 | 设备 / 环境 | V100-SXM2-32G（驱动 580.105.08，96 核 / 375 GB 内存）/ torch 2.10.0+cu128 / timm 1.0.30 / seed 42；代码 `2fea31a` |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies；`check_data.py --full` 复核 train / valid / test 无 Subject / Study / Dicom 交叉（日志 `outputs/A-003_check_data.log`） |
-| 预训练 | 已加载 `mobilenetv3_small_100.lamb_in1k`（固定 revision `76b303ec28c466e9df37f4745dfb7aef20ab87ae`；`model.safetensors` 10,241,912 B、SHA-256 `46d2c063b18125884c48937afa4c49e18128869e52e8db96df48bf0a4d7ff697`；许可 Apache-2.0、上游训练数据 ImageNet-1k；证据 `outputs/A-003_weight_evidence/`）；10 类模型 1,528,106 参数全量微调 |
-| 产物 | `outputs/20261030-230725_A-003_mobilenetv3_small100_s42/`（`best.pt` 6,249,691 B / `last.pt` 24,833,035 B / `metrics.csv` / `train.log` / `config.yaml`）；评测全文 `outputs/eval_reports/A-003_full.txt`；逐 Study 预测 `outputs/A-003_valid_predictions.csv`（859 行，`Study_id` + `p1..p10` + `label1..label10`） |
+| 预训练 | 已加载 `mobilenetv3_small_100.lamb_in1k`（固定 revision `76b303ec28c466e9df37f4745dfb7aef20ab87ae`；`model.safetensors` 10,241,912 B、SHA-256 `46d2c063b18125884c48937afa4c49e18128869e52e8db96df48bf0a4d7ff697`；许可 Apache-2.0、上游训练数据 ImageNet-1k；证据 `outputs/evidence/A-003_weight_evidence/`）；10 类模型 1,528,106 参数全量微调 |
+| 产物 | `outputs/experiments/A/A-003_mobilenetv3_small100_s42/`（`best.pt` 6,249,691 B / `last.pt` 24,833,035 B / `metrics.csv` / `train.log` / `config.yaml`）；评测全文 `outputs/eval_reports/A-003_full.txt`；逐 Study 预测 `outputs/A-003_valid_predictions.csv`（859 行，`Study_id` + `p1..p10` + `label1..label10`） |
 | 耗时 | 2026-10-30 23:07:25 → 2026-10-31 00:24:44 CST，共 **1 小时 17 分 19 秒**；17/25 轮（epoch 12 后连续 5 轮无提升触发早停），单轮约 4.5 分钟；显存抽样 1.4–1.6 GB |
 
 metrics.csv（17 轮原样复制；第 17 轮后日志「连续 5 个 epoch 没有提升，提前结束训练」）：
@@ -2036,7 +2036,7 @@ B 组独立研究对照，计划与边界见 [train_plan12.md](../archive/train_
 - 与参考 RUN-006（ImageNet DenseNet-121 @320×320、3 通道、imagenet 归一化、seed 42，0.7880 / 0.4070）相比：AUC **+0.0032**、F1@0.5 **+0.0050**；但分辨率（224 vs 320）、输入通道（1 vs 3）、归一化（xrv vs imagenet）与初始化来源同时不同，**差值不可归因于医学预训练**。
 - 与 A-001（ConvNeXt-Tiny，0.8038 / 0.4255）不可直接比较：骨干、预训练来源、输入分辨率与归一化均不同，仅记录数值。
 - **重叠风险**：本地数据来源不可确证，指纹（JPEG 量化表 q95、PatientOrientation 取值、规模占比）疑似 MIMIC-CXR-JPG 衍生子集；`densenet121-res224-all` 预训练集含 MIMIC-CXR（约 40%）→ 与本地训练集重叠风险**未知（疑似高）**，valid 指标可能乐观，不能声称无泄漏；唯一确证途径是向主办方询问数据来源。
-- 产物：`outputs/20261031-112106_B-001_xrv_densenet121_s224/`（`best.pt` 28,456,243 B / `last.pt` 112,857,109 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/B-001_full.txt`（阈值曲线与逐类明细）、`outputs/B-001_valid_predictions.csv`（859 个 valid study 的 Study_id / label_1..label_10 / p1..p10）。
+- 产物：`outputs/experiments/B/B-001_xrv_densenet121_s224/`（`best.pt` 28,456,243 B / `last.pt` 112,857,109 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/B-001_full.txt`（阈值曲线与逐类明细）、`outputs/B-001_valid_predictions.csv`（859 个 valid study 的 Study_id / label_1..label_10 / p1..p10）。
 - 判读：本组仅回答「同划分、同聚合、同 seed 下医学预训练权重是否带来可复现差异」的前置研究问题；由于上述混杂与重叠风险，**不并入冻结结论、不参与骨干优劣判定、不进入提交候选**。若后续要推进，应先获得数据来源书面确认、再设计分辨率/归一化对齐的单变量实验。
 
 
@@ -2055,7 +2055,7 @@ valid_loss 在 epoch 4 见底后反弹。本组验证「分类头 dropout + 更�
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08），训练期间无其他 GPU 占用；显存峰值约 14.0 GB（14,346 MiB） |
 | 数据 | `data/train.csv` 30,344 图 / 18,513 studies、`data/valid.csv` 1,422 图 / 859 studies；与 A-001 同一份划分，`check_data.py --full` 核验跨 split Subject/Study/Dicom_id 无重叠 |
 | 预训练 | `convnext_tiny.fb_in1k`（HF commit `b43a6303…`、114,374,272 B、SHA-256 `08b9dc9c…`、Apache-2.0），与 A-001 共用同一份本地缓存，`HF_HUB_OFFLINE=1` 离线加载；`train.log` 确认「预训练权重: 已加载」，`best.pt` metadata `pretrained_loaded: true` |
-| 产物 | `outputs/20261031-121344_A-004_convnext_tiny_dropout_wd_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`、`config.yaml` 确认 `dropout: 0.2` / `weight_decay: 0.05`）、`outputs/eval_reports/A-004_full.txt`、`outputs/A-004_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004/` |
+| 产物 | `outputs/experiments/A/A-004_convnext_tiny_dropout_wd_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`、`config.yaml` 确认 `dropout: 0.2` / `weight_decay: 0.05`）、`outputs/eval_reports/A-004_full.txt`、`outputs/A-004_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004/` |
 | 耗时 | 32m16s（12:13:44–12:46:00），第 7 轮后早停（上限 8）；单轮约 3 分钟，epoch 1 因首轮冷缓存读盘约 10.9 分钟 |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2132,7 +2132,7 @@ class2 / class6，与整体 −0.0050 的方向一致。
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08），训练期间无其他 GPU 占用；显存占用与 A-004 同量级（约 14 GB） |
 | 数据 | `data/train.csv` 30,344 图 / 18,513 studies、`data/valid.csv` 1,422 图 / 859 studies；与 A-001 同一份划分，`check_data.py --full` 通过 |
 | 预训练 | `convnext_tiny.fb_in1k`（与 A-001 共用同一份本地缓存，HF commit `b43a6303…`、SHA-256 `08b9dc9c…`），`HF_HUB_OFFLINE=1` 离线加载；`train.log` 确认「预训练权重: 已加载」 |
-| 产物 | `outputs/20261031-130923_A-004a_dropout_only_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`）、`outputs/eval_reports/A-004a_full.txt`、`outputs/A-004a_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004_decomp/` |
+| 产物 | `outputs/experiments/A/A-004a_dropout_only_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`）、`outputs/eval_reports/A-004a_full.txt`、`outputs/A-004a_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004_decomp/` |
 | 耗时 | 37m16s（13:09:23–13:46:39）；跑满 8 轮上限，第 6 轮达峰后第 7、8 轮无提升，训练在 epoch 8 结束时按早停逻辑收尾 |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2203,7 +2203,7 @@ A-004-a 的 F1 峰从 A-001 的 0.6 左移到 0.4（0.4400 vs 0.4328，+0.0072�
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08），训练期间无其他 GPU 占用；训练中观测显存 14,350 MiB |
 | 数据 | `data/train.csv` 30,344 图 / 18,513 studies、`data/valid.csv` 1,422 图 / 859 studies；与 A-001 同一份划分 |
 | 预训练 | `convnext_tiny.fb_in1k`（与 A-001 共用同一份本地缓存，HF commit `b43a6303…`、SHA-256 `08b9dc9c…`），`HF_HUB_OFFLINE=1` 离线加载；`train.log` 确认「预训练权重: 已加载」 |
-| 产物 | `outputs/20261031-134732_A-004b_weight_decay_only_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`）、`outputs/eval_reports/A-004b_full.txt`、`outputs/A-004b_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004_decomp/` |
+| 产物 | `outputs/experiments/A/A-004b_weight_decay_only_s42/`（`best.pt` 111,385,131 B、`last.pt` 445,536,555 B、`metrics.csv`、`train.log`）、`outputs/eval_reports/A-004b_full.txt`、`outputs/A-004b_valid_predictions.csv`（859 个 valid study）、`outputs/compare_A001_A004_decomp/` |
 | 耗时 | 31m59s（13:47:32–14:19:31），第 7 轮后早停（上限 8） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2280,8 +2280,8 @@ L2 归一化后按残差权重 0.4 加权，温度 1.0，无 bias）。与 A-006
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08）；峰值显存未单独记录，与标准头同量级（A-006 同类记录 11,906 MiB） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份 `data/valid.csv`） |
 | 预训练 | `convnext_tiny.fb_in1k`，SHA-256 `08b9dc9c…`；`metadata.pretrained_loaded: true`、`freeze_backbone: false` |
-| 产物 | `outputs/20261031-164123_A-005/`（`best.pt` 111,384,739 B、`last.pt` 445,548,435 B）、`outputs/A-005_valid.csv`、`outputs/A-005_baseline_valid.csv`、`outputs/compare_A005/`、`outputs/compare_A001_A005/`、`outputs/plan15_bootstrap.py` |
-| 配对基线 | `outputs/20261031-151114_A-005_baseline_s42`：15:11:14–15:40:35、29m21s、best epoch 4、macro-AUC 0.8022 / F1@0.5 0.4210（与 A-006 共用） |
+| 产物 | `outputs/experiments/A/A-005/`（`best.pt` 111,384,739 B、`last.pt` 445,548,435 B）、`outputs/A-005_valid.csv`、`outputs/A-005_baseline_valid.csv`、`outputs/compare_A005/`、`outputs/compare_A001_A005/`、`outputs/plan15_bootstrap.py` |
+| 配对基线 | `outputs/experiments/A/A-005_baseline_s42`：15:11:14–15:40:35、29m21s、best epoch 4、macro-AUC 0.8022 / F1@0.5 0.4210（与 A-006 共用） |
 | 耗时 | 24m28s（16:41:23–17:05:51，独占，未并行） |
 
 逐轮：
@@ -2361,8 +2361,8 @@ P=0.998（2,000 / 2,000 次有效）。对历史 A-001（0.8038 / 0.4255）：Δ
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32GB（驱动 580.105.08），训练期间无其他 GPU 占用；训练中观测显存 11,906 MiB |
 | 数据 | `data/train.csv` 30,344 图 / 18,513 studies、`data/valid.csv` 1,422 图 / 859 studies；与 A-001 同一份划分，执行前 `check_data.py --full` 复核图片齐全、三划分 Subject/Study/Dicom 零重叠，CSV SHA-256 与 A-001 记录一致 |
 | 预训练 | `convnext_tiny.fb_in1k`（本地缓存 HF commit `b43a6303…`、safetensors 114,374,272 B、SHA-256 `08b9dc9c…`，与 A-001 记录一致），`HF_HUB_OFFLINE=1` 离线加载；`train.log` 与 checkpoint metadata 均确认 `pretrained_loaded: true` |
-| 产物 | `outputs/20261031-155701_A-006_ml_decoder_s42/`（`best.pt` 114,276,003 B、`last.pt` 457,115,795 B、`metrics.csv`、`train.log`、`config.yaml`）、`outputs/eval_reports/A-006_decoder_full.txt`、`outputs/A-006_decoder_valid.csv`（859 个 valid study）、`outputs/compare_A006/`（`summary.md` / `per_class.csv` / `bootstrap_A006.csv`） |
-| 配对基线 | `outputs/20261031-151114_A-005_baseline_s42/`（tag `A-005_baseline_s42`）：`exp_A001.yaml` 标准头同版本重训，15:11:14–15:40:35（29m21s）、第 6 轮早停（best epoch 4）、valid macro-AUC **0.8022** / F1@0.5 **0.4210**、27,827,818 参数、`best.pt` 111,385,195 B（目录内未保留 `last.pt`）；与 A-006 同数据、同设备、同预算，训练时工作区为 `50620f3` + 未提交改动（备份 `/root/plan16_backup/wip.patch`，与 `97505f0` 已跟踪 src 改动仅差「允许 `model.head=ml_decoder`」及新增文件），standard 头代码路径一致 |
+| 产物 | `outputs/experiments/A/A-006_ml_decoder_s42/`（`best.pt` 114,276,003 B、`last.pt` 457,115,795 B、`metrics.csv`、`train.log`、`config.yaml`）、`outputs/eval_reports/A-006_decoder_full.txt`、`outputs/A-006_decoder_valid.csv`（859 个 valid study）、`outputs/compare_A006/`（`summary.md` / `per_class.csv` / `bootstrap_A006.csv`） |
+| 配对基线 | `outputs/experiments/A/A-005_baseline_s42/`（tag `A-005_baseline_s42`）：`exp_A001.yaml` 标准头同版本重训，15:11:14–15:40:35（29m21s）、第 6 轮早停（best epoch 4）、valid macro-AUC **0.8022** / F1@0.5 **0.4210**、27,827,818 参数、`best.pt` 111,385,195 B（目录内未保留 `last.pt`）；与 A-006 同数据、同设备、同预算，训练时工作区为 `50620f3` + 未提交改动（备份 `/root/plan16_backup/wip.patch`，与 `97505f0` 已跟踪 src 改动仅差「允许 `model.head=ml_decoder`」及新增文件），standard 头代码路径一致 |
 | 耗时 | 32m39s（15:57:01–16:29:40），第 7 轮后早停（上限 8） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2452,8 +2452,8 @@ ConvNeXt-Small 并改用 `fb_in22k_ft_in1k` 权重（ImageNet-22k 预训练后�
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32GB（驱动 580.105.08），训练期间无其他 GPU 占用；训练中 `nvidia-smi` 抽样显存峰值 14,702 MiB（A-001 记录约 11.7 GB，+约 3.0 GB） |
 | 数据 | `data/train.csv` 30,344 图 / 18,513 studies、`data/valid.csv` 1,422 图 / 859 studies；与 A-001 同一份划分，执行前 `check_data.py --full` 复核图片齐全、三划分 Subject/Study/Dicom 零重叠 |
 | 预训练 | `convnext_small.fb_in22k_ft_in1k`（训练机本地缓存 HF commit `fe6b358a…`、`model.safetensors` 200,928,946 B、SHA-256 `2457488b…`；来源 `timm/convnext_small.fb_in22k_ft_in1k`），`HF_HUB_OFFLINE=1` 离线加载；`train.log` 与 checkpoint metadata 均确认 `pretrained_loaded: true` |
-| 产物 | `outputs/20261031-172305_A-007_convnext_small_in22k_ft_s42/`（`best.pt` 197,987,899 B、`last.pt` 791,962,333 B、`metrics.csv`、`train.log`、`config.yaml`）、`outputs/eval_reports/A-007_full.txt`、`outputs/A-007_convnext_small_valid.csv`（859 个 valid study）、`outputs/compare_A007/`（`summary.md` / `per_class.csv` / `bootstrap_A007.csv` / `bootstrap_A007.log`） |
-| 配对基线 | A-001（`outputs/20261030-150749_A-001_convnext_tiny_s42/`，0.8038 / 0.4255；同数据、同设备、同预算、同 seed 42）。本组只改配置 YAML，训练代码路径与 A-001 完全一致（`_base` 逐字段继承），因此直接以 A-001 记录值作对照、复用其 valid 预测 `outputs/A-001_ref_valid.csv` 做配对，不另重训基线 |
+| 产物 | `outputs/experiments/A/A-007_convnext_small_in22k_ft_s42/`（`best.pt` 197,987,899 B、`last.pt` 791,962,333 B、`metrics.csv`、`train.log`、`config.yaml`）、`outputs/eval_reports/A-007_full.txt`、`outputs/A-007_convnext_small_valid.csv`（859 个 valid study）、`outputs/compare_A007/`（`summary.md` / `per_class.csv` / `bootstrap_A007.csv` / `bootstrap_A007.log`） |
+| 配对基线 | A-001（`outputs/experiments/A/A-001_convnext_tiny_s42/`，0.8038 / 0.4255；同数据、同设备、同预算、同 seed 42）。本组只改配置 YAML，训练代码路径与 A-001 完全一致（`_base` 逐字段继承），因此直接以 A-001 记录值作对照、复用其 valid 预测 `outputs/A-001_ref_valid.csv` 做配对，不另重训基线 |
 | 耗时 | 37m03s（17:23:05–18:00:08），8/8 轮跑满后第 8 轮触发早停（best epoch 6），平均约 4.6 分钟/轮（含启动与首轮数据索引开销） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2545,7 +2545,7 @@ class2 是 A-007 掉出判读门的主要来源（10 类平均上拉低约 0.010
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08），训练中显存约 14.3 GB |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies；`check_data.py --full` 全通过 |
 | 预训练 | `convnext_tiny.fb_in1k`，`HF_HUB_OFFLINE=1` 离线加载 |
-| 产物 | `outputs/20261031-190629_A-008_convnext_tiny_g1_s42/`（`best.pt` 111,385,259 B / `last.pt` / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv` |
+| 产物 | `outputs/experiments/A/A-008_convnext_tiny_g1_s42/`（`best.pt` 111,385,259 B / `last.pt` / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-008_full.txt`、`outputs/A-008_valid_predictions.csv` |
 | 耗时 | 2026-10-31 19:06:29 → 19:38:48 CST，共 32m19s（含启动与首轮数据索引），第 7 轮后早停（best epoch 5） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2577,7 +2577,7 @@ ep5 见顶（A-001 为 ep4），ep6–7 过拟合更陡（valid_loss 1.0375 / 1.
 | 设备环境 | autodl 独占 Tesla V100-SXM2-32G（驱动 580.105.08） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份，未重跑 `check_data --full`） |
 | 预训练 | `convnext_tiny.fb_in1k`，`HF_HUB_OFFLINE=1` 离线加载（日志「预训练权重: 已加载」） |
-| 产物 | `outputs/20261031-194952_A-009_convnext_tiny_lr1e-3_wd0.03_s42/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-009_full.txt`、`outputs/A-009_valid_predictions.csv`、`outputs/compare_A009/bootstrap_A009.csv` |
+| 产物 | `outputs/A-009_convnext_tiny_lr1e-3_wd0.03_s42/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-009_full.txt`、`outputs/A-009_valid_predictions.csv`、`outputs/compare_A009/bootstrap_A009.csv` |
 | 耗时 | 2026-10-31 19:49:52 → 20:33:27 CST，共 **43m35s**（10/10 轮跑满、早停未触发，含启动与数据索引） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2626,12 +2626,12 @@ lr 放大后的收敛推迟与过拟合加剧，但不能据此排除 wd 与轮�
 
 | 项 | 值 |
 |---|---|
-| 运行命令 | `HF_HUB_OFFLINE=1 .venv/bin/python -u src/run_train.py --config configs/exp_A009.yaml --seed 42 --init-from outputs/20261031-194952_A-009_convnext_tiny_lr1e-3_wd0.03_s42/best.pt --tag A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42` |
+| 运行命令 | `HF_HUB_OFFLINE=1 .venv/bin/python -u src/run_train.py --config configs/exp_A009.yaml --seed 42 --init-from outputs/A-009_convnext_tiny_lr1e-3_wd0.03_s42/best.pt --tag A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42` |
 | 代码版本 | `exp/A-009` 分支（含本轮 `--init-from` 改动） |
 | 设备环境 | autodl Tesla V100-SXM2-32G（与另一容器共享 GPU，宿主机侧约 14.3 GiB 被占，训练每轮约 6–7 分钟，慢于首轮独占的 4.4 分钟/轮） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份） |
 | 预训练 | 不加载 ImageNet；`--init-from` 从首轮 A-009 `best.pt` 加载权重，训练日志「warm start: 从 … 加载模型权重 (source epoch 10, sha256 6988006910b8…)」 |
-| 产物 | `outputs/20261031-204914_A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42/`（`best.pt` 111,385,579 B / `last.pt` 445,550,395 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-009-r2_full.txt`、`outputs/A-009-r2_valid_predictions.csv` |
+| 产物 | `outputs/A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42/`（`best.pt` 111,385,579 B / `last.pt` 445,550,395 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-009-r2_full.txt`、`outputs/A-009-r2_valid_predictions.csv` |
 | 耗时 | 2026-10-31 20:49:14 → 21:13:48 CST，共 **24m34s**（5 轮早停，GPU 共享，不可横向比较） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2670,7 +2670,7 @@ BCE + `pos_weight`、AdamW lr 3e-4、warmup 2 + cosine、batch 16 studies、AMP�
 | 设备环境 | autodl Tesla V100-SXM2-32G（与 A-009-r2 同一实例） |
 | 数据 | train 30,344 图 / 18,513 studies；valid 1,422 图 / 859 studies（与 A-001 同一份，未重跑 `check_data --full`） |
 | 预训练 | `convnext_tiny.fb_in1k`，`HF_HUB_OFFLINE=1` 离线加载（日志「预训练权重: 已加载」） |
-| 产物 | `outputs/20261031-213405_A-001_convnext_tiny_s216/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-001-s216_full.txt`、`outputs/A-001-s216_valid_predictions.csv` |
+| 产物 | `outputs/experiments/A/A-001_convnext_tiny_s216/`（`best.pt` 111,385,195 B / `last.pt` 445,550,459 B / `metrics.csv` / `train.log` / `config.yaml`）、`outputs/eval_reports/A-001-s216_full.txt`、`outputs/A-001-s216_valid_predictions.csv` |
 | 耗时 | 2026-10-31 21:34:05 → 22:17:50 CST，共 **43m45s**（10/12 轮，`early_stop_patience: 4` 触发） |
 
 | epoch | lr | train_loss | valid_loss | valid macro-AUC | valid F1@0.5 |
@@ -2742,10 +2742,10 @@ warmup 2 + cosine、batch 16 studies、AMP、`grad_clip 5.0`、view_weighted 0.7
 
 | 编号 | 骨干 | 可训练参数 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: |
-| C-001-a | `convnext_tiny.fb_in1k` | 27,827,818 | `20261101-114223_C-001-a` | 11:42:23–12:13:56 | 31m33s | 7/12 | 3 | 0.7919 | 0.4191 |
-| C-001-b | `efficientnet_b2.ra_in1k` | 7,715,084 | `20261101-121402_C-001-b` | 12:14:02–12:47:03 | 33m01s | 7/12 | 3 | 0.7774 | 0.3996 |
-| C-001-c | `efficientnetv2_rw_s.ra2_in1k` | 22,166,226 | `20261101-124710_C-001-c` | 12:47:10–13:17:02 | 29m52s | 7/12 | 3 | 0.7807 | 0.4055 |
-| C-001-d | `densenet121.ra_in1k` | 6,964,106 | `20261101-131708_C-001-d` | 13:17:08–13:44:12 | 27m04s | 7/12 | 3 | 0.7849 | 0.4049 |
+| C-001-a | `convnext_tiny.fb_in1k` | 27,827,818 | `C-001-a` | 11:42:23–12:13:56 | 31m33s | 7/12 | 3 | 0.7919 | 0.4191 |
+| C-001-b | `efficientnet_b2.ra_in1k` | 7,715,084 | `C-001-b` | 12:14:02–12:47:03 | 33m01s | 7/12 | 3 | 0.7774 | 0.3996 |
+| C-001-c | `efficientnetv2_rw_s.ra2_in1k` | 22,166,226 | `C-001-c` | 12:47:10–13:17:02 | 29m52s | 7/12 | 3 | 0.7807 | 0.4055 |
+| C-001-d | `densenet121.ra_in1k` | 6,964,106 | `C-001-d` | 13:17:08–13:44:12 | 27m04s | 7/12 | 3 | 0.7849 | 0.4049 |
 
 四组学习率轨迹相同（分层倍率一致），epoch 1 为 2.50e-05 / 7.50e-05，epoch 2–3 为 5.00e-05 / 1.50e-04，
 此后按 cosine 同步衰减到 epoch 7 的 3.14e-05 / 9.42e-05。
@@ -2866,10 +2866,10 @@ T4 耗时自检、DenseNet-121 权重文件 SHA-256 单独记录。
 
 | 编号 | 学习率 | seed | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: |
-| C-002-a | 3e-4 | 42 | `20261101-135010_C-002-a` | 13:50:10–14:30:49 | 40m39s | 9/12 | 5 | 0.7962 | 0.4218 |
-| C-002-b | 1.5e-4 | 42 | `20261101-143056_C-002-b` | 14:30:56–15:06:44 | 35m48s | 8/12 | 4 | **0.7976** | 0.4249 |
-| C-002-c | 3e-4 | 2026 | `20261101-150644_C-002-c` | 15:06:44–15:46:37 | 39m53s | 9/12 | 5 | 0.7958 | **0.4300** |
-| C-002-d | 1.5e-4 | 2026 | `20261101-154637_C-002-d` | 15:46:37–16:22:47 | 36m10s | 8/12 | 4 | 0.7956 | 0.4275 |
+| C-002-a | 3e-4 | 42 | `C-002-a` | 13:50:10–14:30:49 | 40m39s | 9/12 | 5 | 0.7962 | 0.4218 |
+| C-002-b | 1.5e-4 | 42 | `C-002-b` | 14:30:56–15:06:44 | 35m48s | 8/12 | 4 | **0.7976** | 0.4249 |
+| C-002-c | 3e-4 | 2026 | `C-002-c` | 15:06:44–15:46:37 | 39m53s | 9/12 | 5 | 0.7958 | **0.4300** |
+| C-002-d | 1.5e-4 | 2026 | `C-002-d` | 15:46:37–16:22:47 | 36m10s | 8/12 | 4 | 0.7956 | 0.4275 |
 
 四组均在 best 之后按 `patience 4` 早停，无一跑满 12 轮；峰值全部落在第 4–5 轮，即 warmup 结束后的第一或第二轮。
 
@@ -2979,8 +2979,8 @@ plan22 / plan23 预置的学习率切换条件为：两次差值**均为正**、
 
 | 编号 | 相对基线 | 改动 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
-| C-002-b-EXTRA | C-002-b | `epochs` 12→8、`early_stop_patience` 4→2 | `20261101-162622_C-002-b-EXTRA` | 16:26:17–16:58:14 | 31m57s | 7/8 | 5 | 0.7958 | **0.4431** |
-| C-002-e | C-002-a | `lr` 3e-4→6e-4、`early_stop_patience` 4→2 | `20261101-165819_C-002-e` | 16:58:14–17:37:52 | 39m38s | 9/12 | 7 | 0.7844 | 0.4132 |
+| C-002-b-EXTRA | C-002-b | `epochs` 12→8、`early_stop_patience` 4→2 | `C-002-b-EXTRA` | 16:26:17–16:58:14 | 31m57s | 7/8 | 5 | 0.7958 | **0.4431** |
+| C-002-e | C-002-a | `lr` 3e-4→6e-4、`early_stop_patience` 4→2 | `C-002-e` | 16:58:14–17:37:52 | 39m38s | 9/12 | 7 | 0.7844 | 0.4132 |
 
 **C-002-b-EXTRA（1.5e-4, seed 42, 8 轮上限）**
 
@@ -3051,8 +3051,8 @@ python src/run_train.py --config configs/exp_C003b.yaml --seed 2026   # 紧接�
 
 | 编号 | size | seed | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | ---: | ---: | --- | --- | --- | --- | ---: | ---: | ---: |
-| C-003-a | 384 | 42 | `20261101-174052_C-003-a` | 17:40:52–18:14:31 | 33m39s | 7/12 | 5 | **0.8020** | 0.4405 |
-| C-003-b | 384 | 2026 | `20261101-181438_C-003-b` | 18:14:38–18:48:48 | 34m10s | 7/12 | 5 | 0.7969 | **0.4448** |
+| C-003-a | 384 | 42 | `C-003-a` | 17:40:52–18:14:31 | 33m39s | 7/12 | 5 | **0.8020** | 0.4405 |
+| C-003-b | 384 | 2026 | `C-003-b` | 18:14:38–18:48:48 | 34m10s | 7/12 | 5 | 0.7969 | **0.4448** |
 
 **判读**
 
@@ -3096,10 +3096,10 @@ for t in a b c d; do python src/run_train.py --config configs/exp_C005$t.yaml --
 
 | 编号 | frontal:lateral | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
-| C-005-a | 0.5 : 0.5 | `20261101-192302_C-005-a` | 19:23:02–19:55:14 | 32m12s | 7/12 | 5 | 0.7991 | **0.4365** |
-| C-005-b | 0.6 : 0.4 | `20261101-195520_C-005-b` | 19:55:20–20:23:19 | 27m59s | 6/12 | 4 | 0.7981 | 0.4218 |
-| C-005-c | 0.8 : 0.2 | `20261101-202325_C-005-c` | 20:23:25–20:55:13 | 31m48s | 7/12 | 5 | **0.8029** | 0.4291 |
-| C-005-d | 0.9 : 0.1 | `20261101-205519_C-005-d` | 20:55:19–21:23:15 | 27m56s | 6/12 | 4 | 0.8019 | 0.4191 |
+| C-005-a | 0.5 : 0.5 | `C-005-a` | 19:23:02–19:55:14 | 32m12s | 7/12 | 5 | 0.7991 | **0.4365** |
+| C-005-b | 0.6 : 0.4 | `C-005-b` | 19:55:20–20:23:19 | 27m59s | 6/12 | 4 | 0.7981 | 0.4218 |
+| C-005-c | 0.8 : 0.2 | `C-005-c` | 20:23:25–20:55:13 | 31m48s | 7/12 | 5 | **0.8029** | 0.4291 |
+| C-005-d | 0.9 : 0.1 | `C-005-d` | 20:55:19–21:23:15 | 27m56s | 6/12 | 4 | 0.8019 | 0.4191 |
 
 **判读**
 
@@ -3117,12 +3117,12 @@ for t in a b c d; do python src/run_train.py --config configs/exp_C005$t.yaml --
 
 | 编号 | 唯一改变 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
-| C-006-a | brightness 0.05 | `20261101-212740_C-006-a` | 21:27:40–21:59:24 | 31m44s | 7/12 | 5 | 0.7957 | 0.4348 |
-| C-006-b | brightness 0.25 | `20261101-215931_C-006-b` | 21:59:31–22:27:41 | 28m10s | 6/12 | 4 | **0.8014** | 0.4263 |
-| C-006-c | contrast 0.05 | `20261101-222747_C-006-c` | 22:27:47–22:56:17 | 28m30s | 6/12 | 4 | 0.7927 | 0.4156 |
-| C-006-d（重跑） | contrast 0.25 | `20261102-122314_C-006-d` | 12:23:14–12:55:15 | 32m01s | 7/12 | 5 | 0.8009 | **0.4371** |
+| C-006-a | brightness 0.05 | `C-006-a` | 21:27:40–21:59:24 | 31m44s | 7/12 | 5 | 0.7957 | 0.4348 |
+| C-006-b | brightness 0.25 | `C-006-b` | 21:59:31–22:27:41 | 28m10s | 6/12 | 4 | **0.8014** | 0.4263 |
+| C-006-c | contrast 0.05 | `C-006-c` | 22:27:47–22:56:17 | 28m30s | 6/12 | 4 | 0.7927 | 0.4156 |
+| C-006-d（重跑） | contrast 0.25 | `C-006-d` | 12:23:14–12:55:15 | 32m01s | 7/12 | 5 | 0.8009 | **0.4371** |
 
-**C-006-d 为重跑结果**：2026-11-01 22:56 首次启动后被实例重启打断（仅 1 轮、无 `best.pt`，残留目录已归档到远端 `outputs/_aborted/20261101-225624_C-006-d`）；2026-11-02 12:23:14 在同一代码 HEAD `64d03da`、同一 seed 42、同一 V100-SXM2-32G 上从头重跑，12:55:15 训练收尾、12:55:57 评测完成，未复用任何中断残留。四组现在齐备，`outputs/comparisons/compare_C006/` 已按四组统一重算，四组 `valid_ids_sha256` 一致（`81e8be7f…`）、valid 均 859 studies。
+**C-006-d 为重跑结果**：2026-11-01 22:56 首次启动后被实例重启打断（仅 1 轮、无 `best.pt`，残留目录已归档到远端 `outputs/experiments/aborted/C-006-d`）；2026-11-02 12:23:14 在同一代码 HEAD `64d03da`、同一 seed 42、同一 V100-SXM2-32G 上从头重跑，12:55:15 训练收尾、12:55:57 评测完成，未复用任何中断残留。四组现在齐备，`outputs/comparisons/compare_C006/` 已按四组统一重算，四组 `valid_ids_sha256` 一致（`81e8be7f…`）、valid 均 859 studies。
 
 **判读**
 
@@ -3140,8 +3140,8 @@ for t in a b c d; do python src/run_train.py --config configs/exp_C005$t.yaml --
 
 | 编号 | 唯一改变 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: |
-| D-001-a | 五项组合 + seed 42 | `20261102-130616_D-001-a` | 13:06:12–13:42:26 | 36m14s | 7/8 | 5 | 0.7988 | **0.4401** |
-| D-001-b | 同 a，seed 2026 | `20261102-134231_D-001-b` | 13:42:31–14:17:35 | 35m04s | 7/8 | 5 | 0.7973 | 0.4321 |
+| D-001-a | 五项组合 + seed 42 | `D-001-a` | 13:06:12–13:42:26 | 36m14s | 7/8 | 5 | 0.7988 | **0.4401** |
+| D-001-b | 同 a，seed 2026 | `D-001-b` | 13:42:31–14:17:35 | 35m04s | 7/8 | 5 | 0.7973 | 0.4321 |
 
 两组在同一张 Tesla V100-SXM2-32G 上串行、同一代码 HEAD `135fb65`、同一份原始 train/valid；启动日志均确认 `convnext_tiny.fb_in1k` 预训练加载成功，AMP 与 fp32 复评差值 ≤ 0.0001（a：0.7988 / 0.7988；b：0.7973 / 0.7973）。`run_compare.py` 统一重算（`outputs/comparisons/compare_D001/`），5 个 run 的 `valid_ids_sha256` 一致（`81e8be7f…`）、均 859 studies。
 
@@ -3163,11 +3163,11 @@ for t in a b c d; do python src/run_train.py --config configs/exp_C005$t.yaml --
 
 | 实验 | 权重 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 | F1 峰位 / 峰值 |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| D-002-a | `best.pt` | `20261102-145203_D-002-a` | 14:52:03–15:27:00 | 34m57s | 7/8 | 5 | 0.8005 | 0.4222 | 0.7 / 0.4344 |
+| D-002-a | `best.pt` | `D-002-a` | 14:52:03–15:27:00 | 34m57s | 7/8 | 5 | 0.8005 | 0.4222 | 0.7 / 0.4344 |
 | D-002-a-EMA | `best_ema.pt` | 同 a | 同 a | 同 a，不重复计 | 同 a | 5 | **0.8100** | 0.4283 | 0.6 / 0.4422 |
-| D-002-b | `best.pt` | `20261102-160442_D-002-b` | 16:04:42–16:35:32 | 30m50s | 6/8 | 4 | 0.7999 | 0.4150 | 0.6 / 0.4233 |
+| D-002-b | `best.pt` | `D-002-b` | 16:04:42–16:35:32 | 30m50s | 6/8 | 4 | 0.7999 | 0.4150 | 0.6 / 0.4233 |
 | D-002-b-EMA | `best_ema.pt` | 同 b | 同 b | 同 b，不重复计 | 同 b | 5 | 0.8074 | 0.4269 | 0.6 / 0.4423 |
-| D-002-c | `best.pt` | `20261102-192442_D-002-c` | 19:24:37–20:04:10 | 39m33s | 8/8（跑满） | 6 | 0.7961 | **0.4331** | 0.5 / 0.4331 |
+| D-002-c | `best.pt` | `D-002-c` | 19:24:37–20:04:10 | 39m33s | 8/8（跑满） | 6 | 0.7961 | **0.4331** | 0.5 / 0.4331 |
 | D-002-c-EMA | `best_ema.pt` | 同 c | 同 c | 同 c，不重复计 | 同 c | 5 | 0.8043 | 0.4329 | 0.6 / 0.4397 |
 
 a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/comparisons/compare_D002_D003/`）；c 与 D-004、E-001 一起在 `outputs/comparisons/compare_D004_E001/`，七个 run 的 `valid_ids_sha256` 均为 `81e8be7f…`、859 studies。EMA 三组用独立 `run_eval.py` 报告（`outputs/eval_reports/D-002-{a,b,c}-EMA.txt`）与预测（`outputs/predictions/valid/D-002-{a,b,c}-EMA.csv`，本地按 `-EMA` 命名，远端对应文件名为小写 `-ema`），预测同样为 859 × 21。启动日志确认 `convnext_tiny.fb_in1k` 预训练加载成功；AMP 与 fp32 复评差值 ≤ 0.0001。
@@ -3188,8 +3188,8 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 | 编号 | 唯一改变 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| D-003-a | `aggregation: study_attention`，seed 42 | `20261102-152705_D-003-a` | 15:27:05–16:04:37 | 37m32s | 8/8（跑满） | 7 | 0.7958 | **0.4494** |
-| D-003-b | 同 a，seed 2026 | `20261102-163536_D-003-b` | 16:35:36–16:58:45 | 23m09s | 4/8（早停） | 2 | 0.7868 | 0.4068 |
+| D-003-a | `aggregation: study_attention`，seed 42 | `D-003-a` | 15:27:05–16:04:37 | 37m32s | 8/8（跑满） | 7 | 0.7958 | **0.4494** |
+| D-003-b | 同 a，seed 2026 | `D-003-b` | 16:35:36–16:58:45 | 23m09s | 4/8（早停） | 2 | 0.7868 | 0.4068 |
 
 **判读**
 
@@ -3206,16 +3206,16 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 | 实验 | 权重 | 唯一变量 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 | F1 峰位 / 峰值 |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| D-002-a-EMA（基线） | `best_ema.pt` | — | `20261102-145203_D-002-a` | 14:52:03–15:27:00 | 34m57s | 7/8 | 5 | **0.8100** | 0.4283 | 0.6 / 0.4422 |
-| D-004-a | `best.pt` | `frontal_weight` 0.7→0.8 | `20261102-200415_D-004-a` | 20:04:10–20:36:29 | 32m19s | 6/8 | 4 | 0.7971 | 0.4203 | 0.6 / 0.4397 |
+| D-002-a-EMA（基线） | `best_ema.pt` | — | `D-002-a` | 14:52:03–15:27:00 | 34m57s | 7/8 | 5 | **0.8100** | 0.4283 | 0.6 / 0.4422 |
+| D-004-a | `best.pt` | `frontal_weight` 0.7→0.8 | `D-004-a` | 20:04:10–20:36:29 | 32m19s | 6/8 | 4 | 0.7971 | 0.4203 | 0.6 / 0.4397 |
 | D-004-a-EMA | `best_ema.pt` | 同上 | 同 a | 同 a | 同 a，不重复计 | 同 a | 5 | 0.8084 | 0.4293 | 0.6 / 0.4408 |
-| D-004-b | `best.pt` | `image.size` 320→384 | `20261102-211906_D-004-b` | 21:19:00–21:55:53 | 36m53s | 7/8 | 5 | 0.7961 | 0.4273 | 0.6 / 0.4363 |
+| D-004-b | `best.pt` | `image.size` 320→384 | `D-004-b` | 21:19:00–21:55:53 | 36m53s | 7/8 | 5 | 0.7961 | 0.4273 | 0.6 / 0.4363 |
 | D-004-b-EMA | `best_ema.pt` | 同上 | 同 b | 同 b | 同 b，不重复计 | 同 b | 5 | 0.8085 | 0.4323 | 0.6 / 0.4417 |
-| D-004-c | `best.pt` | `contrast` 0.15→0.25 | `20261102-215558_D-004-c` | 21:55:53–22:30:50 | 34m57s | 7/8 | 5 | 0.7945 | 0.4287 | 0.6 / 0.4365 |
+| D-004-c | `best.pt` | `contrast` 0.15→0.25 | `D-004-c` | 21:55:53–22:30:50 | 34m57s | 7/8 | 5 | 0.7945 | 0.4287 | 0.6 / 0.4365 |
 | D-004-c-EMA | `best_ema.pt` | 同上 | 同 c | 同 c | 同 c，不重复计 | 同 c | 5 | **0.8096** | 0.4277 | 0.6 / 0.4435 |
-| D-004-d | `best.pt` | `brightness` 0.15→0.25 | `20261102-223054_D-004-d` | 22:30:50–23:01:00 | 约 30m10s | 6/8 | 4 | 0.7961 | 0.4128 | 0.6 / 0.4321 |
+| D-004-d | `best.pt` | `brightness` 0.15→0.25 | `D-004-d` | 22:30:50–23:01:00 | 约 30m10s | 6/8 | 4 | 0.7961 | 0.4128 | 0.6 / 0.4321 |
 | D-004-d-EMA | `best_ema.pt` | 同上 | 同 d | 同 d | 同 d，不重复计 | 同 d | 5 | 0.8058 | 0.4280 | 0.6 / **0.4451** |
-| D-004-e | `best.pt` | `frontal_weight` 0.7→0.9 | `20261104-094810_D-004-e` | 09:48:10–10:22:51 | 34m41s | 7/8 | 5 | 0.7982 | 0.4289 | 0.6 / 0.4350 |
+| D-004-e | `best.pt` | `frontal_weight` 0.7→0.9 | `D-004-e` | 09:48:10–10:22:51 | 34m41s | 7/8 | 5 | 0.7982 | 0.4289 | 0.6 / 0.4350 |
 | D-004-e-EMA | `best_ema.pt` | 同上 | 同 e | 同 e | 同 e，不重复计 | 同 e | 5 | 0.8079 | 0.4326 | 0.6 / 0.4373 |
 
 四个 run 与 D-002-c、E-001、E-001-a 由 `run_compare.py` 统一重算（`outputs/comparisons/compare_D004_E001/`），七个 run 的 `valid_ids_sha256` 均为 `81e8be7f…`、859 studies。启动日志均确认 `convnext_tiny.fb_in1k` 预训练加载成功；AMP 与 fp32 复评差值 ≤ 0.0001。d 组在第 6 轮后触发 patience 2 早停，最优权重于 epoch 4 选出。
@@ -3236,7 +3236,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 - 目的：D-002-a 口径完全不变，只把 `model.backbone` 由 `convnext_tiny.fb_in1k` 换成 `convnext_tiny.fb_in22k_ft_in1k`（ImageNet-22k 预训练再在 1k 微调的权重），检验「更强 ImageNet 预训练」在当前 8 轮、lr 3e-4 预算下是否带来增益。配置 `configs/exp_D002d.yaml`，与 `exp_D002a.yaml` 逐字段一致，仅 backbone 一行不同。
 - 执行：2026-11-04 10:27:06–11:05:29（38m23s），Tesla V100-SXM2-32G，HEAD `529f9f1`，seed 42，8 轮上限、patience 2；实际跑满 8 轮后早停，best epoch 6。启动日志确认「预训练权重: 已加载」。
-- 首次启动的无效 run：10:22:53 那次因 HF 缓存缺该权重、且批次脚本设了 `HF_HUB_OFFLINE=1`，静默退化为随机初始化（日志 `预训练权重: 未加载`）。该 run 已终止并归档到 `outputs/_aborted/20261104-102253_D-002-d_pretrained_failed`，不计入结果。补下载走 `HF_ENDPOINT=https://hf-mirror.com`（28,589,128 参数，缓存 `models--timm--convnext_tiny.fb_in22k_ft_in1k`），并先用 `HF_HUB_OFFLINE=1` 验证离线命中再重跑。
+- 首次启动的无效 run：10:22:53 那次因 HF 缓存缺该权重、且批次脚本设了 `HF_HUB_OFFLINE=1`，静默退化为随机初始化（日志 `预训练权重: 未加载`）。该 run 已终止并归档到 `outputs/experiments/aborted/D-002-d_pretrained_failed`，不计入结果。补下载走 `HF_ENDPOINT=https://hf-mirror.com`（28,589,128 参数，缓存 `models--timm--convnext_tiny.fb_in22k_ft_in1k`），并先用 `HF_HUB_OFFLINE=1` 验证离线命中再重跑。
 - 结果（valid 859 studies）：
 
 | 权重 | macro-AUC | 9 类口径 | F1@0.5 | F1 峰位 / 峰值 | 对 D-002-a 同口径 |
@@ -3245,13 +3245,13 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 | D-002-d-EMA | 0.8037 | 0.8142 | 0.4284 | 0.6 / 0.4405 | −0.0063（9 类 −0.0054） |
 
 - 判读：两组方向均为负，EMA 的 −0.0063 已接近单次 SE 的 0.7 倍，但仍在噪声内；**0.8037 是 D-002/D-004 系列六组 EMA 中最低的一个**（0.8100 / 0.8084 / 0.8085 / 0.8096 / 0.8058 / 0.8037），没有任何一档支持「22k 权重更好」。9 类口径 −0.0054 说明下滑不是 class1 造成。结论限于当前预算：换更强的 ImageNet 预训练没有带来可测收益，不支持替换默认骨干。单 seed，不能排除 seed 效应，也未做配对 bootstrap。
-- 产物：`outputs/20261104-102710_D-002-d/`（`config.yaml` / `metrics.csv` / `train.log` / `best.pt` / `best_ema.pt`）、`outputs/predictions/valid/D-002-d{,-ema}.csv`、`outputs/eval_reports/D-002-d{,-ema}.txt`。
+- 产物：`outputs/experiments/D/D-002-d/`（`config.yaml` / `metrics.csv` / `train.log` / `best.pt` / `best_ema.pt`）、`outputs/predictions/valid/D-002-d{,-ema}.csv`、`outputs/eval_reports/D-002-d{,-ema}.txt`。
 
 ## D-005：多标签 AUCM 对照（初筛，两组均失败）
 
 - 依据 [train_plan28.md](../archive/train_plan28.md)。D-005-a 为 ImageNet 初始化后全程 AUCM；D-005-b 从 D-002-a 的 BCE `best_ema.pt` warm start 后转 AUCM 微调。两组均 `pos_weight: false`、`loss: aucm`、`aucm_require_bce_init` 分别为 false / true，PESG（adam 模式、lr 3e-4、weight decay 0.01、epoch_decay 0）、AUCM margin 1.0 / version v1、`batch_studies: 16`，按类别均衡采样（每批单类别、正负各半）。
 - 依赖与环境：`libauc==2.0.0` 用 uv 装入主 `.venv`（`--index-url` 阿里云），新增 40 个包、无版本升降级，torch 保持 `2.10.0+cu128`；`tests/test_aucm.py` 7 passed。
-- 执行：D-005-a 11:05:29–11:22:44（17m15s），best epoch **1**；D-005-b 11:22:44–11:39:57（17m13s），warm start 从 `20261102-145203_D-002-a/best_ema.pt`（source epoch 5，sha256 `aeeb2106…`），best epoch **1**。两组均在第 3 轮后退化为 0.50 附近并触发早停。
+- 执行：D-005-a 11:05:29–11:22:44（17m15s），best epoch **1**；D-005-b 11:22:44–11:39:57（17m13s），warm start 从 `D-002-a/best_ema.pt`（source epoch 5，sha256 `aeeb2106…`），best epoch **1**。两组均在第 3 轮后退化为 0.50 附近并触发早停。
 - 结果：
 
 | 实验 | 权重 | 10 类 Macro-AUC | 9 类口径 | F1@0.5 | F1 峰位 / 峰值 |
@@ -3267,7 +3267,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
   2. **D-005-b 给出定性证据**：起点是 BCE-EMA 0.8100，一个 epoch 后掉到 0.5422，第三轮 0.5000 → AUCM 的更新在破坏已收敛权重，而不是从零学不动。因此问题在优化/损失侧，不在初始化。
   3. 根因未定。候选按可疑度排序：(a) PESG 的 lr 3e-4 相对 1157 步/epoch 过大，配合默认 `clip_value=1.0` 会快速把权重带离预训练解；(b) `TaskPESG` 对 `a/b/alpha` 的逐类 mask 恢复逻辑在「单类别 batch」下可能让 alpha 与动量状态累积偏差；(c) AUCM 需要更长训练预算和更小 lr，当前 8 轮、3e-4 的初筛设置本身不适合。本轮未做单变量排查，三种假设都未验证。
   4. **结论**：AUCM 在当前实现与初筛超参下不可用，不能作为提交候选；两组只能记为「负结果」，不是「AUCM 方法无效」的证据。如要继续，先固定 D-005-b 的 warm start，对 lr ∈ {3e-5, 1e-5} 做单变量对照，确认不塌缩后再看全程 AUCM。
-- 产物：`outputs/20261104-110534_D-005-a/`、`outputs/20261104-112249_D-005-b/`、`outputs/predictions/valid/D-005-{a,b}{,-ema}.csv`、`outputs/eval_reports/D-005-{a,b}{,-ema}.txt`。
+- 产物：`outputs/experiments/D/D-005-a/`、`outputs/experiments/D/D-005-b/`、`outputs/predictions/valid/D-005-{a,b}{,-ema}.csv`、`outputs/eval_reports/D-005-{a,b}{,-ema}.txt`。
 
 ## E-001：EfficientNetV2-S RW 换骨干双分辨率对照
 
@@ -3275,10 +3275,10 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 | 实验 | 权重 | 运行目录 | 起止（CST） | 耗时 | epochs | best | macro-AUC | F1@0.5 | F1 峰位 / 峰值 |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| D-002-a-EMA（基线） | `best_ema.pt` | `20261102-145203_D-002-a` | 14:52:03–15:27:00 | 34m57s | 7/8 | 5 | **0.8100** | 0.4283 | 0.6 / 0.4422 |
-| E-001 | `best.pt` | `20261102-203634_E-001` | 20:36:29–21:01:21 | 24m52s | 5/8 | 3 | 0.7970 | 0.4112 | 0.5 / 0.4112 |
+| D-002-a-EMA（基线） | `best_ema.pt` | `D-002-a` | 14:52:03–15:27:00 | 34m57s | 7/8 | 5 | **0.8100** | 0.4283 | 0.6 / 0.4422 |
+| E-001 | `best.pt` | `E-001` | 20:36:29–21:01:21 | 24m52s | 5/8 | 3 | 0.7970 | 0.4112 | 0.5 / 0.4112 |
 | E-001-EMA | `best_ema.pt` | 同 E-001 | 同 E-001 | 同 E-001，不重复计 | 同 E-001 | 5 | 0.8038 | 0.4307 | 0.6 / 0.4343 |
-| E-001-a | `best.pt` | `20261102-210126_E-001-a` | 21:01:21–21:19:00 | 17m39s | 3/8 | 1 | 0.7865 | 0.4000 | 0.6 / 0.4110 |
+| E-001-a | `best.pt` | `E-001-a` | 21:01:21–21:19:00 | 17m39s | 3/8 | 1 | 0.7865 | 0.4000 | 0.6 / 0.4110 |
 | E-001-a-EMA | `best_ema.pt` | 同 E-001-a | 同 E-001-a | 同 E-001-a，不重复计 | 同 E-001-a | 3 | 0.7969 | 0.4137 | 0.6 / 0.4195 |
 
 **判读**
@@ -3318,7 +3318,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 限制：教师软标签为 in-sample（学生训练集上的教师预测，非 OOF），教师本身也在同一 valid 上选型；单 seed、同一 valid 反复选型，bootstrap 只覆盖患者抽样、不覆盖训练随机性与选择偏差；未做 seed 2026 配对复核。结论限定为「本次单 seed、当前 λ/T 与 8 轮预算下蒸馏未带来可测增益」，不外推到其他温度、权重或更长预算。
 - 未执行：计划 §2.4 的教师 valid 原始预测逐 study 复算（与教师比较仍用 A-FUSE-5 历史 0.8171 / 0.8249）；seed 2026 配对复核；学生 checkpoint 的 `cost.py` 耗时对比（无 T4，不能声明 T4 达标）。
 - test 推理（2026-11-04 21:36，按用户要求补做）：用各 run 目录内 `config.yaml` 与 `best_ema.pt` 执行 `run_infer.py`，输出全部 10 类概率、未加阈值过滤。b-EMA 写 `outputs/submissionxx.csv`（归档 `outputs/predictions/submissions/submission_Distill-1-b-EMA.csv`，SHA-256 `f308adcf…58d6`），a-EMA 写 `outputs/submission_distill1a_EMA.csv`（归档 `submission_Distill-1-a-EMA.csv`，`79732388…8a62`）。校验：1,414 study / 14,140 行、每 study 覆盖 10 类、study 集合与 `data/test.csv` 完全一致、`Subject_id` 逐 study 匹配、无 NaN、概率范围 [0.0005, 0.9975]；a/b 逐类相关系数 0.938–0.981。仅生成文件，未上传平台（无官方得分）、未做耗时实测。
-- 产物：`outputs/20261104-135517_Distill-1-a/`、`outputs/20261104-142947_Distill-1-b/`（各含 `best.pt`、`best_ema.pt`、`last.pt`、`config.yaml`、`metrics.csv`、`train.log`、`tb/`、`tb_ema/`）、教师缓存 `outputs/distill/Distill-1_teacher/`、`outputs/predictions/valid/Distill-1-{a,b}-{EMA,raw}.csv`、`outputs/comparisons/Distill-1/{summary.md,per_class.csv,bootstrap.json}`、批次日志 `outputs/distill1_run/{runner.log,eval.log}`。
+- 产物：`outputs/experiments/Distill/Distill-1-a/`、`outputs/experiments/Distill/Distill-1-b/`（各含 `best.pt`、`best_ema.pt`、`last.pt`、`config.yaml`、`metrics.csv`、`train.log`、`tb/`、`tb_ema/`）、教师缓存 `outputs/distill/Distill-1_teacher/`、`outputs/predictions/valid/Distill-1-{a,b}-{EMA,raw}.csv`、`outputs/comparisons/Distill-1/{summary.md,per_class.csv,bootstrap.json}`、批次日志 `outputs/distill/runs/distill1_run/{runner.log,eval.log}`。
 
 ## Distill-2：三模型概率融合教师的 train+valid 全量蒸馏
 
@@ -3329,10 +3329,10 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 环境：RTX 3090 24 GiB（driver 535.247.01），torch 2.10.0+cu128 / torchvision 0.25.0+cu128，代码版本 `da24545`。全量训练清单 SHA-256 `0766a71e…b45c`；日志确认「预训练权重: 已加载」。
 - 执行：2026-11-08 19:10:52–19:27:49（16m57s，6/6 轮，固定预算无早停）。逐轮 lr `1.5e-4 / 3e-4 / 3e-4 / 2.275e-4 / 8.25e-5 / 1e-5`，train_loss `1.2763 / 1.2125 / 1.1601 / 1.0889 / 0.9516 / 0.8499`，EMA 更新 7,263 次；末轮 train_loss 仍在下降。
 - 结果：`final_ema.pt`（SHA-256 `ba09c21f…fc89e`，111,387,287 B）。全量训练没有独立验证集，不产生干净 valid 指标；补算对照用的 **in-sample** valid（859 studies，valid 已进入学生训练）10 类 Macro-AUC **0.9253**、F1@0.5 **0.5647**（0.6→0.6161、0.7→0.6307），逐类 AUC `0.9888 / 0.9931 / 0.9611 / 0.9424 / 0.9390 / 0.8693 / 0.8778 / 0.8038 / 0.9449 / 0.9324`。该数字只能与同样把 valid 纳入训练的 D-010-a（0.8937）/ D-010-d（0.9242）对照，不能与干净口径（D-002-a-EMA 0.8100、SW-02 0.8087）并列。
-- test 推理：`run_infer.py --config configs/exp_Distill2a.yaml --checkpoint outputs/20261108-111052_Distill-2-a/final_ema.pt --out outputs/20261108-111052_Distill-2-a/submission.csv`，输出全部 10 类概率、未加阈值过滤。1,414 studies / 14,140 行，study 集合与 `data/test.csv` 完全一致、`Subject_id` 逐 study 匹配、每 study 10 类齐全、无 NaN、概率范围 `[0.0019, 0.9978]`；SHA-256 `64fe190c…14e8`，671,451 B。逐类均值概率 `0.3057 / 0.1982 / 0.3234 / 0.4302 / 0.5128 / 0.5604 / 0.4702 / 0.5593 / 0.5198 / 0.2583`，≥0.5 计数 `308 / 158 / 364 / 530 / 743 / 881 / 655 / 913 / 735 / 224`。未上传平台（无官方得分）、未做 `cost.py` 测时、未做 bootstrap。
+- test 推理：`run_infer.py --config configs/exp_Distill2a.yaml --checkpoint outputs/experiments/Distill/Distill-2-a/final_ema.pt --out outputs/experiments/Distill/Distill-2-a/submission.csv`，输出全部 10 类概率、未加阈值过滤。1,414 studies / 14,140 行，study 集合与 `data/test.csv` 完全一致、`Subject_id` 逐 study 匹配、每 study 10 类齐全、无 NaN、概率范围 `[0.0019, 0.9978]`；SHA-256 `64fe190c…14e8`，671,451 B。逐类均值概率 `0.3057 / 0.1982 / 0.3234 / 0.4302 / 0.5128 / 0.5604 / 0.4702 / 0.5593 / 0.5198 / 0.2583`，≥0.5 计数 `308 / 158 / 364 / 530 / 743 / 881 / 655 / 913 / 735 / 224`。未上传平台（无官方得分）、未做 `cost.py` 测时、未做 bootstrap。
 - 判读：①本组没有干净 valid，任何「优于基线」的判断都缺依据；in-sample 0.9253 比两教师的 in-sample 0.8937 / 0.9242 更高，主要反映学生同样拟合了这 859 个 study，不能当作泛化提升。②教师由 320 的 ConvNeXt / EfficientNetV2 与 384 的 Swin V2 混合，骨干与预处理（letterbox 384 vs 320）不同，融合前各自 study 聚合口径也不同（G0 与 view_weighted），这是「多样性」也是口径混杂，等权概率平均未做校准。③6 轮末 train_loss 仍单调下降，预算可能偏短；全量训练无法用 valid 判断过拟合，只能靠平台 test 分数区分。④本次改动让 full_train 与蒸馏可以组合，但旧的硬编码教师身份校验被放宽为白名单 + 数量校验，后续新增教师需继续在 `TEACHER_FUSIONS` 登记并保留 manifest 审计字段。
 - 限制：单 seed、单次训练；教师为 in-sample 且 SW-02 来自外部工作簿（未在本地重训）；in-sample valid 指标存在数据泄漏；未做多 seed、未与 D-010 系列在干净 valid 上对照。结论限定为「管线跑通、提交文件已生成」，不宣称蒸馏或融合带来泛化增益。
-- 产物：`outputs/20261108-111052_Distill-2-a/`（`final_ema.pt`、`last.pt`、`config.yaml`、`full_train_manifest.json`、`metrics.csv`、`train.log`、`submission.csv`、`valid_pred_final_ema.csv`）、教师缓存 `outputs/distill/FUSE3_teacher/`、日志 `/root/sj-tmp/fuse3_teacher.log` 与 `/root/sj-tmp/infer_distill2a.log`。
+- 产物：`outputs/experiments/Distill/Distill-2-a/`（`final_ema.pt`、`last.pt`、`config.yaml`、`full_train_manifest.json`、`metrics.csv`、`train.log`、`submission.csv`、`valid_pred_final_ema.csv`）、教师缓存 `outputs/distill/FUSE3_teacher/`、日志 `/root/sj-tmp/fuse3_teacher.log` 与 `/root/sj-tmp/infer_distill2a.log`。
 
 ## 汇总
 
@@ -3487,7 +3487,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
     `python src/run_ensemble.py --checkpoint outputs/<run>/best.pt --split valid --out outputs/ensemble/valid/single_<tag>`
     （单模型约 50 秒；缓存 `predictions.csv` 含 Study_id + p1…p10）。
   - 融合评测脚本 `/root/fusion_eval.py`（读上方 predictions.csv，概率空间加权平均，输出 `/root/fusion_eval_result.json`）。
-  - test 提交：`python src/run_ensemble.py --checkpoint outputs/20261030-150749_A-001_convnext_tiny_s42/best.pt outputs/20261031-134732_A-004b_weight_decay_only_s42/best.pt outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/best.pt --split test --out outputs/ensemble/test_fuse4`（112 秒）。
+  - test 提交：`python src/run_ensemble.py --checkpoint outputs/experiments/A/A-001_convnext_tiny_s42/best.pt outputs/experiments/A/A-004b_weight_decay_only_s42/best.pt outputs/experiments/RUN/run009a_effv2s_384_s2026/best.pt outputs/experiments/A/A-001d_convnext_tiny_mean_s42/best.pt --split test --out outputs/ensemble/test_fuse4`（112 秒）。
 - 候选与单模型 valid macro-AUC（本轮重算）：A-001 0.8038、A-005_baseline 0.8022、A-004-b 0.7999、A-008 0.7974、A-001-B(ASL, s42) 0.7970、A-001(s216) 0.7947、RUN-009-A 0.7945、A-001-D(mean) 0.7931；B-001（研究用）与 RUN-008-D（CC BY-NC）按规则排除，A-001-C 冻结骨干 0.7264 不作候选。
 - 手动融合（概率空间加权平均，valid macro-AUC / F1@0.5）：A-001+RUN-009-A+A-001-D w111 0.8100 / 0.4409、w211 0.8104 / 0.4389；A-001+A-005_baseline+RUN-009-A+A-001-D w1111 0.8106 / 0.4401；含 A-001(s216) 的五模型 w11111 0.8108 / 0.4446；**A-001+A-004-b+RUN-009-A+A-001-D w1111 0.8116 / 0.4416（采用）**；A-001+A-008+RUN-009-A+A-001-D 0.8112 / 0.4455；六模型等权 0.8113 / 0.4406。
 - 权重网格：6 模型、权重 0/1/2、至少 2 模型，249 组；top1 0.8124（A-001:2 / A-005_baseline:1 / RUN-009-A:2 / A-004-b:2 / A-008:1），仅比等权四模型高 0.0008（< 单 seed 波动 ±0.0033）→ 不采用，避免 valid 过拟合。
@@ -3564,7 +3564,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 
 - 触发：成本优化后的 `k3_D002a_C005c_E001.tar.gz` 三模型导出包（D-002-a-EMA / C-005-c / E-001，`cost_ensemble.json` 指定 `fusion: logit`、`weights: [4,2,3]`）上传 sjy，同步代码后跑 test 融合推理并回传 submission；用户（m00126）要求把这次融合登记为 A-FUSE-5，并告知平台分数 **77.34**（m00185）。
 - 执行：sjy RTX 3090 上通过密钥直连（`ssh -p 51703 root@sz-s.suanjiayun.com`），sjy 仓库 `git pull --ff-only origin loker` 从 `bf7e276` 快进到 `3796b64` 后跑
-  `.venv/bin/python src/run_ensemble.py --checkpoint outputs/export/k3_D002a_C005c_E001/D-002-a-ema.pt outputs/export/k3_D002a_C005c_E001/C-005-c.pt outputs/export/k3_D002a_C005c_E001/E-001.pt --weights 4,2,3 --fusion logit --split test --out outputs/ensemble_k3_D002a_C005c_E001`（约 1 分钟，1414 studies）；`--split valid` 另跑一次复现 valid 指标。三 ckpt md5 分别为 `e97524bb825f4eaf4326477fe37497d3` / `fb8bb5255dbd26e4a010348f7b4dbb4e` / `0ba0918511a52f5c160276aaa2fd9988`，与 `MANIFEST.json` 一致。
+  `.venv/bin/python src/run_ensemble.py --checkpoint outputs/export/k3_D002a_C005c_E001/D-002-a-ema.pt outputs/export/k3_D002a_C005c_E001/C-005-c.pt outputs/export/k3_D002a_C005c_E001/E-001.pt --weights 4,2,3 --fusion logit --split test --out outputs/ensemble/k3_D002a_C005c_E001`（约 1 分钟，1414 studies）；`--split valid` 另跑一次复现 valid 指标。三 ckpt md5 分别为 `e97524bb825f4eaf4326477fe37497d3` / `fb8bb5255dbd26e4a010348f7b4dbb4e` / `0ba0918511a52f5c160276aaa2fd9988`，与 `MANIFEST.json` 一致。
 - 结果：
 
   | 方案 | 成员 | valid AUC | F1@0.5 | 9 类口径 | 平台 test |
@@ -3581,7 +3581,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
   - **首个 10 类与 9 类同时超 A-FUSE-2 的融合**：0.8171 / 0.8249 vs 0.8148 / 0.8213；相对 A-FUSE-4 高 0.0050 / 0.0051。成员分布是原因——D-002-a-EMA 提供 EMA 稳定化、C-005-c 提供 frontal_weight 0.8 的聚合口径差异、E-001 换 EfficientNetV2-S RW 骨干，三类差异正好对应 A-FUSE-4 所缺的结构多样性；A-FUSE-4 的三个 ConvNeXt-Tiny + EMA 同源变体相关 0.971–0.979。
   - 但平台分数打平（77.34 vs 77.36）：valid 上 +0.005 的选型收益在 test 上不可分辨，与 `docs/optimization_review.md`「判读门低于噪声（单次 859-study macro-AUC 的 bootstrap SE 0.0094）」一致——**融合提交的决策应按多样性与耗时，而非 valid 小数点第三位**。
   - 权重精修的边际极小：equal 0.8168 → logit 4:2:3 0.8171（+0.0003），且 F1@0.5 从 0.4352 降到 0.4333；`MANIFEST` 的 refined 结果与 equal 的差距落在噪声内，不应把 4:2:3 说成「精调提升」。
-- 产物：sjy `outputs/ensemble_k3_D002a_C005c_E001/submission.csv`（14,140 行 = 1414 studies × 10 类，概率 0.001211–0.996982，UTF-8）、`valid/metrics.json`（macro_auc 0.8170642208053028 / macro_f1 0.43327788385104943）、`valid/per_class.csv`、`valid/f1_curve.csv`；同目录 `cost_ensemble.json`、`MANIFEST.json`；本机副本 `outputs/submission_k3_D002a_C005c_E001.csv`。校验：14,140 行、字段 `Subject_id,Study_id,Predict_class,Probability` 与历史提交一致、无缺失/重复键、每 study 10 类 1–10、study 集合与 `data/test.csv` 完全一致（1414）。本机用 `outputs/predictions/valid/` 逐 study 预测复算 A-FUSE-5 = AUC 0.817069 / 9 类 0.824937 / F1@0.5 0.433329，与 sjy 完全一致。三模型 test 推理约 1 分钟（RTX 3090，非 `cost.py` 计时口径，`docs/cost.md` 的三模型 93.6 ms/study 另计）。
+- 产物：sjy `outputs/ensemble/k3_D002a_C005c_E001/submission.csv`（14,140 行 = 1414 studies × 10 类，概率 0.001211–0.996982，UTF-8）、`valid/metrics.json`（macro_auc 0.8170642208053028 / macro_f1 0.43327788385104943）、`valid/per_class.csv`、`valid/f1_curve.csv`；同目录 `cost_ensemble.json`、`MANIFEST.json`；本机副本 `outputs/submission_k3_D002a_C005c_E001.csv`。校验：14,140 行、字段 `Subject_id,Study_id,Predict_class,Probability` 与历史提交一致、无缺失/重复键、每 study 10 类 1–10、study 集合与 `data/test.csv` 完全一致（1414）。本机用 `outputs/predictions/valid/` 逐 study 预测复算 A-FUSE-5 = AUC 0.817069 / 9 类 0.824937 / F1@0.5 0.433329，与 sjy 完全一致。三模型 test 推理约 1 分钟（RTX 3090，非 `cost.py` 计时口径，`docs/cost.md` 的三模型 93.6 ms/study 另计）。
 - 注：未做患者整簇配对 bootstrap；成员与权重在同一份 valid 上选定，带选择偏差；test 无标签，77.34 与 valid 0.8171 无可换算关系。`outputs/` 被 `.gitignore` 忽略，产物不入库。
 
 ## 工程记录：A-FUSE-5 的端到端耗时优化（O1–O4，2026-11-04，V100）
@@ -3643,7 +3643,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 逐类（EMA，c1→c10）：AUC `.7154 .8485 .7947 .7544 .8785 .8010 .7922 .7185 .9027 .8756`；相对基线 Δ `−0.0081 −0.0079 −0.0142 +0.0092 +0.0022 +0.0102 −0.0058 −0.0013 −0.0012 −0.0017`。最大跌幅 class3 −0.0142、最大涨幅 class6 +0.0102，均未触 0.02 逐类门；7 降 3 升，没有集中在某一类。class4（68 正）与 class8（214 正）这两个历史弱项分别 +0.0092 / −0.0013，无改善。
 - 耗时（`cost.py`，fp32，100 study / 162 图，batch=1 以 study 为单位，连续 3 轮）：**54.5 ms/study**（162 图折算 33.6 ms/图），0 个 study 与 submission 不一致，init 59.1 ms，1 个模型。DropPath 只在训练期生效，推理未增加耗时——与 D-002-a 同参数量级，54.5 ms 也验证了这一点。
 - 判读：**DropPath 0.1 没有可测增益，也没有明确损害。** 方向略负（−0.0019）但远小于单次 859-study macro-AUC 的 SE 0.0094，不能读成「DropPath 有害」。本轮早停依据改为 EMA AUC，且 EMA best epoch（5）与基线相同，两个 EMA 权重在第 5 轮的可比性较好；但单 seed、单次训练不能支持方法级结论，若继续该方向应改多 seed 配对，而不是在同一 valid 上继续调强度。
-- 产物：`outputs/20261104-193131_D-006-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-a-EMA.csv`、`D-006-a.csv`；`outputs/predictions/submissions/submission_D006a_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-a{,-EMA}.txt` 与 `outputs/eval_reports/D-006-a*-analysis.json`；`outputs/cost_reports/D-006-a-EMA.json`。本机副本已同步 `outputs/predictions/valid/` 与 `outputs/eval_reports/`。
+- 产物：`outputs/experiments/D/D-006-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-a-EMA.csv`、`D-006-a.csv`；`outputs/predictions/submissions/submission_D006a_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-a{,-EMA}.txt` 与 `outputs/eval_reports/D-006-a*-analysis.json`；`outputs/cost_reports/D-006-a-EMA.json`。本机副本已同步 `outputs/predictions/valid/` 与 `outputs/eval_reports/`。
 
 ## D-006-b：cosine 第 6 轮到达最低学习率
 
@@ -3663,7 +3663,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - F1：raw 0.4425 / 峰值 0.6 的 **0.4513**、EMA 0.4297 / 峰值 0.6 的 **0.4491**，两组峰值均为本批（含 D-002/D-004）最高。但 F1 峰值只反映阈值处形态，不作为选型依据；AUC 侧 EMA 仅 +0.0008。
 - 耗时（`cost.py`，fp32，100 study / 162 图，3 轮）：**53.9 ms/study**（162 图折算 33.3 ms/图），0 个 study 与 submission 不一致，init 59.9 ms。与 D-006-a 的 54.5 ms 差 0.6 ms，属同机型重复测量的正常波动，不是配置差异（两组推理路径完全相同）。
 - 判读：**提前完成 cosine 使 EMA 权重持平、raw 权重小幅正向，均未越过证据门槛。** EMA 是主权重，+0.0008 落在噪声内；raw 的 +0.0067 与 class4 +0.0407 值得作为线索，但单 seed、单次训练、且 raw 不是本轮主权重。结论限于「8 轮、lr 3e-4、warmup 2」这一配方的初筛，不外推到更长预算或更小初始 lr；若要验证，应固定其余变量做 3 seed 配对，或把 `cosine_end_epoch` 与更小 lr/更长 warmup 组合后再测。
-- 产物：`outputs/20261104-201457_D-006-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-b-EMA.csv`、`D-006-b.csv`；`outputs/predictions/submissions/submission_D006b_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-b{,-EMA}.txt` 与 `D-006-b*-analysis.json`；`outputs/cost_reports/D-006-b-EMA.json`。本机副本已同步。
+- 产物：`outputs/experiments/D/D-006-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-b-EMA.csv`、`D-006-b.csv`；`outputs/predictions/submissions/submission_D006b_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-b{,-EMA}.txt` 与 `D-006-b*-analysis.json`；`outputs/cost_reports/D-006-b-EMA.json`。本机副本已同步。
 
 ## D-006-c：Study Mixup（alpha 0.2、概率 0.3）
 
@@ -3682,7 +3682,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 逐类：EMA AUC `.7334 .8446 .8042 .7373 .8732 .7927 .7935 .7126 .9109 .8740`，Δ `+0.0100 −0.0118 −0.0048 −0.0079 −0.0032 +0.0020 −0.0045 −0.0072 +0.0070 −0.0033`（4 升 6 降，无一项触 0.02 门）。raw Δ `+0.0192 −0.0485 −0.0057 +0.0361 −0.0025 +0.0056 −0.0051 −0.0209 +0.0063 −0.0015`：**class2 −0.0485（37 正）与 class8 −0.0209（214 正）超 0.02 逐类门**，class4 +0.0361 上升，呈类间重新分配而非整体下滑。
 - 耗时（`cost.py`，fp32，100 study / 162 图，3 轮）：**56.0 ms/study**（162 图折算 34.5 ms/图），0 个 study 与 submission 不一致，init 81.4 ms。Mixup 只在训练期生效，与 a/b 的 53.9–54.5 ms 差 1.5–2.1 ms，属同机型测量波动。
 - 判读：**在当前配方与 0.2448 的实际覆盖率下没有增益证据，9 类口径与 raw 的类级退化方向一致偏负。** F1@0.5 由 0.4283 → 0.4306、峰值 0.4358，说明混合带来轻微正则作用但没有转化为排序能力。计划第 6 节要求「若 c 实际覆盖率很低，先解释执行事实」——0.2448 属配置概率的 81.6%，未低到「方法未被真正执行」的程度，因此可以作为一次有效的方向初筛，但单 seed、单一 alpha/prob 组合仍不足以判定 Mixup 方法无效。
-- 产物：`outputs/20261104-205718_D-006-c/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-c-EMA.csv`、`D-006-c.csv`；`outputs/predictions/submissions/submission_D006c_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-c{,-EMA}.txt` 与 `D-006-c*-analysis.json`；`outputs/cost_reports/D-006-c-EMA.json`。本机副本已同步。
+- 产物：`outputs/experiments/D/D-006-c/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/predictions/valid/D-006-c-EMA.csv`、`D-006-c.csv`；`outputs/predictions/submissions/submission_D006c_EMA.csv`（1414 studies、14,140 行）；`outputs/eval_reports/D-006-c{,-EMA}.txt` 与 `D-006-c*-analysis.json`；`outputs/cost_reports/D-006-c-EMA.json`。本机副本已同步。
 
 ## D-006 汇总：三组全部不可分辨，无一过 +0.010 参考线
 
@@ -3730,7 +3730,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 逐类（EMA，相对基线）：D-007-a Δ `−0.0012 −0.0233 +0.0003 +0.0014 −0.0054 +0.0000 −0.0056 −0.0067 −0.0011 −0.0037`（2 升 8 降，class2 −0.0233 超 0.02 逐类门）；D-007-b Δ `−0.0092 −0.0184 −0.0190 +0.0067 −0.0028 −0.0120 −0.0065 +0.0007 +0.0035 +0.0004`（4 升 6 降，class2 −0.0184 / class3 −0.0190 贴门未过）。**class2 是唯一在两个 seed 上都明显下滑的类**（37 正样本），与 D-006-c 的 class2 −0.0485 同向，提示该类的排序对训练随机性特别敏感。
 - **EMA 峰值早于 raw 峰值是一个稳定形态**：D-007-a 的 EMA 峰值在第 4 轮（0.8055）、raw 峰值在第 5 轮（0.7976）；D-002-a 同样（EMA ep4 0.8100 / raw ep5 0.8004）。这为「导出 `best_ema.pt` 就该按 EMA 早停」提供了第二组独立证据，也是后续 D-008 改 `ema_auc` 的直接理由。
 - 判读：**提前衰减到最低学习率在本项目不构成可复现的增益。** 三 seed 均值 −0.0032，方向略负、量级在 seed 噪声内。D-006-b 留下的两条线索（raw +0.0067、class4 +0.0407）在本批未复现：D-007-a/b 的 raw Δ 分别为 −0.0024 / −0.0040（相对基线 raw），class4 为 +0.0014 / +0.0067。D-006 汇总的后续第 ① 条到此结项，不再投入。
-- 产物：`outputs/20261106-140614_D-007-a/`、`outputs/20261106-143742_D-007-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`tb/`、`tb_ema/`，无 `last.pt`）；`outputs/predictions/valid/D-007-{a,b}{,-EMA}.csv`；`outputs/eval_reports/D-007-{a,b}{,-EMA}.txt`。本机 `outputs/experiments/D-007-{a,b}/` 只保留三件套，md5 与远端一致。
+- 产物：`outputs/experiments/D/D-007-a/`、`outputs/experiments/D/D-007-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`tb/`、`tb_ema/`，无 `last.pt`）；`outputs/predictions/valid/D-007-{a,b}{,-EMA}.csv`；`outputs/eval_reports/D-007-{a,b}{,-EMA}.txt`。本机 `outputs/experiments/D/D-007-{a,b}/` 只保留三件套，md5 与远端一致。
 
 ## D-008：骨干容量阶梯（Small / Base / Large，教师候选）
 
@@ -3762,9 +3762,9 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - **Large 的过拟合最严重**：raw 最优停在 **epoch 3**（0.7976），EMA 峰值在第 5 轮（0.8022），valid_loss 从 epoch 4 的 0.89 一路涨到 epoch 7 的 **1.93**，train_loss 同期降到 0.22。8 轮预算对 Large 明显过长，raw 权重在 epoch 3 之后持续劣化。**c 的 F1 峰值出现在阈值 0.5（0.4385）而非 0.6**，是六组里唯一如此的一档，说明 Large 的概率分布整体偏低（校准偏移），与 D-002-a 及 a/b 的形态不同。
 - 逐类（EMA，相对基线）：D-008-c Δ `−0.0250 −0.0247 −0.0173 −0.0154 −0.0041 +0.0033 −0.0006 −0.0024 +0.0066 +0.0016`（3 升 7 降）。c1 −0.0250 是六组里唯一让 class1 明显下滑的一档；raw 侧的类级退化更重（`−0.0332 +0.0062 −0.0276 −0.0249 −0.0082 +0.0027 −0.0153 −0.0119 −0.0036 −0.0080`，2 升 8 降，class1 −0.0332 / class3 −0.0276 / class4 −0.0249 三项超 0.02 门）。
 - F1 侧无补偿：a/b/c 的 F1@0.5 为 0.4333 / 0.4337 / 0.4385，均略高于基线的 0.4283，但 F1 峰值 0.4423 / 0.4354 / 0.4385 均未超过基线的 0.4422（a 持平）。AUC 下降而 F1@0.5 微升，是阈值处形态变化而非排序能力提升，不作选型依据。
-- **执行事故：c 的第一次尝试被 cgroup OOM 杀掉**。16:29:43 启动，epoch 1/2 正常（raw 0.7875 / 0.7852，EMA 0.7652 / 0.7937），16:50:38 在 epoch 3 开始时被 `SIGKILL`（`rc=137`）。排查排除 CUDA OOM（无 traceback、显存正常）与系统内存不足（`free` 显示 310 GiB 可用，但那是宿主机），根因为容器 cgroup v1 上限 **43.0 GiB**，而 train 图片总量 **47 GiB**、clean page cache 计入 cgroup，前几组训练累积到 27.4 GiB 后 c 的预取撞顶。证据：`memory.max_usage_in_bytes` 精确等于 `limit_in_bytes`（46,170,902,528 vs 46,170,898,432）、`failcnt` 115,082。处置：容器内 `drop_caches` 无权限，改用用户态 `posix_fadvise(POSIX_FADV_DONTNEED)` 逐出（30,344 文件 / 6.2 秒，cache 27.4 GiB → 2.0 GiB），并由守护进程每 150 秒执行一轮，训练期 cache 稳定在 3–23 GiB；**未改任何训练配置**（`num_workers` 16、`batch_studies` 16 保持），以免引入额外变量。失败 run 归档 `outputs/_aborted/20261106-162948_D-008-c_cgroup_oom/`。
+- **执行事故：c 的第一次尝试被 cgroup OOM 杀掉**。16:29:43 启动，epoch 1/2 正常（raw 0.7875 / 0.7852，EMA 0.7652 / 0.7937），16:50:38 在 epoch 3 开始时被 `SIGKILL`（`rc=137`）。排查排除 CUDA OOM（无 traceback、显存正常）与系统内存不足（`free` 显示 310 GiB 可用，但那是宿主机），根因为容器 cgroup v1 上限 **43.0 GiB**，而 train 图片总量 **47 GiB**、clean page cache 计入 cgroup，前几组训练累积到 27.4 GiB 后 c 的预取撞顶。证据：`memory.max_usage_in_bytes` 精确等于 `limit_in_bytes`（46,170,902,528 vs 46,170,898,432）、`failcnt` 115,082。处置：容器内 `drop_caches` 无权限，改用用户态 `posix_fadvise(POSIX_FADV_DONTNEED)` 逐出（30,344 文件 / 6.2 秒，cache 27.4 GiB → 2.0 GiB），并由守护进程每 150 秒执行一轮，训练期 cache 稳定在 3–23 GiB；**未改任何训练配置**（`num_workers` 16、`batch_studies` 16 保持），以免引入额外变量。失败 run 归档 `outputs/experiments/aborted/D-008-c_cgroup_oom/`。
 - 判读：**扩容骨干在 8 轮预算下没有收益，且规模越大越早过拟合。** Small 与基线不可分辨（−0.0043 跨 0）；Base 与 Large 都出现可测负向（−0.0079 / −0.0078，10 类口径 CI 均不跨 0），Large 并未优于 Base，两档实质持平。三点限制必须一起引用：早停口径与基线不同、单 seed、大模型最优轮次提前（Base 第 4 轮、Large 第 3 轮）且 Large 的 valid_loss 末段涨到 1.93。因此只能读作「本预算与本早停口径下扩容无收益、Base/Large 有可测损害、8 轮对 Large 过长」，不能外推为架构优劣。**教师候选这条路也随之收窄**：a/b/c 的 EMA 权重都不如 Tiny 基线 0.8100，用它们做蒸馏教师的先验价值不高；若仍要蒸，应改用更短预算（Large 在 epoch 3 即达 raw 峰）或直接把 Tiny 的 EMA 权重当教师。
-- 产物：`outputs/20261106-151321_D-008-a/`、`outputs/20261106-155019_D-008-b/`、`outputs/20261106-170640_D-008-c/`（三件套 + `best.pt` + `best_ema.pt` + `tb/`、`tb_ema/`，无 `last.pt`；c 的两个权重各 749 MB）；`outputs/predictions/valid/D-008-{a,b,c}{,-EMA}.csv`；`outputs/eval_reports/D-008-{a,b,c}{,-EMA}.txt`。本机 `outputs/experiments/D-008-{a,b,c}/` 三件套已同步。
+- 产物：`outputs/experiments/D/D-008-a/`、`outputs/experiments/D/D-008-b/`、`outputs/experiments/D/D-008-c/`（三件套 + `best.pt` + `best_ema.pt` + `tb/`、`tb_ema/`，无 `last.pt`；c 的两个权重各 749 MB）；`outputs/predictions/valid/D-008-{a,b,c}{,-EMA}.csv`；`outputs/eval_reports/D-008-{a,b,c}{,-EMA}.txt`。本机 `outputs/experiments/D/D-008-{a,b,c}/` 三件套已同步。
 
 ## D-009：患者检查次数重加权采样（patient_count，a/b 双 seed）
 
@@ -3800,7 +3800,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 逐类（EMA，相对各自 seed 基线）：a Δ `−0.0350 −0.0191 −0.0309 −0.0293 −0.0081 −0.0238 −0.0260 +0.0047 −0.0148 −0.0109`（1 升 9 降，class1 −0.0350 / class3 −0.0309 / class4 −0.0293 / class7 −0.0260 超 0.02 逐类门）；b Δ `−0.0268 −0.0056 −0.0517 −0.0433 −0.0181 −0.0219 −0.0307 −0.0154 −0.0129 −0.0173`（**10 类全降**，class3 −0.0517 / class4 −0.0433 / class7 −0.0307 超门）。退化没有集中在低支持类：class5（115 正）与 class9/class10（260/306 正）也同步下滑，排除「只伤小 support 类」的解释。
 - raw 侧逐类同样为负：a 全 10 类下降（最大 class3 −0.0511、class4 −0.0268）；b 全 10 类下降（最大 class4 −0.0834、class1 −0.0827、class3 −0.0532）。
 - 判读：**在 8 轮、lr 3e-4、EMA 0.999 预算下，按患者检查次数重加权采样明确有害，且其设计目标（改善多检查患者的 AUC）没有兑现。** 三点限制须一起引用：①早停口径与基线不同（`ema_auc` vs raw），但 D-008 的同口径对照只有 −0.0043 / −0.0079，不足以解释 −0.02；②单次训练、双 seed（a/b），不是 3 seed 复核，且 b 的 Δ 比 a 更大，seed 间差异提示效应量本身有波动；③两组都只跑 4 轮、最优轮次前移到第 1–2 轮，结论严格限于该预算——不排除更短训练、更强正则或更小目标占比下重采样有用。此外**未逐 epoch 记录实际多检查占比**（配置期望 0.665，有放回采样每轮有波动），实际占比未核验，这一点已披露。
-- 产物：`outputs/20261107-112733_D-009-a/`、`outputs/20261107-114205_D-009-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`，无 `last.pt`）；`outputs/predictions/valid/D-009-{a,b}{,-EMA}.csv`；`outputs/eval_reports/D-009-{a,b}{,-EMA}.txt` 与 `D-009-{a,b}{,-EMA}_analysis.json`。本机 `outputs/experiments/D-009-{a,b}/` 三件套已同步。
+- 产物：`outputs/experiments/D/D-009-a/`、`outputs/experiments/D/D-009-b/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`，无 `last.pt`）；`outputs/predictions/valid/D-009-{a,b}{,-EMA}.csv`；`outputs/eval_reports/D-009-{a,b}{,-EMA}.txt` 与 `D-009-{a,b}{,-EMA}_analysis.json`。本机 `outputs/experiments/D/D-009-{a,b}/` 三件套已同步。
 
 ## D-010：train + valid 合并全量训练（固定 5 轮，a/b/c Tiny 三 seed + d EfficientNetV2-S）
 
@@ -3820,7 +3820,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 训练 loss 四组均单调下降，末轮相对首轮降幅 a −0.2368 / b −0.2269 / c −0.2320 / d −0.2844；**跨组 loss 不可横向比较**（不同骨干的容量、损失尺度与正负样本难度不同），d 组末轮 0.7037 最低不能读成「d 最好」。
 - 耗时四组 14m05s–15m12s（均值约 14m30s），比 D-002-a 的 34m57s（7 轮、含每轮验证）短，原因是只跑 5 轮且跳过验证；合并训练集后每轮步数由 1,157 增至 1,210（+4.6%），单轮约 2m50s，未出现显存或数据加载瓶颈。
 - 限制：①5 轮是预先选定的预算，**不证明是最优轮数**；②没有验证曲线，无法从数据侧判断过拟合点，只能依赖预设预算与后续 test 反馈；③单次训练/组，seed 间差异没有验证集可量化；④产物大小 `final_ema.pt` 107 MB（Tiny）/ 86 MB（EffNetV2-S），`last.pt` 532 MB / 426 MB，四组磁盘合计约 2.5 GB。
-- 产物：`outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`（每组 `config.yaml`、`train.log`、`metrics.csv`、`full_train_manifest.json`、`last.pt`、`final_ema.pt`、TensorBoard）；无 valid predictions / eval_reports（全量训练无验证集）；test 推理、融合产物与耗时见下条。
+- 产物：`outputs/experiments/D/D-010-a/`、`outputs/experiments/D/D-010-b/`、`outputs/experiments/D/D-010-c/`、`outputs/experiments/D/D-010-d/`（每组 `config.yaml`、`train.log`、`metrics.csv`、`full_train_manifest.json`、`last.pt`、`final_ema.pt`、TensorBoard）；无 valid predictions / eval_reports（全量训练无验证集）；test 推理、融合产物与耗时见下条。
 - 推理与耗时（2026-11-07）：四组 `final_ema.pt` 13:30:20–13:33:00 跑 test（1414 studies / 14,140 行、全部 10 类概率），推理耗时 a 46s / b 47s / c 46s / d 21s，`rc=0`；单组端到端计费均值 a 45.99 / b 45.57 / c 46.07 / d 59.86 ms（batch=1、100 个计时 study + 5 个预热 study、连续 3 轮、fp32，与各自 submission 比对 0 个 study 不一致）。最终提交采用 **a + d 概率等权融合**（`fusion: probability`、`weights [1, 1]`）：`outputs/ensemble/D-010-ad/submission.csv`（1414 studies / 14,140 行）与 `cost_ensemble.json`；融合计费均值 **60.7 ms**（3 轮 60.10 / 60.07 / 61.73，中位数 60.97、p95 69.20、最大 72.12，上限 100 ms），与提交概率最大差 2.96e-4、0 个 study 不一致。两模型均为 320 letterbox + `view_weighted` 0.7、预处理签名相同，计时循环对同一 study 只解码一次并复用预处理，故融合耗时接近单组 d 而非两组之和；权重合计 193 MB < 500 MB、fp32。
 
 ## D-011：骨干与输入分辨率扫描（a/b/e 中断，c/d 完成）
@@ -3829,7 +3829,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 执行（2026-11-08，V100-SXM2-32G 独占，`setsid` 串行，`HF_ENDPOINT=https://hf-mirror.com` 走镜像拉权重，`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`）：
   - a 11:38:46–12:13:14（**34m28s**，8 轮跑满、未早停），`rc=0`。
   - b 12:13:14 起跑，2 轮后按用户指令于 12:29 前后停止（**中断组**，无 END 标记）。
-  - c 12:31:38–13:13:15（**41m37s**，7 轮，连续 2 轮无提升早停），`rc=0`。此前 12:29:26 首次启动时与并行运行的 fp32 探针抢显存触发 CUDA OOM（`Process 257085 has 24.41 GiB, Process 263426 has 7.30 GiB`），停止探针后重跑，产物残骸移入 `outputs/_aborted/`。
+  - c 12:31:38–13:13:15（**41m37s**，7 轮，连续 2 轮无提升早停），`rc=0`。此前 12:29:26 首次启动时与并行运行的 fp32 探针抢显存触发 CUDA OOM（`Process 257085 has 24.41 GiB, Process 263426 has 7.30 GiB`），停止探针后重跑，产物残骸移入 `outputs/experiments/aborted/`。
   - d 13:13:15–13:52:42（**39m27s**，6 轮早停），`rc=0`。
   - e 13:53:44 起跑，1 轮后按用户指令于 14:03 前后停止（**中断组**）。
   - 五组启动日志均确认「预训练权重: 已加载」，训练 18,513 studies / valid 859 studies；全程 page cache 驱逐守护按 150 s 一轮运行，未出现 rc=137。
@@ -3847,7 +3847,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 判读一（分辨率）：**448 / 512 相对 320 无收益**。c 相对 D-002-a-EMA 为 **−0.0023**、d 为 **−0.0032**；7 个口径（全集 / 9 类 / ge5 / ge10，各含 10 类与 9 类，加 F1@0.5）差异全部落在 ±0.004 内，且**方向不一致**——ge10 的 10 类口径 c/d 反而 +0.0003 / +0.0006，同一组的 9 类口径转为 −0.0040 / −0.0026。逐类仅 c 的 class4 达 +0.0138，但该类 valid 只有 68 个正样本（单类 SE 约 0.03），不构成证据。代价是 c 耗时 +19%、d +13%，显存由约 11 GiB 升至约 25 GiB。**分辨率不是当前瓶颈。**
 - 判读二（ViT 系）：**a/b/e 三组在 D-002-a 配方下训练失效，且已排除混合精度**。a 的 8 轮 train_loss 仅 1.1741→1.0951，同轮 ConvNeXt 为 0.9916→0.4692；首轮 raw AUC 0.5806 对 0.7737，缺口从第 1 轮就存在，说明预训练特征没有被有效利用而非后期过拟合。b 首两轮 raw 0.6063 / 0.6431、e 首轮 0.5569，三组首轮全部落在 0.55–0.61。为定位原因另跑 fp32 探针（a 配置、`amp: false`、2 轮、warmup 1，lr 3e-4）：ep1 train_loss 1.1734 / raw 0.5635，与 AMP 的 1.1741 / 0.5806 同档 → **不是 fp16 数值问题**。timm 侧核对：`vit_small_patch14_reg4_dinov2` 传 `img_size=336` 后 pos_embed 由 (37,37) 正确插值为 (24,24)、仅 `head.weight/bias` 为新初始化、前向输出 (N,10) 正常，**不是尺寸适配的实现缺陷**。低分应归因于配方层（ViT 需要更低骨干 lr、更长 warmup 或先 frozen probe 再解冻），但**该归因是推断，未做配方级验证**。
 - 限制：①全部单 seed（42），与对照的差异都小于单次 study 级 bootstrap SE 0.0094，任何「更好 / 更差」都不成立；②b/e 分别只有 2 轮与 1 轮且为主动中断，**不能作为「EVA02 / CLIP 不行」的证据**；③a/b/e 同时变动骨干与分辨率，无法分离两者贡献；④D-002-a 当年未埋 ge5/ge10，本次用 `run_eval.py --pred-out` 导出其 EMA 逐 study 预测后按 `engine.py` 同一逻辑补算（全集复现 0.8100，口径一致），9 类口径同样由预测重算；⑤c 首启 OOM 后重跑，配置未变。
-- 产物：`outputs/20261108-113851_D-011-a/`、`-121329_D-011-b/`、`-123143_D-011-c/`、`-131319_D-011-d/`、`-135349_D-011-e/`（各含 `config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`tb/`、`tb_ema/`；`--no-save-last` 故无 `last.pt`）；补算预测在训练环境 `/tmp/d002a_valid.csv`、`/tmp/d011{a,c,d}_valid.csv`（未入库）；`outputs/_aborted/` 留有 c 首启 OOM 与 fp32 探针残骸。**五组均不进入提交候选。**
+- 产物：`outputs/experiments/D/D-011-a/`、`outputs/experiments/D/D-011-b/`、`outputs/experiments/D/D-011-c/`、`outputs/experiments/D/D-011-d/`、`outputs/experiments/D/D-011-e/`（各含 `config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`tb/`、`tb_ema/`；`--no-save-last` 故无 `last.pt`）；补算预测在训练环境 `/tmp/d002a_valid.csv`、`/tmp/d011{a,c,d}_valid.csv`（未入库）；`outputs/experiments/aborted/` 留有 c 首启 OOM 与 fp32 探针残骸。**五组均不进入提交候选。**
 
 ## F-001-a：ASL 损失（γ+=0、γ−=4）替换 BCE + pos_weight
 
@@ -3864,12 +3864,12 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
   逐轮（raw AUC / raw F1 / EMA AUC / EMA F1）：ep1 0.7880/0.3838/0.7640/0.3664；ep2 0.7811/0.3988/0.7915/0.4098；ep3 0.7884/0.4119/0.7988/0.4246；ep4 0.7962/0.4114/0.8008/0.4267；ep5 0.7877/0.4265/0.8008/0.4346；ep6 0.7845/0.4379/0.7944/0.4394。fp32 复评 best.pt（ep4）：macro-AUC 0.7962（AMP 同值）、F1 0.4115。
 - 判读：**无收益。** EMA 0.8008 比 D-002-a-EMA 0.8100 低 **0.0092**，与单次 859-study macro-AUC 的 bootstrap SE 0.0094 同量级；raw 0.7962 对 0.8004 为 −0.0042。本组 train_loss 约 0.08 量级，与 D-002-a 的 0.46 不可横向比较（γ−=4 的 `(1−p)^4` 抑制项整体压低 loss），不能据 loss 更低判为收敛更好。F1@0.5 由 0.4283 降到 0.4115，但 EMA 侧 0.4346 略高于基线，属阈值形态差异。损失层的负样本抑制与 D-009 的 patient_count 重采样方向不同，不能互相替代。
 - 限制：①单 seed、单次训练，−0.0092 在单次 SE 内，「无收益」而非「有害」；②早停用 raw AUC、EMA 权重同时导出，两者 best epoch 都是 4，比较相对干净；③未导出 valid 逐 study 预测、未跑 `cost.py`；④与 S-001-a 串行执行（本组先），无显存争抢。
-- 产物：`outputs/20261108-064623_F-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）。**不进入提交候选。**
+- 产物：`outputs/experiments/F/F-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）。**不进入提交候选。**
 
 ## S-001-a：SwinV2-T @384 骨干替换尝试
 
 - 设计：骨干换 `swinv2_tiny_window8_256`（27.59M 参数）、输入 384。与 D-002-a 同时差六项：分辨率 320→384、损失 BCE+pos_weight→ASL（γ+=1、γ−=4、clip 0.05）、优化器分组 backbone 2e-5 / head 2e-4、预算 8→20 轮、早停 raw→EMA（patience 3）、`hflip: false` 不变。**不是骨干单变量对照。** SwinV2 的 relative position bias 只依赖 window=8，与分辨率无关，无需 pos_embed 插值。
-- 配置修复：timm 在 `strict_img_size=true` 下按 384 建静态 attention mask 崩溃，报 `RuntimeError: shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`；改 `strict_img_size: false` 走动态 mask 后正常。torchvision ImageNet 权重经 `src/import_backbone.py` 映射，**219 个张量成功、仅 `head.fc.bias/weight` 随机**，产出 `outputs/S-001-a_init/swinv2t_in1k_loker.pt`（sha256 `17fddd03…`），用 `--init-from` warm start。
+- 配置修复：timm 在 `strict_img_size=true` 下按 384 建静态 attention mask 崩溃，报 `RuntimeError: shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`；改 `strict_img_size: false` 走动态 mask 后正常。torchvision ImageNet 权重经 `src/import_backbone.py` 映射，**219 个张量成功、仅 `head.fc.bias/weight` 随机**，产出 `outputs/initialization/S-001-a_init/swinv2t_in1k_loker.pt`（sha256 `17fddd03…`），用 `--init-from` warm start。
 - 执行（15:08:06 启动，15:55:30 结束，**47m24s**；F-001-a 退出后 20 秒由 `/root/ChestX-MLC/logs/chain_s001a.sh` 守护串行接棒）：实际训练 **11/20 轮**，EMA AUC 在 ep8 达峰 0.7194，ep9–11 为 0.7158 / 0.7150 / 0.7157，连续 3 轮无提升触发早停，此时 lr 1.55e-5、cosine 远未走完。每轮约 4.6 分钟，单组显存 21.2 GB、GPU 利用率 95%。
 - 结果：
 
@@ -3883,7 +3883,7 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 - 判读：**失败组。** EMA 0.7194 比 F-001-a-EMA 0.8008 低 **0.081**、比 D-002-a-EMA 0.8100 低 **0.091**，远超单次 SE 0.0094；分层 ge5 0.6710 / ge10 0.6633 与全集同向。**没有重演 D-011 的 ViT 训练失效**：ep1 EMA 即 0.6456、11 轮持续爬升、train_loss 0.0673→0.0635 单调下降，说明映射权重在 384 下前向与梯度正常，问题在收敛速度与平台高度，不是实现缺陷。
 - 归因（推断，未验证）：①分组 lr 比 ConvNeXt 配方低一个量级（2e-5 / 2e-4 对 3e-4），11 轮后仍 1.55e-5，停在半收敛区；②patience 3 配 20 轮预算，ep8 达峰后立即截断；③384 输入与 256 预训练的窗口统计偏移，动态 mask 未验证与静态 mask 数值等价。三条都可能，现有实验无法区分。
 - 限制：①单 seed、单次训练；②六项同改，不能把差异归因给骨干或尺寸中的任一项；③未导出 valid 逐 study 预测、未跑 `cost.py`；④21.2 GB 显存已接近 24 GB，动态 mask 的额外开销使再加宽输入不可行。
-- 产物：`outputs/20261108-070806_S-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/S-001-a_init/swinv2t_in1k_loker.pt`；`/root/weights/swin_v2_t-b137f0e2.pth`（未入库）。**不进入提交候选。**
+- 产物：`outputs/experiments/S/S-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；`outputs/initialization/S-001-a_init/swinv2t_in1k_loker.pt`；`/root/weights/swin_v2_t-b137f0e2.pth`（未入库）。**不进入提交候选。**
 
 ## 环境
 
@@ -3894,3 +3894,22 @@ a/b 两组与 D-001-a/b、A-001 由 `run_compare.py` 统一重算（`outputs/com
 | B 组独立环境 | `/root/venv-b001`：Python 3.12、torch 2.8.0+cu128、torchxrayvision 1.5.7、timm 1.0.30（仅 B-001） |
 | 数据根目录 | `/root/sj-tmp`（`data/` 下以软链接挂入，数据本身不入库） |
 | 随机种子 | 42（RUN-002-B / RUN-006-A / RUN-007-A / RUN-007-B / RUN008-A~D / RUN-009-A / A-001-B(seed 2026) 为 2026，其余 run 均为 42） |
+
+## PC-001：患者检查次数后处理（D-002-a-EMA 历史 valid CPU 探索，2026-11-08）
+
+- 样本与来源：859 studies、228 患者；读取 `outputs/predictions/valid/D-002-a-EMA.csv` 与 `data/valid.csv`，逐 study 标签、患者映射、概率范围及完整覆盖经入口核验。复用历史 seed 42 EMA 预测；本次不加载权重、不读图片、不重新训练，没有新增 best epoch。
+- 命令：`.venv/bin/python src/run_patient_count_prior.py explore --predictions outputs/predictions/valid/D-002-a-EMA.csv --metadata data/valid.csv --out outputs/count_prior_D002a_EMA`；本机 CPU，进程退出码 0，`/usr/bin/time -p` 墙钟 **0.87 s**（四个候选合计，不是 GPU 推理耗时）。
+- 固定设计：自动按 valid 内不同 Study_id 计数，`g(n)=log(1+min(n,10))-log(2)`；异常1–9加 beta*g，class10减；beta=0/0.05/0.10/0.20，eps=1e-6。每个候选从同一原始概率开始，不累计调整。
+
+| beta | Study Macro-AUC | ΔAUC | Macro-F1@0.5 | ΔF1 | 9类AUC（class2–10） | Brier（越低越好） |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.810015 | +0.000000 | 0.428330 | +0.000000 | 0.819633 | 0.178708 |
+| 0.05 | 0.810215 | +0.000200 | 0.428892 | +0.000562 | 0.819656 | 0.184637 |
+| 0.1 | 0.810187 | +0.000172 | 0.425662 | -0.002668 | 0.819353 | 0.190780 |
+| 0.2 | 0.809695 | -0.000320 | 0.424158 | -0.004172 | 0.818662 | 0.203642 |
+
+- 点估计最高为 beta=0.05：ΔAUC **+0.000200**、ΔF1 **+0.000562**，均很小；class1 AUC +0.001796，其加权贡献约占总体增量90%，class2–10诊断AUC仅+0.000023；逐类5升5降，没有一致改善。Brier从0.178708升至0.184637，更大强度继续变差，不能将此偏置称为校准改善。
+- beta=0.05分层：<5 次288 studies，AUC 0.855445→0.856157；5–9次162 studies，0.759820→0.759904；≥5次571 studies，0.766328→0.766464；≥10次409 studies，0.759865→0.759865。≥10组统一封顶得到同类同常数偏置，组内排序不变，因此该子集AUC不变是公式预期，不代表改善了该组辨别能力。
+- 结论：本次仅支持“无卡后处理链路能运行”；没有稳定收益证据，不冻结beta、不进入正式test，不扩展候选网格。本次没有bootstrap/CI、患者级OOF或多seed复核；在同一valid上比较候选存在选型偏差，不能把最高点估计当独立验证结果。
+- 工程验证：`python -m pytest tests/test_patient_counts.py tests/test_patient_count_prior.py tests/test_patient_oof.py tests/test_patient_count_prior_cli.py -q`：**40 passed in 2.82s**。只覆盖所列合成测试；没有运行真实OOF训练或GPU耗时自检。
+- 产物：`outputs/count_prior_D002a_EMA/` 内含 `summary.csv`、`report.json`、四份调整概率、原始概率副本、逐类与计数审计；输入SHA-256已写入report。工作簿 `~/Desktop/loker_exp.xlsx` 的D系列实验追加PC-001四个候选（行62–65），共享0.87s CPU成本，无新增训练成本。

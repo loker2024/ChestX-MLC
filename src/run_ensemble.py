@@ -19,6 +19,10 @@ from data.resplit import checkpoint_manifest_path
 from infer.ensemble import fuse_prediction_frames, normalize_weights
 from infer.predict import load_checkpoint_model, predict_loader, predict_loader_logits, validate_submission_model
 from infer.submission import build_submission_frame, validate_submission, write_submission
+from data.patient_counts import counts_from_records
+from infer.patient_count_prior import (
+    apply_prior_frame, load_prior, require_research_split, validate_prior_recipe, validate_prior_checkpoints,
+)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -49,6 +53,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="train/valid 的 F1 阈值网格，例如 0.3,0.5,0.7",
     )
     parser.add_argument("--out", default="outputs/ensemble", help="输出目录")
+    parser.add_argument("--patient-count-prior", help="固定次数后处理参数，自动计数；仅 train/valid 研究")
     return parser.parse_args(argv)
 
 
@@ -156,6 +161,8 @@ def _write_labeled_outputs(
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.patient_count_prior:
+        require_research_split(args.split)
     checkpoint_paths = [Path(path) for path in args.checkpoint]
     config_paths = _check_config_paths(args.config, len(checkpoint_paths))
     configs = [
@@ -166,15 +173,26 @@ def main(argv: list[str] | None = None) -> None:
         for config, checkpoint_path in zip(configs, checkpoint_paths):
             validate_submission_model(config, checkpoint_path)
     weights = _parse_weights(args.weights, len(checkpoint_paths))
+    prior = None
+    if args.patient_count_prior:
+        if any(config.data.full_train for config in configs):
+            raise ValueError("full_train 融合成员已见 valid，不能用于患者次数后处理的独立复核")
+        prior = load_prior(args.patient_count_prior)
+        validate_prior_recipe(prior, configs, weights, args.fusion)
+        validate_prior_checkpoints(prior, [load_checkpoint(path, map_location="cpu") for path in checkpoint_paths],
+                                   weights, args.fusion)
     device = resolve_device(configs[0].device)
 
     prediction_frames = []
     loaders = []
+    prior_counts = None
     for checkpoint_path, config in zip(checkpoint_paths, configs):
         checkpoint = load_checkpoint(checkpoint_path, map_location="cpu")
         manifest_path = checkpoint_manifest_path(config, checkpoint, checkpoint_path) if args.split != "test" else None
         loader = build_loader(config, args.split, pin_memory=device.type == "cuda", manifest_path=manifest_path)
         loaders.append(loader)
+        if prior is not None and prior_counts is None:
+            prior_counts = counts_from_records(loader.dataset.records)
         model = load_checkpoint_model(config, checkpoint_path, device)
         if args.fusion == "logit":
             prediction_frames.append(predict_loader_logits(model, loader, device, config))
@@ -196,6 +214,12 @@ def main(argv: list[str] | None = None) -> None:
             args.split,
             args.thresholds,
         )
+        if prior is not None:
+            adjusted = apply_prior_frame(predictions, prior_counts, prior)
+            print(f"患者次数后处理（自动计数，beta={prior.beta:g}），结果写入 adjusted/：")
+            _write_labeled_outputs(output_dir / "adjusted", adjusted, labels, configs,
+                                   weights, args.fusion, args.split, args.thresholds)
+            prior_counts.to_csv(output_dir / "adjusted" / "patient_counts.csv", index=False, encoding="utf-8")
         return
 
     frame = build_submission_frame(predictions, study_subjects)

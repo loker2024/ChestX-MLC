@@ -130,6 +130,7 @@ P7 的目标是把「训练什么、怎么评、交什么」固定下来。训�
 | D-011-e | `D-011-e` | `configs/exp_D011e.yaml`（独立完整配置） | 1（用户指令停止） | 是 | 同 a 口径，骨干换 CLIP ViT-B/16 `laion2b` @224；1 轮 EMA 0.5505 / raw 0.5569、train_loss 1.1873，ViT 三组首轮全部落在 0.55–0.61；**中断组，不构成完整结论** |
 | F-001-a | `F-001-a` | `configs/exp_F001a.yaml`（独立完整配置） | 8（早停 2，实际 6） | 否（ASL γ+=0 γ−=4） | 损失函数对照：同 D-002-a 的 ConvNeXt-Tiny `fb_in1k` @320、lr 3e-4、seed 42，只把 BCE + `pos_weight` 换成 ASL（γ+=0、γ−=4、clip 0.05）；**无收益**——best raw 0.7962（ep4，F1 0.4115）、EMA 0.8008（ep4–5，F1 0.4267/0.4346），vs D-002-a-EMA 0.8100 为 −0.0092；21m11s；不进入提交候选 |
 | S-001-a | `S-001-a` | `configs/exp_S001a.yaml`（独立完整配置） | 20（早停 3，实际 11） | 否（ASL γ+=1 γ−=4） | Swin 骨干尝试：`swinv2_tiny_window8_256` @384，`use_configured_img_size: true` + `strict_img_size: false`（否则 timm 在 384 下建静态 attn mask 报 `shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`），ImageNet 权重经 `import_backbone.py` 映射（219 张量、仅 `head.fc` 随机）warm start；分组 lr backbone 2e-5 / head 2e-4；**失败**——best raw 0.7190（ep7，F1 0.3156）、EMA 0.7194（ep8，F1 0.3183），vs F-001-a-EMA 0.8008 差 0.081、vs D-002-a-EMA 0.8100 差 0.091；21.2 GB 显存、47m24s；不进入提交候选 |
+| PC-001 | 历史 valid 后处理探索 | `src/run_patient_count_prior.py explore`（固定设计同 `configs/patient_count_prior.yaml`） | 无新增训练轮次 | 否（仅CPU） | D-002-a-EMA，859 studies/228患者；beta 0/0.05/0.10/0.20：AUC 0.810015/0.810215/0.810187/0.809695；最高点Δ+0.000200、F1Δ+0.000562，9类仅+0.000023，Brier变差；0.87s共享CPU成本；同valid探索，无CI/OOF/多seed证据，不冻结参数 |
 
 短周期基线把 `epochs` 降到 6，并关闭 early stop 和 `pos_weight`，其余超参数继承 `default.yaml`，
 这样两个 run 的差异只来自 `pos_weight`。6 个 epoch 不足以跑出最终成绩，但足以判断
@@ -196,7 +197,7 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
 - **口径说明**：本组与 RUN008-C 同时改变三项超参，不能把 AUC/F1 差值单变量归因；本组只用于验证「更宽轮数上限 + 早停」下 ConvNeXt-Tiny 是否稳定在 0.80 附近。若需判定轮数或早停的增益，需固定 seed 做单变量对照。
 
 **A-001-a 训练随机水平翻转对照**（配置 `configs/exp_A001a.yaml`，数字来自 `run_eval.py`，产物
-`outputs/20261030-154652_A-001-a_convnext_tiny_s42`，2026-10-30）：完整展开配置、无 `_base`，与
+`outputs/experiments/A/A-001-a_convnext_tiny_s42`，2026-10-30）：完整展开配置、无 `_base`，与
 `configs/exp_A001.yaml` 的展开结果只差 `image.hflip: false → true`（训练随机水平翻转），其余口径
 逐字段一致；6/8 轮触发早停，best epoch 4：
 
@@ -211,7 +212,7 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
   尚未提交（17:20 补提交 `ac2d2f3`），训练时 HEAD 为 `0475bc7`、`src/` 其余口径未变。
 
 **A-001-B A-001 的 ASL 损失对照**（配置 `configs/exp_A001b.yaml`，数字来自 `run_eval.py`，产物
-`outputs/20261030-165734_A-001b_convnext_tiny_asl_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
+`outputs/experiments/A/A-001b_convnext_tiny_asl_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
 只覆盖损失五项（`train.loss: asl`、`train.pos_weight: false`、`asl_gamma_pos: 0`、`asl_gamma_neg: 4`、
 `asl_clip: 0.05`），6/8 轮触发早停，best epoch 4：
 
@@ -225,7 +226,7 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
   单 seed 不能据此断言 ASL 在所有骨干/口径下无效。
 
 **A-001-C 冻结骨干对照（仅训练分类头）**（配置 `configs/exp_A001c.yaml`，数字来自 `run_eval.py`，
-产物 `outputs/20261030-173249_A-001c_convnext_tiny_freeze_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
+产物 `outputs/experiments/A/A-001c_convnext_tiny_freeze_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
 只覆盖 `model.freeze_backbone: true`，ConvNeXt-Tiny 骨干全部冻结，训练时骨干走 `eval()` 模式（BN 统计不更新），
 仅分类头（768→10 Linear）可训练——checkpoint metadata 实测 `total_params: 27827818` /
 `trainable_params: 7690`，可训练比例约 0.03%；8 轮跑满未触发早停，best epoch 8：
@@ -244,7 +245,7 @@ RUN-010 尚未执行真实 GPU 训练。本机已通过配置、模型冻结、�
   单 seed、单轮数上限，结论只针对本口径。
 
 **A-001-B（seed 2026）ASL 的 seed 复核**（配置 `configs/exp_A001b.yaml` + `--seed 2026`，数字来自
-`run_eval.py`，产物 `outputs/20261030-181110_A-001b_convnext_tiny_asl_s2026`，2026-10-30）：与
+`run_eval.py`，产物 `outputs/experiments/A/A-001b_convnext_tiny_asl_s2026`，2026-10-30）：与
 A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 seed 复核惯例），7/8 轮触发早停，best epoch 5：
 
 - valid macro-AUC **0.7952** / F1@0.5 **0.4182**，F1 峰值在 0.6（0.4254）；独占 V100-SXM2-32G 训练
@@ -258,7 +259,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 口径注意：seed 2026 同时改变数据划分与初始化/增强随机性，本组与 A-001-B(s42) 构成 seed 配对，
   与 A-001 的对照仍受损失方案差异混杂。
 
-**A-002 / A-003 轻量骨干对照（MobileNetV3-Small 宽度）**（配置 `configs/exp_A002.yaml` / `configs/exp_A003.yaml`，数字来自 `run_eval.py`，产物 `outputs/20261030-223911_A-002_mobilenetv3_small050_s42` / `outputs/20261030-230725_A-003_mobilenetv3_small100_s42`，2026-10-30/31）：
+**A-002 / A-003 轻量骨干对照（MobileNetV3-Small 宽度）**（配置 `configs/exp_A002.yaml` / `configs/exp_A003.yaml`，数字来自 `run_eval.py`，产物 `outputs/experiments/A/A-002_mobilenetv3_small050_s42` / `outputs/experiments/A/A-003_mobilenetv3_small100_s42`，2026-10-30/31）：
 
 - A-002（0.5×，578,474 参数）22:39:11 启动，23:03:03 第 5 轮后按用户要求中止（非早停），只有 `last.pt` 与 5 轮 metrics、无 `best.pt` → 与 A-003 的配对 `run_compare` 不成立；前 5 轮最佳 epoch 4（0.7634 / 0.3918，仅历史参考）。
 - A-003（1.0×，1,528,106 参数，相对 A-002 只换骨干）23:07:25 启动，00:24:44 第 17 轮早停（best epoch 12），共 1h17m19s、单轮约 4.5 分钟、显存 1.4–1.6 GB；`best.pt` metadata 确认预训练权重已加载、全量微调（6,249,691 B）。
@@ -267,7 +268,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：1.0× 宽度在本口径下仍明显低于 ConvNeXt-Tiny 记录值且未过门 → 不补 25+5 ConvNeXt 基线、不补 seed 2026、不改默认骨干；A-002 中止使「宽度 vs 0.5×」的配对问题保持未答，要回答需重跑 A-002。单 seed、单预算，差值不作统计显著性结论。
 
 **A-001-D 取消正侧位加权对照**（配置 `configs/exp_A001d.yaml`，数字来自 `run_eval.py`，产物
-`outputs/20261030-190645_A-001d_convnext_tiny_mean_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
+`outputs/experiments/A/A-001d_convnext_tiny_mean_s42`，2026-10-30）：以 `_base: exp_A001.yaml`
 只覆盖 `model.aggregation: view_weighted → mean`，study 内多张图片改为等权均值，其余口径逐字段
 不变（同 seed 42、同 8 轮上限与早停）；8 轮跑满无早停，best epoch 6：
 
@@ -287,8 +288,8 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   属单变量对照；单 seed；硬件、代码版本与 A-001 相同，耗时可直接横向对照。
 
 **A-001-G 组 ASL 超参扫描**（配置 `configs/exp_A001_G1.yaml`…`configs/exp_A001_G5.yaml`，
-数字来自 `run_eval.py`，产物 `outputs/20261030-201129_A-001-G1_convnext_tiny_asl_s42` …
-`outputs/20261030-220518_A-001-G5_convnext_tiny_asl_s42`，2026-10-30）：五组均以
+数字来自 `run_eval.py`，产物 `outputs/experiments/A/A-001-G1_convnext_tiny_asl_s42` …
+`outputs/experiments/A/A-001-G5_convnext_tiny_asl_s42`，2026-10-30）：五组均以
 `_base: exp_A001.yaml` 只覆盖损失五项，以 A-001-B（ASL gamma_pos 0 / gamma_neg 4 / clip 0.05：
 0.7970 / 0.4103）为参照；在 autodl V100-SXM2-32G 上按 G1→G5 串行执行（链式脚本，
 20:11:24–22:36:29，共 2h25m05s），代码版本统一 `78ce901`、seed 42、数据与 A-001 同一份：
@@ -314,7 +315,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   不切换**；若继续，应把 clip 0 + gamma_pos 1 组合另开单变量组并补 seed 复核，不在单 seed 上继续扫参数。
 
 **B 组：TorchXRayVision 医学预训练 DenseNet-121 独立研究对照**（配置 `configs/exp_B001.yaml`，数字来自 `run_eval.py`，产物
-`outputs/20261031-112106_B-001_xrv_densenet121_s224`，2026-10-31）：
+`outputs/experiments/B/B-001_xrv_densenet121_s224`，2026-10-31）：
 
 - 目的与边界：验证 TorchXRayVision `densenet121-res224-all`（18 类胸片预训练）在本地数据上的可复现差异；
   **仅研究，不用于赛题提交、模型融合或候选选择**（规则第 1 条），计划见 [train_plan12.md](../archive/train_plan12.md)。
@@ -326,7 +327,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   疑似 MIMIC-CXR-JPG 衍生，与预训练集重叠风险未知（疑似高）→ 指标可能乐观，不声称无泄漏；不并入冻结结论。
 
 **A-004：分类头 dropout + weight decay 组合对照**（配置 `configs/exp_A004.yaml`，数字来自 `run_eval.py`，
-产物 `outputs/20261031-121344_A-004_convnext_tiny_dropout_wd_s42`，2026-10-31）：
+产物 `outputs/experiments/A/A-004_convnext_tiny_dropout_wd_s42`，2026-10-31）：
 
 - 目的与口径：A-001 上只改两项——`model.dropout: 0.0 → 0.2`（分类头 Linear 前的 Dropout，训练启用 /
   评估关闭）与 `train.weight_decay: 0.01 → 0.05`；其余（ConvNeXt-Tiny @320、epoch 8 / patience 2、
@@ -348,8 +349,8 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   weight_decay 拆成两个单变量组并补 seed 2026 配对。
 
 **A-004-a / A-004-b：dropout 与 weight decay 的单变量分解**（配置 `configs/exp_A004a.yaml` /
-`configs/exp_A004b.yaml`，数字来自 `run_eval.py`，产物 `outputs/20261031-130923_A-004a_dropout_only_s42` /
-`outputs/20261031-134732_A-004b_weight_decay_only_s42`，2026-10-31，计划见 [train_plan14.md](../archive/train_plan14.md)）：
+`configs/exp_A004b.yaml`，数字来自 `run_eval.py`，产物 `outputs/experiments/A/A-004a_dropout_only_s42` /
+`outputs/experiments/A/A-004b_weight_decay_only_s42`，2026-10-31，计划见 [train_plan14.md](../archive/train_plan14.md)）：
 
 - 目的与口径：把 A-004 同时改的两项拆开——A-004-a 只开分类头 dropout 0.2（`weight_decay` 保持 0.01），
   A-004-b 只把 `train.weight_decay` 提到 0.05（dropout 保持 0）；其余（ConvNeXt-Tiny @320、epoch 8 /
@@ -373,7 +374,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   不在单 seed 上继续扫正则化参数**。若继续，应先补 seed 2026 配对复核，再考虑与其他增强的组合。
 
 **A-005：CSRA 分类头对照**（配置 `configs/exp_csra.yaml`，数字来自 `run_eval.py`，产物
-`outputs/20261031-164123_A-005/`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
+`outputs/experiments/A/A-005/`，配对基线 `outputs/experiments/A/A-005_baseline_s42`，
 2026-10-31，计划见 [训练计划 15](../archive/train_plan15.md)）：
 
 - 目的与口径：在 A-001 训练预算内只把标准分类头换成单头 CSRA（残差权重 0.4、温度 1.0、
@@ -396,7 +397,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   配对基线 0.8022，分类头结构方向否定。
 
 **A-006：ML-Decoder 分类头对照**（配置 `configs/exp_ml_decoder.yaml`，数字来自 `run_eval.py`，产物
-`outputs/20261031-155701_A-006_ml_decoder_s42`，配对基线 `outputs/20261031-151114_A-005_baseline_s42`，
+`outputs/experiments/A/A-006_ml_decoder_s42`，配对基线 `outputs/experiments/A/A-005_baseline_s42`，
 2026-10-31，计划见 [train_plan16.md](../archive/train_plan16.md)）：
 
 - 目的与口径：ConvNeXt-Tiny @320、epoch 8 / patience 2、seed 42、`view_weighted` 0.7/0.3、BCE +
@@ -420,7 +421,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   应先解决稀疏类的类别先验/初始化，而不是在单 seed 上改结构。
 
 **A-007：ConvNeXt-Small 骨干 + ImageNet-22k 预训练权重对照**（配置 `configs/exp_A007.yaml`，数字来自
-`run_eval.py`，产物 `outputs/20261031-172305_A-007_convnext_small_in22k_ft_s42`，2026-10-31，计划见
+`run_eval.py`，产物 `outputs/experiments/A/A-007_convnext_small_in22k_ft_s42`，2026-10-31，计划见
 [train_plan17.md](../archive/train_plan17.md)）：
 
 - 目的与口径：数据、预处理、`view_weighted` 0.7/0.3、BCE + `pos_weight`、cosine、batch 16 studies、
@@ -451,7 +452,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 
 
 **A-008：聚合空间（logits G0 → 概率空间 G1）对照**（配置 `configs/exp_A008.yaml`，产物
-`outputs/20261031-190629_A-008_convnext_tiny_g1_s42`，2026-10-31，计划见
+`outputs/experiments/A/A-008_convnext_tiny_g1_s42`，2026-10-31，计划见
 [train_plan18.md](../archive/train_plan18.md)）
 
 - 配置：以 A-001 为基准只改 `model.aggregation: view_weighted → view_weighted_probability`，正侧位仍 7:3；展开配置逐字段核对仅此一项不同。
@@ -461,7 +462,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：概率空间聚合训练方向否定（单 seed，差值超过 ±0.0033 波动带）；默认聚合保持 `view_weighted`，不做 seed 2026 复核、不进入候选提交。
 
 **A-009：优化超参联合放大（lr 1e-3 / wd 0.03 / 10 轮 / patience 4）对照**（配置 `configs/exp_A009.yaml`，产物
-`outputs/20261031-194952_A-009_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
+`outputs/A-009_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
 [train_plan19.md](../archive/train_plan19.md)）
 
 - 配置：以 A-001 为基准只改 `train.lr` 0.0003 → 0.001、`train.weight_decay` 0.01 → 0.03、`train.epochs` 8 → 10、`train.early_stop_patience` 2 → 4，其余口径逐字段不变；四项同改，差值不可拆单项。
@@ -473,7 +474,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：与「更大 lr + 更强 wd + 更长预算」的组合假设相反（单 seed）；A-004-b 显示 wd 0.01 → 0.05 单独只差 AUC −0.0039（seed 波动内），本组 −0.0239 更可能主要来自 lr 放大后的收敛推迟与过拟合加剧，但四项同改不能单变量归因；默认超参保持 A-001 口径，不补 seed 2026，若继续调参应改开 lr / wd 单变量实验。
 
 **A-009-r2：A-009 的二轮 warm start（以首轮 best.pt 为初始权重、同配置重训 10 轮）**（配置 `configs/exp_A009.yaml` + `src/run_train.py --init-from`，产物
-`outputs/20261031-204914_A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
+`outputs/A-009-r2_warmstart_convnext_tiny_lr1e-3_wd0.03_s42`，2026-10-31，计划见
 [train_plan20.md](../archive/train_plan20.md)）
 
 - 配置：与首轮 A-009 逐字段相同（lr 1e-3 / wd 0.03 / 10 轮 / patience 4），唯一区别是初始化——不加载 ImageNet 预训练权重，改为加载首轮 `best.pt`（epoch 10，SHA-256 `6988006910b824a83c277764695d0db4a3bdeb3ab0b1b029d22dc9e3ee0f1b15`）；训练从第 1 轮重新开始，不恢复优化器 / 调度器 / 进度。
@@ -484,7 +485,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：以首轮 ep10 权重初始化后，lr 重新从 5e-4 warmup 到 1e-3 破坏了已收敛的权重——train_loss 由首轮的 0.6562 反弹到 0.7556，valid AUC 由源权重 0.7799 掉到 0.7764 后连续 4 轮未回升，5 轮即早停；**warm start 二轮无增益**，A-009 首轮的否定结论不变。本轮耗时受 GPU 共享影响（每轮约 6–7 分钟 vs 首轮 4.4 分钟/轮），不可横向比较。
 
 **A-001(s216)：A-001 口径下的 seed 216 复核（+12 轮 / patience 4 / wd 0.02）**（配置 `configs/exp_A001_seed216.yaml`，产物
-`outputs/20261031-213405_A-001_convnext_tiny_s216`，2026-10-31）：
+`outputs/experiments/A/A-001_convnext_tiny_s216`，2026-10-31）：
 - 配置：相对 A-001 同时改四项——`seed` 42 → 216、`train.epochs` 8 → 12、`train.early_stop_patience` 2 → 4、`train.weight_decay` 0.01 → 0.02，其余逐字段不变。
 - 结果：21:34:05–22:17:50（43m45s）、第 10 轮后连续 4 轮无提升早停（best epoch 6），valid macro-AUC **0.7947** / F1@0.5 **0.4235**（`run_eval.py` 重算）。
 - 阈值曲线（0.2–0.7）：0.3768 / 0.3992 / 0.4127 / 0.4235 / 0.4245 / 0.3960，F1 峰在 0.6；低阈值段高于 A-001、0.4 以上低于 A-001，属校准形态变化。
@@ -554,14 +555,14 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：三成员的选择依据是同一份 valid 的单模型 AUC 排名，带选择偏差；结论只在 valid 859 studies 与本次 test 上成立，不能外推为「同源融合一律无效」——若换入 C-005-c 或 RUN-009-A 这类结构差异成员，同一套三模型框架的 valid 为 0.8154（贪心与穷举一致），仍高于本方案 0.0033。
 
 **A-FUSE-5：k3 导出包的三模型 logit 加权融合与 test 提交**（脚本 `src/run_ensemble.py`，产物
-`outputs/ensemble_k3_D002a_C005c_E001/submission.csv`，2026-11-03）
+`outputs/ensemble/k3_D002a_C005c_E001/submission.csv`，2026-11-03）
 
 - 目的：`k3_D002a_C005c_E001.tar.gz` 是成本优化后导出的三模型组合包（内含 `cost_ensemble.json` 与 `MANIFEST.json`），本次把包上传到 sjy、同步代码后跑 test 融合推理并回传 `submission.csv`；同时用 `--split valid` 复现导出包声明的 valid 指标，检验 4:2:3 logit 加权能否超过 A-FUSE-2 / A-FUSE-4，并补记平台反馈。
 - 结果：valid macro-AUC **0.8171** / F1@0.5 **0.4333**（阈值峰值在 0.61，0.4526），9 类口径 **0.8249**；与 `MANIFEST.json` 的 refined_logit_auc 0.8171 / refined_logit_9class 0.8249 逐位一致。同成员等权概率 0.8168（F1@0.5 0.4352、峰 0.62 / 0.4553）→ 4:2:3 精修只把 AUC 抬了 **+0.0003**，F1@0.5 反而低 0.0019。
 - 对比：相对 A-FUSE-2（0.8148 / 0.4420 / 9 类 0.8213）**+0.0023 / −0.0087 / +0.0036**；相对 A-FUSE-4（0.8121 / 0.4289 / 9 类 0.8198）**+0.0050 / +0.0044 / +0.0051**；相对单模型最好 D-002-a-EMA（0.8100 / 0.4283）**+0.0071 / +0.0050**。这是首个在 10 类与 9 类两个口径上同时超过 A-FUSE-2 的融合。
 - **平台 test 反馈 77.34**（百分制，即 0.7734）。A-FUSE-4 同平台为 77.36，两者差 **−0.02**（绝对 −0.0002）；而 A-FUSE-5 的 valid 比 A-FUSE-4 高 0.0050 → **valid 上 0.005 量级的提升没有传导到 test**，与「小差距在 test 上不可分辨」的判断一致。A-FUSE-2 仍无平台分数，无法完成 valid→test 的三点校验。
 - 判读：成员结构是 A-FUSE-5 相对 A-FUSE-4 的关键差异——D-002-a-EMA 提供 EMA 稳定化、C-005-c 提供正侧位聚合权重 0.8 的口径差异、E-001 换 EfficientNetV2-S RW 骨干；三者分别覆盖稳定性、聚合口径、骨干三类差异，多样性优于 A-FUSE-4 的三个 ConvNeXt-Tiny + EMA 同源变体。valid 0.8171 是三模型组合里的最高值，9 类口径同步到 0.8249（A-FUSE-4 0.8198），说明增益不是 class1 假象（class1 逐类 AUC 0.7463 仍是 10 类最低，但 9 类 macro 高于 10 类 macro）。但 test 77.34 与 A-FUSE-4 的 77.36 打平 → **valid 上的选型收益在 test 上无法体现，融合提交的决策应按多样性与耗时，而非 valid 小数点第三位**。
-- 产物：sjy `outputs/ensemble_k3_D002a_C005c_E001/submission.csv`（14,140 行 = 1414 studies × 10 类、概率 0.001211–0.996982、UTF-8），本机副本 `outputs/submission_k3_D002a_C005c_E001.csv`；同目录 `cost_ensemble.json`（`fusion: logit`、`weights: [4,2,3]`、三 ckpt）与 `MANIFEST.json`（三 ckpt md5 与 valid 指标）。校验：14,140 行 + header、字段 `Subject_id,Study_id,Predict_class,Probability` 与历史提交一致、无缺失/重复键、每 study 10 类 1–10、study 集合与 `data/test.csv` 完全一致（1414）。三模型 test 推理约 1 分钟（RTX 3090，非 `cost.py` 计时口径）。
+- 产物：sjy `outputs/ensemble/k3_D002a_C005c_E001/submission.csv`（14,140 行 = 1414 studies × 10 类、概率 0.001211–0.996982、UTF-8），本机副本 `outputs/submission_k3_D002a_C005c_E001.csv`；同目录 `cost_ensemble.json`（`fusion: logit`、`weights: [4,2,3]`、三 ckpt）与 `MANIFEST.json`（三 ckpt md5 与 valid 指标）。校验：14,140 行 + header、字段 `Subject_id,Study_id,Predict_class,Probability` 与历史提交一致、无缺失/重复键、每 study 10 类 1–10、study 集合与 `data/test.csv` 完全一致（1414）。三模型 test 推理约 1 分钟（RTX 3090，非 `cost.py` 计时口径）。
 - 限制：未做患者整簇配对 bootstrap（A-FUSE-2/4 的显著性结论不能直接沿用）；4:2:3 权重与成员选择都在同一份 valid 上得到，带选型偏差；`k3` 包是为第 7 条耗时优化导出的组合，最终提交选择还需结合 `docs/cost.md` 的三模型 93.6 ms/study 与四模型临界值一起判断。
 
 **A-FUSE-5 耗时优化：O1–O4 逐项对照**（工程测试，无新训练，产物在远端 `cost_run/afuse5/`，2026-11-04，计划见 [cost_optimization_plan.md](cost_optimization_plan.md)）
@@ -592,7 +593,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 产物：`outputs/ensemble/D-010-ad/submission.csv`（14,140 行 = 1414 studies × 10 类、UTF-8），同目录 `cost_ensemble.json`（`fusion: probability`、`weights [1, 1]`、两 ckpt 为训练环境绝对路径）；归档 `outputs/submission_A-FUSE-7_D010a-D010d_prob_w11.csv`（SHA-256 `73b60421…`、14,141 行含表头）；`outputs/cost_reports/D-010-ad.json`。平台 test 成绩 **77.37**（用户提供）；原记录中的组包注意事项：将清单里的 ckpt 换成包内相对路径，并为 view_weighted 口径补 `cost_views.csv`，实际提交包状态未核实。
 
 **C-001：四骨干低学习率 + 分类头差异学习率对照**（配置 `configs/exp_C001{a,b,c,d}.yaml`，产物
-`outputs/20261101-114223_C-001-a` 等四组，2026-11-01，计划见 [train_plan21.md](../archive/train_plan21.md)）
+`outputs/experiments/C/C-001-a` 等四组，2026-11-01，计划见 [train_plan21.md](../archive/train_plan21.md)）
 
 - 设计：四份配置逐字段一致，唯一变量是 `model.backbone`（ConvNeXt-Tiny `fb_in1k` / EfficientNet-B2 `ra_in1k` / EfficientNetV2-S RW `ra2_in1k` / DenseNet-121 `ra_in1k`）；骨干峰值 `train.lr=5e-5`、分类头 `train.head_lr=1.5e-4`，12 轮上限、patience 4、seed 42 串行独占 V100。
 - 结果：四组**全部在 best epoch 3 达峰、epoch 7 触发早停**，无一跑满 12 轮。C-001-a 0.7919 / 0.4191（31m33s）、C-001-b 0.7774 / 0.3996（33m01s）、C-001-c 0.7807 / 0.4055（29m52s）、C-001-d 0.7849 / 0.4049（27m04s）。
@@ -602,7 +603,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：**方向否定**——分层低学习率没有换来更长训练窗口，反而把峰值压在 warmup 结束的第 3 轮，epoch 4 起 valid_loss 单调反弹（C-001-c 0.9331 → 1.5712）。C-001 不产生提交候选，不改默认骨干与学习率；四组同受早峰压制，本轮不能判定骨干绝对优劣。未执行：第二 seed、逐类 bootstrap、test 推理与 T4 耗时自检、DenseNet-121 权重 SHA-256 单独记录。
 
 **C-002：ConvNeXt-Tiny 统一学习率双 seed 配对**（配置 `configs/exp_C002{a,b,c,d}.yaml`，产物
-`outputs/20261101-135010_C-002-a` 等四组，2026-11-01，计划见 [train_plan22.md](../archive/train_plan22.md)）
+`outputs/experiments/C/C-002-a` 等四组，2026-11-01，计划见 [train_plan22.md](../archive/train_plan22.md)）
 
 - 设计：a（3e-4, seed 42）↔ b（1.5e-4, seed 42）、c（3e-4, seed 2026）↔ d（1.5e-4, seed 2026）两组 seed 内配对，每对仅 `train.lr` 不同；AdamW 单参数组（`head_lr: null`）、320×320、12 轮上限、patience 4、warmup 2 + cosine，V100-SXM2-32G 串行独占。
 - 结果：0.7962 / 0.4218（a，40m39s）、0.7976 / 0.4249（b，35m48s）、0.7958 / 0.4300（c，39m53s）、0.7956 / 0.4275（d，36m10s）；四组均在 best 后按 `patience 4` 早停，峰值集中在第 4–5 轮。
@@ -619,14 +620,14 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 影响边界：不影响 A-FUSE-2 / A-FUSE-3 的融合结论——融合增益是相对 A-001 的实测患者整簇配对 bootstrap（+0.0109，区间不跨 0），多模型平均本身会压低单类噪声。但融合选型若只按 10 类 macro-AUC 挑成员，会系统性偏好 class1 偶然偏高的模型，后续选型须用 9 类口径复核。
 
 **C-003：ConvNeXt-Tiny 输入分辨率 320 → 384 对照**（配置 `configs/exp_C003{a,b}.yaml`，产物
-`outputs/20261101-174052_C-003-a`、`outputs/20261101-181438_C-003-b`，2026-11-01，计划见 [train_plan23.md](../archive/train_plan23.md)）
+`outputs/experiments/C/C-003-a`、`outputs/experiments/C/C-003-b`，2026-11-01，计划见 [train_plan23.md](../archive/train_plan23.md)）
 
 - 设计：`image.size` 320→384，两 seed 各一组（a seed 42、b seed 2026），其余按 C-002-b 口径固定：AdamW 单参数组、峰值 lr 1.5e-4、12 轮上限、patience 2、warmup 2 + cosine、view_weighted 0.7/0.3。首轮 `train_plan23.md` 定的 3e-4 口径在学习率判读后由用户改为 C-002-b 口径，故两组均从 1.5e-4 起训，非从 A-001 checkpoint 热启动。
 - 结果：C-003-a **0.8020 / 0.4405**（best epoch 5，7 轮早停，17:40:52–18:14）、C-003-b **0.7969 / 0.4448**（best epoch 5，7 轮早停，18:14:38–18:48）。阈值曲线峰均落在 **0.5**（a 0.3846/0.4092/0.4239/**0.4405**/0.4397/0.4364，b 0.3940/0.4163/0.4311/**0.4448**/0.4351/0.4153）。
 - 判读：以同 seed 的 320 组为对照，ΔAUC 为 **+0.0044**（a vs C-002-b 0.7976）与 **+0.0013**（b vs C-002-d 0.7956），均未达 +0.005 方向性门；但对 A-001（0.8038）a 仍低 0.0018。**真正显著的是 F1@0.5：+0.0156 / +0.0173**，幅度是 AUC 变化的 3–13 倍，且两组峰位都稳定在 0.5、无校准漂移 → 384 抬高的是阈值处的判别质量（precision/recall 平衡），不是整体排序能力。（9 类口径：a **−0.0006**、b **−0.0041**，见上方告警——AUC 层面的「提升」不成立；F1@0.5 的抬升不受 class1 影响，仍是真实观察。）
 - 限制：对照组 patience 4、本组 patience 2，属**非纯分辨率对照**（`train_plan23.md` 已预先声明该差异）；每 seed 仅一组，无重复；未做配对 bootstrap；384 的显存峰值与单轮耗时未单独记录，不能据此估算算力代价；同受早峰压制（第 5 轮达峰、第 7 轮早停），与 320 组形态一致。
 
-**C-004：ConvNeXt-Tiny 平方根类别权重**（配置 `configs/exp_C004.yaml`，产物 `outputs/20261101-185032_C-004`，2026-11-01，计划见 [train_plan24.md](../archive/train_plan24.md)）
+**C-004：ConvNeXt-Tiny 平方根类别权重**（配置 `configs/exp_C004.yaml`，产物 `outputs/experiments/C/C-004`，2026-11-01，计划见 [train_plan24.md](../archive/train_plan24.md)）
 
 - 设计：`train.pos_weight_power` 1.0 → **0.5**（BCE 正样本权重由 `负/正` 改为其平方根，权重只按训练集 study 标签统计），其余同 C-002-b 口径。配置首行注释仍写「与 A-001 展开配置仅 `pos_weight_power` 不同」，但字段值已是 lr 1.5e-4 / 12 轮 / patience 2 —— **以字段值为准，注释属未同步**。
 - 结果：**0.7950 / 0.4125**（best epoch 4，6 轮早停，18:50:32–19:18）。阈值曲线 **0.3967 / 0.4198 / 0.4362 / 0.4125 / 0.3894 / 0.3269**，峰在 **0.4** 而非 0.5。
@@ -634,7 +635,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：单 seed；未做配对 bootstrap；校准结论仅由阈值曲线峰位与两侧陡降推得，未出可靠性图或 ECE，也没有 logit 分布对比；峰位左移对提交无实质影响（提交输出全 10 类概率、不做阈值过滤）。
 
 **C-005：ConvNeXt-Tiny 正侧位聚合权重四组对照**（配置 `configs/exp_C005{a,b,c,d}.yaml`，产物
-`outputs/20261101-192302_C-005-a` 等四组，2026-11-01，计划见 [train_plan25.md](../archive/train_plan25.md)）
+`outputs/experiments/C/C-005-a` 等四组，2026-11-01，计划见 [train_plan25.md](../archive/train_plan25.md)）
 
 - 设计：`model.frontal_weight` 0.7 → **0.5 / 0.6 / 0.8 / 0.9** 四组（侧位权重取补数），其余同 C-002-b 口径，全部从原始预训练权重全量训练、不热启动。四份配置展开后逐字段一致，唯一变量是聚合权重。
 - 结果（valid 859 studies，宏平均）：
@@ -652,10 +653,10 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：单 seed 四组，权重-性能关系可能被 seed 噪声主导（0.8 与 0.9 只差 0.0010）；逐类对比见 `outputs/comparisons/compare_C005/`（`summary.md` 的 per-run 表与逐类表），四组 `valid_ids_sha256` 一致可核；未做统一 bootstrap 的多重比较校正。
 
 **C-006：ConvNeXt-Tiny 亮度与对比度扰动四组对照**（配置 `configs/exp_C006{a,b,c,d}.yaml`，产物
-`outputs/20261101-212740_C-006-a` 等三组 + `outputs/20261102-122314_C-006-d`（d 为重跑），2026-11-01/02，计划见 [train_plan26.md](../archive/train_plan26.md)）
+`outputs/experiments/C/C-006-a` 等三组 + `outputs/experiments/C/C-006-d`（d 为重跑），2026-11-01/02，计划见 [train_plan26.md](../archive/train_plan26.md)）
 
 - 设计：以 `image.brightness=0.15`、`image.contrast=0.15` 为历史参考，a 亮度 0.15→0.05、b 亮度 0.15→0.25、c 对比度 0.15→0.05、d 对比度 0.15→0.25，每组只改一个参数，其余同 C-002-b 口径。
-- 结果：C-006-a **0.7957 / 0.4348**（best 5，7 轮）、C-006-b **0.8014 / 0.4263**（best 4，6 轮）、C-006-c **0.7927 / 0.4156**（best 4，6 轮）、C-006-d **0.8009 / 0.4371**（best 5，7 轮）。d 的 11-01 首跑被实例重启打断（仅 1 轮、无 `best.pt`），2026-11-02 12:23:14–12:55:15 在同一 HEAD `64d03da`、seed 42、同型号 V100 上重跑完成，中断残留归档到远端 `outputs/_aborted/`。四组已按 `run_compare.py` 统一重算（`outputs/comparisons/compare_C006/`），`valid_ids_sha256` 全部一致（`81e8be7f…`）、859 studies。阈值曲线：a 峰 0.6（0.4411）、b 峰 0.6（0.4382）、c 峰 **0.7**（0.4350）、d 峰 **0.6**（0.4493，四组最高）。
+- 结果：C-006-a **0.7957 / 0.4348**（best 5，7 轮）、C-006-b **0.8014 / 0.4263**（best 4，6 轮）、C-006-c **0.7927 / 0.4156**（best 4，6 轮）、C-006-d **0.8009 / 0.4371**（best 5，7 轮）。d 的 11-01 首跑被实例重启打断（仅 1 轮、无 `best.pt`），2026-11-02 12:23:14–12:55:15 在同一 HEAD `64d03da`、seed 42、同型号 V100 上重跑完成，中断残留归档到远端 `outputs/experiments/aborted/`。四组已按 `run_compare.py` 统一重算（`outputs/comparisons/compare_C006/`），`valid_ids_sha256` 全部一致（`81e8be7f…`）、859 studies。阈值曲线：a 峰 0.6（0.4411）、b 峰 0.6（0.4382）、c 峰 **0.7**（0.4350）、d 峰 **0.6**（0.4493，四组最高）。
 - 判读：相对 C-002-b（0.7976 / 0.4249），a **−0.0019**、b **+0.0038**、d **+0.0033**、c **−0.0049**；b 与 d 都落在 `train_plan26.md` 的「弱正向」区间（0 < ΔAUC < 0.005），**均未过 +0.005 门**，且 9 类口径分别为 **−0.0011** / **−0.0035**，正向增益全部来自基线 class1 偏低，剔除即转负。四组相对 A-001（0.8038）为 −0.0081 / −0.0024 / **−0.0029** / −0.0111，无一接近。**逐类降幅门（任何类别 AUC 降 ≥0.02）本轮补完**：a 触发（class4 −0.0331）、c 触发（class2 −0.0251）、b 通过（−0.0108）、**d 通过（−0.0164）**——d 是唯一「组级正向 + 逐类不触门」的组合，但幅度不足，只算方向性线索。**对比度这一对互为机制证据**：c（0.05）峰右移到 0.7 且仍在上升，d（0.25）峰回到 0.6 并给出四组最高 F1@0.5（0.4371）与最高峰值（0.4493），说明峰位是对比度扰动的单调响应，而非单组噪声。四组均受早峰压制（第 4–5 轮达峰、第 6–7 轮早停），d 后段过拟合最重（valid_loss 0.9128→1.4312，AUC 连掉两轮 −0.0129 / −0.0144）。
 - 限制：四组各单 seed；未做配对 bootstrap，也未校正「在同一 valid 上挑最高分」的多重比较；`brightness` 与 `contrast` 未做交互扫描，因此只能判断这两个参数的**边缘**效应，不能排除两参数联合时的互补；d 与 a/b/c 相隔约 14 小时重跑，代码 HEAD、seed、设备、数据与训练口径一致，唯一配置差异是 `model.xrv_weights` 由残留值改为 `null`（`arch: timm` 下不被读取，ImageNet 预训练加载已在启动日志确认）。
 
@@ -680,7 +681,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：单次前向、无 seed 重复；外部权重的训练划分（其内部 v2：9396 患者训练 / 1659 患者验证）与本仓库口径不同，本表只能做「同一份 valid 上的横向比较」，不能归因于训练配方差异；未做患者整簇配对 bootstrap，ENS02 的 +0.0048 没有置信区间；`docs/MODEL_CARD.md` 里 v2 划分的 0.8030 / 0.8059 与本表的 859 Study 不可比，勿混用。
 
 **D-001：384 + 正位权重 0.8 + 亮/对比 0.25 + lr 1.5e-4 的组合双 seed 对照**（配置 `configs/exp_D001{a,b}.yaml`，产物
-`outputs/20261102-130616_D-001-a`、`outputs/20261102-134231_D-001-b`，2026-11-02，训练记录见 [training_log.md](training_log.md)）
+`outputs/experiments/D/D-001-a`、`outputs/experiments/D/D-001-b`，2026-11-02，训练记录见 [training_log.md](training_log.md)）
 
 - 设计：以 A-001 展开口径为参照，**同时**改动五项——`image.size` 320→384、`image.brightness` 0.15→0.25、`image.contrast` 0.15→0.25、`model.frontal_weight` 0.7→0.8、`train.lr` 3e-4→1.5e-4，预算收到 8 轮 / patience 2；两份配置除 `seed`（42 / 2026）外逐字段一致，`model.xrv_weights` 由 A-001 的残留值清为 `null`（`arch: timm` 下不被读取）。目标是检验「A 系列单项结论能否叠加成组合增益」，不是单变量归因。
 - 结果：D-001-a **0.7988 / 0.4401**（best 5，7 轮，36m14s）、D-001-b **0.7973 / 0.4321**（best 5，7 轮，35m04s）；阈值峰均在 0.6（0.4462 / 0.4357）。`outputs/comparisons/compare_D001/` 已把两组与 A-001、C-006-b、C-006-d 统一重算，五个 run 的 `valid_ids_sha256` 一致（`81e8be7f…`）、均 859 studies；AMP 与 fp32 复评差值 ≤ 0.0001。
@@ -693,7 +694,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：五项同改，**只能判「该组合无效」，不能把差异归给其中任何一项**；单 seed 各自一次、未做配对 bootstrap、未拆项重训。单项证据见 C-005（frontal）、C-006（亮/对比）、RUN-007-B / RUN-009-A（384）。
 
 **D-002：EMA 三 seed 对照，EMA 权重独立记为 `原实验名-EMA`**（配置 `configs/exp_D002{a,b,c}.yaml`，产物
-`outputs/20261102-145203_D-002-a`、`outputs/20261102-160442_D-002-b`、`outputs/20261102-192442_D-002-c`，2026-11-02）
+`outputs/experiments/D/D-002-a`、`outputs/experiments/D/D-002-b`、`outputs/experiments/D/D-002-c`，2026-11-02）
 
 - 设计：相对 A-001 只启用 `train.ema_enabled: true`，`ema_decay=0.999`，其余训练口径不变；a/b/c 仅 seed 42 / 2026 / 216 不同，三份配置完整展开、逐字段一致。每次训练分别保存按原始验证 AUC 选出的 `best.pt` 与按 EMA 验证 AUC 选出的 `best_ema.pt`，两者在 valid 859 studies 上独立 fp32 复评。**`D-002-a-EMA` / `D-002-b-EMA` / `D-002-c-EMA` 是独立实验条目，但与对应原始组共享训练过程，不重复计算训练耗时。** c 组是为把双 seed 均值推过 +0.005 门而补的第三点，属事后追加，不做多重比较校正。
 - 结果：
@@ -716,7 +717,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 产物与限制：a/b 与 D-001、A-001 的统一重算见 `outputs/comparisons/compare_D002_D003/`；c 与 D-004、E-001 一起在 `outputs/comparisons/compare_D004_E001/`（七个 run 的 `valid_ids_sha256` 均为 `81e8be7f…`、859 studies）。EMA 组使用独立 `run_eval.py` 报告与预测 `outputs/eval_reports/D-002-{a,b,c}-EMA.txt`、`outputs/predictions/valid/D-002-{a,b,c}-EMA.csv`（本地按 `-EMA` 命名，远端对应文件名为小写 `-ema`）。未做患者整簇配对 bootstrap、EMA decay 扫描或 test/融合评估；三点均值仍低于门，**不据此改默认配置或生成新提交**。
 
 **D-003：Study 注意力聚合双 seed 对照**（配置 `configs/exp_D003{a,b}.yaml`，产物
-`outputs/20261102-152705_D-003-a`、`outputs/20261102-163536_D-003-b`，2026-11-02）
+`outputs/experiments/D/D-003-a`、`outputs/experiments/D/D-003-b`，2026-11-02）
 
 - 设计：相对 A-001 只把 `model.aggregation` 从 `view_weighted` 改为 `study_attention`，其余训练口径不变；a/b 仅 seed 42 / 2026 不同。D-002 与 D-003 均在 HEAD `e3ec4d6`、同一张 V100-SXM2-32G 上串行执行，预检确认各对配置仅 seed 不同，启动时均确认 ImageNet 预训练加载成功。
 - 结果：D-003-a **0.7958 / 0.4494**（best 7，跑满 8 轮，37m32s，F1 峰就在 0.5）；D-003-b **0.7868 / 0.4068**（best 2，4 轮早停，23m09s，F1 峰在 0.5）。统一比较见 `outputs/comparisons/compare_D002_D003/`。
@@ -724,7 +725,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：未做配对 bootstrap、第三 seed 或注意力超参扫描；本组只能否定当前实现的这两次训练，不证明所有注意力聚合结构都无效。
 
 **D-004：在 EMA 基线上重测 C 系列五项单项**（配置 `configs/exp_D004{a,b,c,d}.yaml`，产物
-`outputs/20261102-200415_D-004-a`、`outputs/20261102-211906_D-004-b`、`outputs/20261102-215558_D-004-c`、`outputs/20261102-223054_D-004-d`，2026-11-02）
+`outputs/experiments/D/D-004-a`、`outputs/experiments/D/D-004-b`、`outputs/experiments/D/D-004-c`、`outputs/experiments/D/D-004-d`，2026-11-02）
 
 - 设计：把基线整体换成**已启用 EMA 的 `D-002-a` 口径**（A-001 训练口径 + `ema_enabled`、decay 0.999、8 轮上限、patience 2、lr 3e-4），四项各改一项、单 seed 42：a `model.frontal_weight` 0.7→0.8、b `image.size` 320→384、c `image.contrast` 0.15→0.25、d `image.brightness` 0.15→0.25。**这不是 C 系列重复实验**：C 系列测的是「相对 A-001 是否有增益」，本组测的是「相对更强基线是否仍有增益」。第五项 `frontal_weight` 0.9（D-004-e）原于 2026-11-02 由用户取消，2026-11-04 补跑（`configs/exp_D004e.yaml`，其余口径不变）。五组均产出 `best.pt` 与 `best_ema.pt`，同口径与 `D-002-a-EMA` 配对。
 - 结果：
@@ -754,7 +755,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 限制：单 seed、每项一次训练，±0.002 量级不能区分个体差异与 seed 噪声；共享同一份 valid 反复选型，最高分带选择偏差；未做配对 bootstrap 与多重比较校正。
 
 **E-001：EfficientNetV2-S RW 换骨干双分辨率对照**（配置 `configs/exp_E001.yaml`、`configs/exp_E001a.yaml`，产物
-`outputs/20261102-203634_E-001`、`outputs/20261102-210126_E-001-a`，2026-11-02）
+`outputs/experiments/E/E-001`、`outputs/experiments/E/E-001-a`，2026-11-02）
 
 - 设计：把骨干从 `convnext_tiny.fb_in1k`（27.83M 参数）换成 `efficientnetv2_rw_s.ra2_in1k`（22.17M 参数），其余保持 `D-002-a` 口径（含 EMA、8 轮上限、patience 2、lr 3e-4、seed 42）。E-001 为 320 档，E-001-a 在其余不变的前提下把 `image.size` 提到 384。两组均确认预训练权重加载成功（`HF_HUB_OFFLINE=1` 下命中缓存）。
 - 结果：
@@ -775,16 +776,16 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   - **归因限制**：E-001 与 E-001-a 同时换了骨干与（384 档）分辨率，不能拆项判断是骨干容量、感受野还是优化预算导致下滑。本组只能给出「在当前训练配方下 EfficientNetV2-S RW 不优于 ConvNeXt-Tiny」这一结论。
 - 限制：单 seed、每档一次训练；未做 `efficientnetv2_rw_s` 的 lr / 分辨率专项调参，也未测 384 档配更小 lr 或更大 batch 的变体；未做配对 bootstrap。本批原以七组收尾，D-004-e 已于 2026-11-04 补跑（见上一节）。
 
-**D-002-d：换 ImageNet-22k 预训练权重**（配置 `configs/exp_D002d.yaml`，产物 `outputs/20261104-102710_D-002-d`，2026-11-04）
+**D-002-d：换 ImageNet-22k 预训练权重**（配置 `configs/exp_D002d.yaml`，产物 `outputs/experiments/D/D-002-d`，2026-11-04）
 
-- 设计：D-002-a 口径完全不变，只把 `model.backbone` 从 `convnext_tiny.fb_in1k` 换成 `convnext_tiny.fb_in22k_ft_in1k`（ImageNet-22k 预训练后在 1k 微调），检验更强 ImageNet 预训练在当前预算下是否有增益。单 seed 42、8 轮上限、patience 2。首次启动（10:22:53）因 HF 离线缓存缺该权重退化为随机初始化，已终止并归档到 `outputs/_aborted/20261104-102253_D-002-d_pretrained_failed`；补下载（`HF_ENDPOINT=https://hf-mirror.com`，28,589,128 参数）并验证离线命中后重跑，日志确认「预训练权重: 已加载」。
+- 设计：D-002-a 口径完全不变，只把 `model.backbone` 从 `convnext_tiny.fb_in1k` 换成 `convnext_tiny.fb_in22k_ft_in1k`（ImageNet-22k 预训练后在 1k 微调），检验更强 ImageNet 预训练在当前预算下是否有增益。单 seed 42、8 轮上限、patience 2。首次启动（10:22:53）因 HF 离线缓存缺该权重退化为随机初始化，已终止并归档到 `outputs/experiments/aborted/D-002-d_pretrained_failed`；补下载（`HF_ENDPOINT=https://hf-mirror.com`，28,589,128 参数）并验证离线命中后重跑，日志确认「预训练权重: 已加载」。
 - 结果：raw **0.7964 / 0.4258**（9 类 0.8060，best 6，8/8 轮，38m23s）；EMA **0.8037 / 0.4284**（9 类 0.8142，F1 峰 0.6 / 0.4405）。
 - 判读：相对 `D-002-a`（raw 0.8005 / EMA 0.8100），raw −0.0041、EMA −0.0063（9 类 −0.0054），方向为负；**0.8037 是 D-002/D-004 六组 EMA 中最低**（0.8100 / 0.8084 / 0.8085 / 0.8096 / 0.8058 / 0.8037），没有任何一档支持「22k 权重更好」。9 类口径同步下降说明不是 class1 造成。结论限于当前 8 轮、lr 3e-4 预算：换更强的 ImageNet 预训练没有带来可测收益，不支持替换默认骨干。
 - 限制：单 seed，不能排除 seed 效应；未做配对 bootstrap；22k 权重可能需要更小 lr 或更长训练才能体现优势，本轮未扫。
 
-**D-005：多标签 AUCM 对照（初筛失败）**（配置 `configs/exp_D005a.yaml`、`configs/exp_D005b.yaml`，产物 `outputs/20261104-110534_D-005-a`、`outputs/20261104-112249_D-005-b`，2026-11-04）
+**D-005：多标签 AUCM 对照（初筛失败）**（配置 `configs/exp_D005a.yaml`、`configs/exp_D005b.yaml`，产物 `outputs/experiments/D/D-005-a`、`outputs/experiments/D/D-005-b`，2026-11-04）
 
-- 设计：依据 `train_plan28.md`。D-005-a 为 ImageNet 初始化后全程 AUCM；D-005-b 从 `20261102-145203_D-002-a/best_ema.pt`（source epoch 5，sha256 `aeeb2106…`）warm start 后转 AUCM 微调。两组均关闭 `pos_weight`、`loss: aucm`、AUCM margin 1.0 / version v1、PESG（adam、lr 3e-4、weight decay 0.01、epoch_decay 0）、`batch_studies: 16`，按类别均衡采样（每批单类别、正负各半）。
+- 设计：依据 `train_plan28.md`。D-005-a 为 ImageNet 初始化后全程 AUCM；D-005-b 从 `D-002-a/best_ema.pt`（source epoch 5，sha256 `aeeb2106…`）warm start 后转 AUCM 微调。两组均关闭 `pos_weight`、`loss: aucm`、AUCM margin 1.0 / version v1、PESG（adam、lr 3e-4、weight decay 0.01、epoch_decay 0）、`batch_studies: 16`，按类别均衡采样（每批单类别、正负各半）。
 - 依赖：`libauc==2.0.0` 用 uv 装入主 `.venv`（新增 40 包、无版本升降级，torch 保持 2.10.0+cu128）；`tests/test_aucm.py` 7 passed。
 - 结果：
 
@@ -802,7 +803,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   - 根因未定，候选按可疑度：(a) PESG 的 lr 3e-4 相对 1157 步/epoch 过大，配合默认 `clip_value=1.0` 快速把权重带离预训练解；(b) `TaskPESG` 对 `a/b/alpha` 的逐类 mask 恢复在单类别 batch 下可能让 alpha 与动量状态累积偏差；(c) AUCM 需要更长预算与更小 lr，8 轮、3e-4 的初筛设置本身不匹配。三种假设均未验证。
   - **结论**：AUCM 在当前实现与初筛超参下不可用，不能作为提交候选；两组记为负结果，不构成「AUCM 方法无效」的证据。后续若继续，先固定 D-005-b 的 warm start 对 lr ∈ {3e-5, 1e-5} 做单变量对照，确认不塌缩后再看全程 AUCM。
 
-**Distill-1：固定融合教师离线蒸馏配对对照**（配置 `configs/exp_Distill1a.yaml`、`configs/exp_Distill1b.yaml`，产物 `outputs/20261104-135517_Distill-1-a`、`outputs/20261104-142947_Distill-1-b`，教师缓存 `outputs/distill/Distill-1_teacher`，2026-11-04）
+**Distill-1：固定融合教师离线蒸馏配对对照**（配置 `configs/exp_Distill1a.yaml`、`configs/exp_Distill1b.yaml`，产物 `outputs/experiments/Distill/Distill-1-a`、`outputs/experiments/Distill/Distill-1-b`，教师缓存 `outputs/distill/Distill-1_teacher`，2026-11-04）
 
 - 设计：依据 `train_plan29.md` / `train_plan30.md`。教师固定为 A-FUSE-5 的三模型裁剪 logit 4:2:3 融合（D-002-a `best_ema.pt`、C-005-c `best.pt`、E-001 `best.pt`），先把训练集 18,513 个 study 的软标签落盘并校验（study 集合、概率范围、三 checkpoint SHA-256、融合权重），再由学生读取；缓存为 in-sample 预测，不是 OOF。两份配置独立完整、无 `_base`，展开后唯一差异是 `train.distill_enabled`：a 关闭，b 开启（λ=0.5、T=1，软目标 BCE 不带 `pos_weight`）。学生同从 `convnext_tiny.fb_in1k` 初始化（确认已加载），seed 42、320、batch 16 studies、lr 3e-4、warmup 2、cosine 8 轮、patience 2、BCE + `pos_weight`、EMA 0.999。
 - 结果：
@@ -823,22 +824,22 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   - **软目标信息量有限**：b 的 `train_soft_loss` 0.5434→0.4919（epoch 5）→0.5501（epoch 7），全程仅降 0.05 量级，而 `train_hard_loss` 0.9787→0.4439；软 BCE 后程回升与 valid_loss 上升同步，说明教师与硬标签高度一致、软标签未提供额外排序信息。
 - 限制：教师软标签为 in-sample 且教师也在同一 valid 上选型；单 seed；同一 valid 反复选型；bootstrap 不覆盖训练随机性与选择偏差；未做 seed 2026 配对、test 评估、教师 valid 独立复算与学生耗时对比。结论限于「当前 λ/T、8 轮预算、单 seed 下无可测增益」，不外推到其他温度、权重或更长训练。
 
-**Distill-2：三模型概率融合教师的 train+valid 全量蒸馏**（配置 `configs/exp_Distill2a.yaml`，产物 `outputs/20261108-111052_Distill-2-a`，教师缓存 `outputs/distill/FUSE3_teacher`，2026-11-08）
+**Distill-2：三模型概率融合教师的 train+valid 全量蒸馏**（配置 `configs/exp_Distill2a.yaml`，产物 `outputs/experiments/Distill/Distill-2-a`，教师缓存 `outputs/distill/FUSE3_teacher`，2026-11-08）
 
 - 设计：以用户指定的三模型为教师——SW-02 `best_ema.pth`（torchvision `swin_v2_t` @384，ASL + EMA，官方 valid 0.8087）、D-010-a `final_ema.pt`（ConvNeXt-Tiny @320）、D-010-d `final_ema.pt`（EfficientNetV2-S RW-S @320）——各自按 checkpoint 配置做 study 聚合后等权概率平均，落盘 19,372 个 train+valid study 的软标签（`fusion=probability_mean`、`weights=[1,1,1]`、`split=train_full`；缓存 SHA-256 `59bd0142…`、predictions `b6f154d5…`，in-sample 非 OOF）。学生 `convnext_tiny.fb_in1k` @320，seed 42，batch 16 studies，lr 3e-4，warmup 2，cosine 6 轮，`lr_min=1e-5`，BCE + `pos_weight`，EMA 0.999，λ=0.5，AMP，`grad_clip=5.0`；`data.full_train: true`、无 resplit、无早停。
 - 执行：2026-11-08 19:10:52–19:27:49（16m57s，6/6 轮）。train_loss 逐轮 1.2763 / 1.2125 / 1.1601 / 1.0889 / 0.9516 / 0.8499；`final_ema.pt` SHA-256 `ba09c21f…fc89e`。
 - 结果：全量训练无独立验证集，未产生干净 valid 指标。补算 **in-sample** valid（859 studies，valid 已入训）10 类 Macro-AUC **0.9253** / F1@0.5 **0.5647**（0.6→0.6161、0.7→0.6307），逐类 AUC 0.8038（c8）–0.9931（c2）。该数字只能与同样全量训练的 D-010-a 0.8937 / D-010-d 0.9242 对照，不能与干净口径 D-002-a-EMA 0.8100、SW-02 0.8087 并列。
-- test 提交：`outputs/20261108-111052_Distill-2-a/submission.csv`，1,414 studies / 14,140 行、10 类齐全、无 NaN、概率 [0.0019, 0.9978]，SHA-256 `64fe190c…14e8`。未上传平台。
+- test 提交：`outputs/experiments/Distill/Distill-2-a/submission.csv`，1,414 studies / 14,140 行、10 类齐全、无 NaN、概率 [0.0019, 0.9978]，SHA-256 `64fe190c…14e8`。未上传平台。
 - 判读：管线（full_train + 蒸馏 + 外部 Swin 教师）首次跑通，但没有任何干净验证证据支持「蒸馏/融合有效」；in-sample 指标升高是同一个 859 个 study 被学生拟合的结果。教师混合了 320 与 384 两种输入尺寸和 G0 / view_weighted 两种聚合口径，等权概率平均未校准。6 轮末 train_loss 仍下降，预算偏短，但全量训练无法用 valid 判断过拟合，只能等平台分数。
 - 限制与未执行：单 seed；教师 in-sample 且 SW-02 为外部权重；未做多 seed、平台提交、`cost.py` 测时、bootstrap、教师 valid 复算；in-sample valid 指标含泄漏，不可作选型依据。
 
-**D-006：单模型 AUC 三方向初筛（已完成）**（配置 `configs/exp_D006a.yaml`、`configs/exp_D006b.yaml`、`configs/exp_D006c.yaml`，产物 `outputs/20261104-193131_D-006-a`、`outputs/20261104-201457_D-006-b`、`outputs/20261104-205718_D-006-c`，2026-11-04）
+**D-006：单模型 AUC 三方向初筛（已完成）**（配置 `configs/exp_D006a.yaml`、`configs/exp_D006b.yaml`、`configs/exp_D006c.yaml`，产物 `outputs/experiments/D/D-006-a`、`outputs/experiments/D/D-006-b`、`outputs/experiments/D/D-006-c`，2026-11-04）
 
 - 依据 [20261104-train-plan-01.md](20261104-train-plan-01.md)。三组各跑一次、全部 seed 42，不重跑基线、不做早停对照、不预排额外 seed、不做融合或蒸馏。共同口径：`convnext_tiny.fb_in1k` 预训练（日志确认「预训练权重: 已加载」）、320 letterbox、hflip 关闭、batch 16 studies、AdamW lr 3e-4、warmup 2、BCE + `pos_weight`、EMA 0.999、8 轮上限、patience 2。
 - **早停依据由历史 D-002-a 的 raw AUC 改为 EMA AUC**（`train.early_stop_monitor: ema_auc`）。与历史分数的差值因此属低成本探索结果，不能把全部差值严格归因于研究变量。
 - 参考基线：D-002-a-EMA（valid 0.8100 / 9 类 0.8196 / F1@0.5 0.4283），同一 859 study 集合、同一份 valid。
 
-**D-006-a：DropPath 0.1**（配置 `configs/exp_D006a.yaml`，产物 `outputs/20261104-193131_D-006-a`）
+**D-006-a：DropPath 0.1**（配置 `configs/exp_D006a.yaml`，产物 `outputs/experiments/D/D-006-a`）
 
 - 设计：相对 D-002-a 唯一变量是 `model.drop_path_rate` 0→0.1，其余逐字段一致（含 EMA、8 轮、patience 2、lr 3e-4、seed 42）。
 - 结果：raw **0.8009 / 0.4331**（峰值 0.6 / 0.4404，best epoch 6）；EMA **0.8082 / 0.4271**（9 类 0.8185，峰值 0.7 / 0.4403，best epoch 5）；7/8 轮早停，训练 **34m15s**；`cost.py` fp32 单 study **54.5 ms**（100 study / 162 图，连续 3 轮，0 个 study 不一致，init 59.1 ms，162 图折算 33.6 ms/图）。
@@ -846,7 +847,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：相对基线 **Δ10 −0.0019 / Δ9 −0.0012**，患者整簇配对 bootstrap（2000 次、seed 2026、228 患者、2000/2000 有效）95% CI **[-0.0082, +0.0055]**、P(Δ>0)=0.330 → 跨 0，**不可分辨**。raw 侧 0.8009 vs 0.8005 近乎同值（+0.0005），但 9 类口径 −0.0033。逐类最大跌幅 class3 −0.0142，最大涨幅 class6 +0.0102 / class4 +0.0092，均未触 0.02 逐类门，没有哪一类出现方向明确的退化或增益。F1@0.5 0.4271 略低于基线 0.4283，峰值位置从 0.6 右移到 0.7，属阈值形态差异而非排序差异。
 - 结论：DropPath 0.1 在当前 8 轮、lr 3e-4 预算下**没有可测增益，也没有明确损害**。本轮早停依据已改为 EMA AUC，且 EMA best epoch（5）与基线相同，可比性较好；但单 seed、单次训练不足以支持方法级结论，若继续该方向应做多 seed 配对，而不是在同一 valid 上继续调强度。
 
-**D-006-b：cosine 第 6 轮到达最低学习率**（配置 `configs/exp_D006b.yaml`，产物 `outputs/20261104-201457_D-006-b`）
+**D-006-b：cosine 第 6 轮到达最低学习率**（配置 `configs/exp_D006b.yaml`，产物 `outputs/experiments/D/D-006-b`）
 
 - 设计：唯一变量是 `train.cosine_end_epoch` null→6，衰减分母由 `8-1-2=5` 改为 `6-1-2=3`，使第 6 轮即到 `lr_min` 1e-5 并在第 7–8 轮保持。逐轮 LR 已用真实 optimizer/scheduler 核验：`1.5e-4 / 3e-4 / 3e-4 / 2.275e-4 / 8.25e-5 / 1e-5 / 1e-5 / 1e-5`，与计划表逐位一致，第 6–8 轮无反弹。
 - 结果：raw **0.8071 / 0.4425**（峰值 0.6 / 0.4513，best epoch 5）；EMA **0.8108 / 0.4297**（9 类 0.8189，峰值 0.6 / 0.4491，best epoch 5）；7/8 轮早停，训练 **34m31s**；`cost.py` fp32 单 study **53.9 ms**（100 study / 162 图、0 个 study 不一致、init 59.9 ms）。
@@ -854,7 +855,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - **低 LR 保持阶段（第 6–7 轮，lr 1e-5）没有带来提升**：EMA 0.8102 → 0.8074、raw 0.8054 → 0.8041，同期 train_loss 0.573 → 0.542 继续下降而 valid_loss 0.921 → 0.982 上升，属典型过拟合。因此本组的价值不在「更长的低 LR 训练」，而在**第 5 轮的位置**：b 的第 5 轮 lr 是 8.25e-5（a 为 2.0e-4），更早进入低学习率使该轮权重明显好于 a 的同一轮。计划第 3.3 条要求「未进入第 6 轮则标注未充分观察」——本轮实际进入了第 6、7 轮，观察到的是**无增益**，不属观察不足。
 - 结论：提前完成 cosine 使 EMA 权重**持平**（+0.0008，噪声内）、raw 权重**小幅正向**（+0.0067，CI 下界贴 0）；F1 峰值 0.4491（EMA）/ 0.4513（raw）为本批最高，但峰值位置不能替代 AUC 判读。单 seed 下不能判定「提前衰减有效」，可作为后续「更短 cosine + 更小 lr」组合的线索，不宜直接改默认配置。
 
-**D-006-c：Study Mixup（alpha 0.2、概率 0.3）**（配置 `configs/exp_D006c.yaml`，产物 `outputs/20261104-205718_D-006-c`）
+**D-006-c：Study Mixup（alpha 0.2、概率 0.3）**（配置 `configs/exp_D006c.yaml`，产物 `outputs/experiments/D/D-006-c`）
 
 - 设计：开启按视角签名分组、同批内两两配对的 Study Mixup（`train.mixup_alpha: 0.2`、`train.mixup_prob: 0.3`），其余同 D-006-a 口径（含 `ema_auc` 早停、drop_path 0）。图像、标签、offsets 与视角数在混合后保持不变，软标签走原 `pos_weight` 的 BCE。
 - 执行事实：**实际混合覆盖率 0.2392–0.2488、7 轮均值 0.2448**（每轮约 4,428–4,606 / 18,513 study），为配置概率 0.3 的 **81.6%**。缺口来自同批次内找不到同视角签名配对的 study（单图正位、单图侧位、含 unknown 的 study 按设计不参与），属计划已预期的执行事实，不是实现失效。
@@ -878,7 +879,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 训练耗时 34m15s / 34m31s / 34m52s，三组几乎相同，说明本批的单变量改动没有改变训练吞吐。
 - 后续：不自动追加训练（计划第 6 节）。若要继续，优先级依次是 ① b 方向补 3 seed 配对，确认 raw +0.0067 与 class4 +0.0407 是否可重复；② c 方向先统计视角签名可配对比例、再决定是否调整配对粒度；③ a 方向证据最弱，暂不投入。
 
-**D-007：cosine 终点 6 的三 seed 复核（已完成）**（配置 `configs/exp_D007a.yaml`、`configs/exp_D007b.yaml`，产物 `outputs/20261106-140614_D-007-a`、`outputs/20261106-143742_D-007-b`，2026-11-06）
+**D-007：cosine 终点 6 的三 seed 复核（已完成）**（配置 `configs/exp_D007a.yaml`、`configs/exp_D007b.yaml`，产物 `outputs/experiments/D/D-007-a`、`outputs/experiments/D/D-007-b`，2026-11-06）
 
 - 设计：执行 D-006 汇总后续第 ① 条。seed 42 复用 D-006-b 不重跑，本批补 seed 2026（a）与 seed 216（b），唯一研究变量是 `seed`。
 - 执行：a 14:06:09–14:37:37（31m28s，6/8 轮）、b 14:37:37–15:12:19（34m42s，7/8 轮），V100-SXM2-32G 独占，`--no-save-last`。
@@ -887,23 +888,23 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 副产品：**同配置只换 seed 的配对差 CI 宽 0.0134**（[−0.0054, +0.0080]），再次实测出 seed 噪声量级，印证 ±0.005 门在本项目不可判读。
 - 形态观察：D-007-a 的 EMA 峰值在第 4 轮、raw 峰值在第 5 轮，与 D-002-a 同形态，说明「EMA 最优点早于 raw」稳定，为导出 `best_ema.pt` 时按 EMA 早停提供第二组证据。
 
-**D-008：骨干容量阶梯 Small / Base / Large（已完成）**（配置 `configs/exp_D008{a,b,c}.yaml`，产物 `outputs/20261106-151321_D-008-a`、`outputs/20261106-155019_D-008-b`、`outputs/20261106-170640_D-008-c`，2026-11-06）
+**D-008：骨干容量阶梯 Small / Base / Large（已完成）**（配置 `configs/exp_D008{a,b,c}.yaml`，产物 `outputs/experiments/D/D-008-a`、`outputs/experiments/D/D-008-b`、`outputs/experiments/D/D-008-c`，2026-11-06）
 
 - 设计：以 D-002-a（Tiny `fb_in1k`，seed 42）为基线，同 seed 换 Small / Base / Large，兼作蒸馏教师候选。显式改用 `ema_auc` 早停（基线是 raw），**因此不是严格单变量对照**，差值混入早停口径；理由见 D-007 的 EMA/raw 峰值形态。原 ConvNeXt V2 三档于 15:21 删除（权重 CC-BY-NC，赛题不接受）。
-- 执行：a（Small）15:13:16–15:50:15（37m00s，7/8 轮）、b（Base）15:50:15–16:28:53（38m38s，7/8 轮）。**c（Large）首跑 16:29–16:50 在 epoch 3 被容器 cgroup 43 GiB 内存上限 SIGKILL（rc=137）**，根因是 47 GiB train 图片的 page cache 计入 cgroup、前几组累积到 27.4 GiB 后撞顶；`drop_caches` 无权限，改用 `posix_fadvise(DONTNEED)` 用户态逐出（27.4 → 2.0 GiB）并每 150 秒守护，未改训练配置，17:06:35 重跑。失败 run 归档 `outputs/_aborted/20261106-162948_D-008-c_cgroup_oom/`。
+- 执行：a（Small）15:13:16–15:50:15（37m00s，7/8 轮）、b（Base）15:50:15–16:28:53（38m38s，7/8 轮）。**c（Large）首跑 16:29–16:50 在 epoch 3 被容器 cgroup 43 GiB 内存上限 SIGKILL（rc=137）**，根因是 47 GiB train 图片的 page cache 计入 cgroup、前几组累积到 27.4 GiB 后撞顶；`drop_caches` 无权限，改用 `posix_fadvise(DONTNEED)` 用户态逐出（27.4 → 2.0 GiB）并每 150 秒守护，未改训练配置，17:06:35 重跑。失败 run 归档 `outputs/experiments/aborted/D-008-c_cgroup_oom/`。
 - 结果：a（Small）raw 0.7927 / 0.4209、EMA **0.8057** / 0.4333（9 类 0.8161）；b（Base）raw 0.7909 / 0.4181、EMA **0.8021** / 0.4337（9 类 0.8121）；c（Large）raw 0.7976 / 0.4187、EMA **0.8022** / 0.4385（9 类 0.8137，60m53s，7/8 轮）。
 - 判读：**扩容骨干在 8 轮预算下没有收益，且规模越大越早过拟合。** 容量阶梯单调下降：Tiny 0.8100 → Small 0.8057（Δ −0.0043，CI [−0.0110, +0.0032] 跨 0）→ Base 0.8021（Δ −0.0079，CI [−0.0131, −0.0025]，P=0.002）→ Large 0.8022（Δ −0.0078，CI [−0.0142, −0.0005]，P=0.019）。**Base 与 Large 是本项目首次出现 CI 不跨 0 的负向；Large 未优于 Base，两档持平且都低于 Tiny。** 三点限制必须一起引用：①早停口径与基线不同（`ema_auc` vs raw）；②单 seed；③最优轮次随规模提前（Base 第 4 轮、Large 第 3 轮），Large 的 valid_loss 从 0.89 涨到 1.93、train_loss 降到 0.22，8 轮明显过长。另需披露 **c 的 9 类口径 CI 跨 0**（−0.0059，[−0.0123, +0.0010]），只有 10 类口径不跨 0。因此只能读作「本预算与本早停口径下扩容无收益、Base/Large 有可测损害、8 轮对 Large 过长」，不能外推为架构优劣。
 - F1 侧无补偿：a/b/c 的 F1@0.5（0.4333 / 0.4337 / 0.4385）略高于基线 0.4283，但峰值（0.4423 / 0.4354 / 0.4385）未超基线 0.4422，属阈值处形态变化，不作选型依据。**c 的 F1 峰值落在阈值 0.5 而非 0.6**，是六组里唯一如此的一档，说明 Large 概率分布整体偏低（校准偏移）。
 - 教师用途收窄：a/b/c 的 EMA 权重都不如 Tiny 基线 0.8100，用它们做蒸馏教师的先验价值不高；若仍要蒸，应改用更短预算（Large 第 3 轮即达 raw 峰）或直接以 Tiny 的 EMA 权重为教师。
 
-**D-009：患者检查次数重加权采样 patient_count（已完成）**（配置 `configs/exp_D009a.yaml`、`configs/exp_D009b.yaml`，产物 `outputs/20261107-112733_D-009-a`、`outputs/20261107-114205_D-009-b`，2026-11-07）
+**D-009：患者检查次数重加权采样 patient_count（已完成）**（配置 `configs/exp_D009a.yaml`、`configs/exp_D009b.yaml`，产物 `outputs/experiments/D/D-009-a`、`outputs/experiments/D/D-009-b`，2026-11-07）
 
 - 设计：D-002-a 的唯一变量对照。训练集多检查患者（检查数 ≥5）只占 study 的 18.51%，valid 却占 571/859 = 66.47%，训练分布与评测分布不一致；D-009 用有放回 `WeightedRandomSampler` 把多检查组 study 的期望占比拉到 66.5%（`train.study_sampler: patient_count`、阈值 5、目标占比 0.665），每 epoch 样本数不变。a seed 42 / b seed 2026 分别配对 D-002-a / D-002-b，其余逐字段同基线。**早停口径与基线不同**（本组未设 `early_stop_monitor`，按 `early_stop_metric` 默认 `ema_auc`；基线按 raw AUC），差值不严格归因于重采样。
 - 执行：a 19:27:29–19:42:01（14m32s，4/8 轮）、b 19:42:01–19:57:00（14m59s，4/8 轮），sjy RTX 3090 24G 独占，`--no-save-last`。两组启动日志均确认预训练权重已加载。
 - 结果：a raw 0.7729 / 0.3985、EMA **0.7907** / 0.4200（9 类 0.8021）；b raw 0.7619 / 0.3956、EMA **0.7830** / 0.4061（9 类 0.7918）。两组 EMA 峰值都在第 2 轮、第 4 轮 stale 2 早停；raw 峰值 a 第 2 轮、b 第 1 轮。
 - 判读：**四组配对 Δ 全部为负且 CI 全部不跨 0，是本项目迄今量级最大的一次负向。** 10 类口径 a-EMA **−0.0193**（CI [−0.0311, −0.0058]、P=0.003）、b-EMA **−0.0244**（CI [−0.0397, −0.0105]、P=0.002），raw 侧 a −0.0276、b −0.0379 同向；9 类诊断口径 a −0.0176、b −0.0241，方向一致。**设计目标未兑现**：valid 分层多检查患者（ge5/ge10）的 Δ 为 a −0.0167/−0.0105、b −0.0194/−0.0152，多检查组与整体同步退化，raw 侧同样为负（a −0.0280/−0.0184、b −0.0319/−0.0337）——「训练分布向评测分布对齐」的机制假设被直接否定。两 seed 都与基线同向且幅度达 seed 噪声的 4–5 倍（D-007 实测 CI 宽 0.0134）。限制：①早停口径差异（D-008 同口径对照仅 −0.0043/−0.0079，不足解释 −0.02）；②双 seed 单次训练，b 的效应量比 a 更大；③两组都只跑 4 轮、峰值前移到第 1–2 轮，结论限于 8 轮预算；④未逐 epoch 记录实际多检查占比（期望 0.665）。综合判读：**在当前预算下按患者检查次数重加权采样明确有害，不进入提交候选，方向暂不追加训练。**
 
-**D-010：train + valid 合并全量训练（已完成）**（配置 `configs/exp_D010{a,b,c,d}.yaml`，产物 `outputs/20261107-122517_D-010-a`、`outputs/20261107-123943_D-010-b`、`outputs/20261107-125348_D-010-c`、`outputs/20261107-130808_D-010-d`，2026-11-07）
+**D-010：train + valid 合并全量训练（已完成）**（配置 `configs/exp_D010{a,b,c,d}.yaml`，产物 `outputs/experiments/D/D-010-a`、`outputs/experiments/D/D-010-b`、`outputs/experiments/D/D-010-c`、`outputs/experiments/D/D-010-d`，2026-11-07）
 
 - 设计：D-010 不做对照实验，目标是用全部官方训练数据（train 30,345 行 + valid 1,423 行合并为 19,372 studies）训练最终提交候选。a/b/c 为 ConvNeXt-Tiny `fb_in1k`、seed 42/2026/216，d 为 EfficientNetV2-S `ra2_in1k`、seed 42。`data.full_train: true` 关闭 `resplit`、早停与训练期验证，固定 5 轮（cosine 终点仍第 8 轮），导出末轮 EMA；其余口径同 D-002-a（320 letterbox、view_weighted 0.7、batch 16 studies、BCE + 按合并标签重算 `pos_weight`、AdamW lr 3e-4、warmup 2、EMA 0.999）。要求实际加载 ImageNet 预训练、禁止 `--init-from`。
 - 执行：a 12:25:17–12:39:39（14m26s）、b 12:39:39–12:53:44（14m05s）、c 12:53:44–13:08:04（14m20s）、d 13:08:04–13:23:16（15m12s），sjy RTX 3090 24G 独占、串行四组；四组均确认「预训练权重: 已加载」，训练 19,372 studies、无验证集，每轮 1,210 batch，`rc=0` 且日志无异常。四组 `full_train_manifest.json` 清单 SHA-256 一致：`0766a71e…`。
@@ -911,10 +912,10 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：**全量训练没有独立验证分数，原 valid 已进入训练**，不能以原 valid 分数比较 D-002-a-EMA 0.8100，也不能据平台反馈反复挑模型；四组 loss 均单调下降但只能说明优化正常，跨骨干的 loss 不可横向比较（d 的 0.7037 最低不等于最好）。5 轮为预设预算、非最优；无验证曲线，无法判断过拟合点；单次训练/组。最终提交前另需按赛题核对权重许可、模型大小与端到端耗时。
 - 推理与耗时：四组 `final_ema.pt` 13:30–13:33 跑 test（1414 studies / 14,140 行、全部 10 类概率），推理耗时 a 46s / b 47s / c 46s / d 21s；单组计费均值 a 45.99 / b 45.57 / c 46.07 / d 59.86 ms。最终提交为 **a + d 概率等权融合**（`weights [1, 1]`、`fusion probability`），`outputs/ensemble/D-010-ad/submission.csv`（1414 studies / 14,140 行）；融合计费均值 **60.7 ms**（3 轮 60.10 / 60.07 / 61.73，p95 69.20、最大 72.12），与提交概率最大差 2.96e-4、0 个 study 不一致。同一 study 只解码一次、两模型预处理签名相同复用，融合耗时接近单组 d 而非两组之和；权重合计 193 MB < 500 MB、fp32、100 ms 上限余量约 39 ms；`cost_ensemble.json` 随提交包提供。
 
-**D-011：骨干与输入分辨率扫描（a/b/e 被中断，c/d 完成）**（配置 `configs/exp_D011{a..e}.yaml`，产物 `outputs/20261108-113851_D-011-a`、`-121329_D-011-b`、`-123143_D-011-c`、`-131319_D-011-d`、`-135349_D-011-e`，2026-11-08，V100-SXM2-32G 独占）
+**D-011：骨干与输入分辨率扫描（a/b/e 被中断，c/d 完成）**（配置 `configs/exp_D011{a..e}.yaml`，产物 `outputs/experiments/D/D-011-a`、`outputs/experiments/D/D-011-b`、`outputs/experiments/D/D-011-c`、`outputs/experiments/D/D-011-d`、`outputs/experiments/D/D-011-e`，2026-11-08，V100-SXM2-32G 独占）
 
 - 设计：以 D-002-a（ConvNeXt-Tiny `fb_in1k` @320、EMA 0.8100）为唯一对照，逐组只改「骨干 + 输入尺寸」：a DINOv2 ViT-S/14 `lvd142m` @336、b EVA02-S `mim_in22k_ft_in1k` @336、c ConvNeXt-T @448、d ConvNeXt-T @512、e CLIP ViT-B/16 `laion2b` @224。其余口径逐字段沿用 D-002-a（8 轮、batch 16 studies、AdamW lr 3e-4 + warmup 2 + cosine 到 1e-5、BCE + pos_weight、EMA 0.999、早停 patience 2、view_weighted 0.7、letterbox、ImageNet 归一化、`hflip: false`）。新增 `model.use_configured_img_size`，把 `image.size` 传给支持 `img_size` 的 timm 骨干（仅 a/b/e 置 true；c/d 走 ConvNeXt 天然多分辨率路径）。**注意 c/d 是干净单变量，a/b/e 同时换了骨干与分辨率，不能把差异单独归因给尺寸。**
-- 执行（11:38:46 起串行）：a 11:38:46–12:13:14（**34m28s**，8 轮跑满、未触发早停）；b 12:13:14 起跑 2 轮后按用户指令于 12:29 前后停止（**中断组**）；c 12:31:38–13:13:15（**41m37s**，7 轮，连续 2 轮无提升早停；期间 12:29 首启因与 fp32 探针并行抢占显存 CUDA OOM，产物移入 `outputs/_aborted/` 后重跑）；d 13:13:15–13:52:42（**39m27s**，6 轮早停）；e 13:53:44 起跑 1 轮后按用户指令于 14:03 前后停止（**中断组**）。五组启动日志均确认「预训练权重: 已加载」，训练 18,513 / valid 859 studies。
+- 执行（11:38:46 起串行）：a 11:38:46–12:13:14（**34m28s**，8 轮跑满、未触发早停）；b 12:13:14 起跑 2 轮后按用户指令于 12:29 前后停止（**中断组**）；c 12:31:38–13:13:15（**41m37s**，7 轮，连续 2 轮无提升早停；期间 12:29 首启因与 fp32 探针并行抢占显存 CUDA OOM，产物移入 `outputs/experiments/aborted/` 后重跑）；d 13:13:15–13:52:42（**39m27s**，6 轮早停）；e 13:53:44 起跑 1 轮后按用户指令于 14:03 前后停止（**中断组**）。五组启动日志均确认「预训练权重: 已加载」，训练 18,513 / valid 859 studies。
 - 结果（EMA 峰值权重、fp32 推理；分层口径与 D-009 同源，按 `data/valid.csv` 患者去重 study 计数分 ge5 = 571、ge10 = 409）：
 
   | 组 | 骨干 @尺寸 | EMA 全集 | raw 全集 | 9 类 | ge5（10 类） | ge10（10 类） | F1@0.5 | 轮次 / 耗时 |
@@ -929,10 +930,10 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读一（分辨率）：**448/512 相对 320 无收益**。c 为 −0.0023、d 为 −0.0032，且 9 类 / ge5 / ge10 / F1 共 7 个口径全部落在 ±0.004 内、方向不一致（ge10 的 10 类口径 c/d 反而 +0.0003 / +0.0006，同一组的 9 类口径又转为负）——这是噪声的符号翻转特征，不构成任何子群收益。逐类只有 c 的 class4 达 +0.0138，但该类别 valid 仅 68 正样本（单类 SE 约 0.03），不构成证据。代价是耗时 +19%（c 41m37s）与 +13%（d 39m27s），显存从 ~11 GiB 升至约 25 GiB。**结论：分辨率不是当前瓶颈，瓶颈仍在 8 轮预算内的过拟合动态。**
 - 判读二（ViT 系）：**三组 ViT 在 D-002-a 配方下训练失效，且不是混合精度问题**。a 8 轮 train_loss 仅 1.1741→1.0951（ConvNeXt 同轮 0.9916→0.4692），首轮 raw 0.5806 对 ConvNeXt 的 0.7737；b 首两轮 0.6063 / 0.6431、e 首轮 0.5569，三组首轮全部 0.55–0.61，与 ConvNeXt 三组首轮 0.77 形成断层。为排除 AMP 影响另跑 fp32 探针（a 配置、`amp: false`、2 轮、warmup 1）：ep1 train_loss 1.1734 / raw 0.5635，与 AMP 的 1.1741 / 0.5806 同档 → **排除 fp16**。timm 加载侧已核对：`vit_small_patch14_reg4_dinov2` 传 `img_size=336` 后 pos_embed 由 (37,37) 正确插值为 (24,24)（`timm.layers.pos_embed` 日志）、仅 head 为新初始化，前向正常输出 (N,10)。因此低分应归因于配方（ViT 需要更低骨干 lr / 更长 warmup / 先 frozen probe 再解冻），而不是实现缺陷；**但这属于推断，未做配方级验证**。
 - 限制：①全部单 seed（42），与 D-002-a 的差异都小于单次 SE 0.0094，任何「更好/更差」的判读都不成立；②b/e 为中断组、分别只有 2 轮与 1 轮，**不能作为「该骨干不行」的证据**，只能说明前两轮未脱离低分区；③a/b/e 同时变动骨干与分辨率，无法分离两者贡献；④D-002-a 的 ge5/ge10 与 9 类口径当年未埋点，本次用 `run_eval.py --pred-out` 导出其 EMA 逐 study 预测后按同一逻辑补算（全集复现 0.8100，口径一致）；⑤c 组首次启动遇到 OOM，重跑后配置未变，不影响可比性。
-- 产物：五组 run 目录各含 `config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、TensorBoard（`--no-save-last`，无 `last.pt`）；补算用的逐 study 预测为训练环境 `/tmp/d002a_valid.csv`、`/tmp/d011{a,c,d}_valid.csv`；`outputs/_aborted/` 留有 c 首次 OOM 与 fp32 探针两处残骸。**五组均不进入提交候选。**
+- 产物：五组 run 目录各含 `config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、TensorBoard（`--no-save-last`，无 `last.pt`）；补算用的逐 study 预测为训练环境 `/tmp/d002a_valid.csv`、`/tmp/d011{a,c,d}_valid.csv`；`outputs/experiments/aborted/` 留有 c 首次 OOM 与 fp32 探针两处残骸。**五组均不进入提交候选。**
 
 
-**F-001-a：ASL 损失（γ+=0、γ−=4）替换 BCE + pos_weight**（配置 `configs/exp_F001a.yaml`，产物 `outputs/20261108-064623_F-001-a`，2026-11-08，sjy RTX 3090 24G 独占）
+**F-001-a：ASL 损失（γ+=0、γ−=4）替换 BCE + pos_weight**（配置 `configs/exp_F001a.yaml`，产物 `outputs/experiments/F/F-001-a`，2026-11-08，sjy RTX 3090 24G 独占）
 
 - 设计：以 D-002-a（ConvNeXt-Tiny `fb_in1k` @320、BCE + `pos_weight`、EMA 0.8100）为对照，唯一研究变量是损失——换成 asymmetric loss（`asl_gamma_neg: 4`、`asl_gamma_pos: 0`、`asl_clip: 0.05`），其余逐字段沿用 D-002-a（8 轮、batch 16 studies、AdamW lr 3e-4 + warmup 2 + cosine 到 1e-5、EMA 0.999、早停 `raw_auc` patience 2、`view_weighted` 0.7、320 letterbox、ImageNet 归一化、`hflip: false`、seed 42、要求预训练加载）。γ+=0 时 ASL 不含正样本聚焦项，等价于「负样本按 `(1−p)^4` 抑制并 clip」的 focal 式损失，因此本组测的是负样本抑制替代 `pos_weight` 的净效果。
 - 执行（14:46:23–15:07:34，**21m11s**，sjy RTX 3090 24G 独占，`HF_HUB_OFFLINE=1` 命中 `convnext_tiny.fb_in1k` 缓存，日志确认「预训练权重: 已加载」）：训练 18,513 studies / valid 859 studies；实际训练 **6/8 轮**，第 4 轮 raw 0.7962 后连续 2 轮无提升（ep5 0.7877、ep6 0.7845）触发早停。首轮约 5m40s（含数据索引与冷缓存），其后约 4.3 分钟/轮；单组显存 14.4 GB、GPU 利用率约 68%。
@@ -947,12 +948,12 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
   逐轮（raw AUC / raw F1 / EMA AUC / EMA F1）：ep1 0.7880/0.3838/0.7640/0.3664；ep2 0.7811/0.3988/0.7915/0.4098；ep3 0.7884/0.4119/0.7988/0.4246；ep4 0.7962/0.4114/0.8008/0.4267；ep5 0.7877/0.4265/0.8008/0.4346；ep6 0.7845/0.4379/0.7944/0.4394。
 - 判读：**ASL 替换 BCE + pos_weight 无收益。** EMA 0.8008 相对 D-002-a-EMA 0.8100 为 **−0.0092**，与单次 859-study macro-AUC 的 bootstrap SE 0.0094 同量级；raw 侧 0.7962 对 0.8004 为 −0.0042。注意本组 train_loss 与 D-002-a 不可横向比较（γ−=4 的抑制项把 loss 压到 0.08 量级，D-002-a 末轮约 0.46），不能据 loss 更低判为收敛更好。F1@0.5 由 0.4283 降到 0.4115，但 EMA 侧 0.4346 反而略高于基线 0.4283，属阈值处的形态差异，不作为选型依据。损失层面的负样本抑制（`(1−p)^4` + clip）与 D-009 的 patient_count 重采样方向不同，不能互相替代。
 - 限制：①单 seed、单次训练，−0.0092 无法与噪声分离，只能作为「未见增益」的初筛；②早停口径是 raw AUC，而 EMA 权重同时导出，两者 best epoch 一致（4）使比较相对干净；③未导出 valid 逐 study 预测、未跑 `cost.py`；④本组与 S-001-a 串行（F 先起），F 组独占 GPU，S 组未并行争抢。
-- 产物：`outputs/20261108-064623_F-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）。**不进入提交候选。**
+- 产物：`outputs/experiments/F/F-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）。**不进入提交候选。**
 
-**S-001-a：SwinV2-T @384 骨干替换尝试**（配置 `configs/exp_S001a.yaml`，产物 `outputs/20261108-070806_S-001-a`，2026-11-08，sjy RTX 3090 24G 独占）
+**S-001-a：SwinV2-T @384 骨干替换尝试**（配置 `configs/exp_S001a.yaml`，产物 `outputs/experiments/S/S-001-a`，2026-11-08，sjy RTX 3090 24G 独占）
 
 - 设计：把骨干从 ConvNeXt-T 换成 `swinv2_tiny_window8_256`（27.59M 参数）并把输入提到 384。**与 D-002-a 的差异不止骨干**：分辨率 320→384、损失 BCE+pos_weight→ASL（γ+=1、γ−=4、clip 0.05）、优化器分组（backbone 2e-5 / head 2e-4，对比 ConvNeXt 的 3e-4）、预算 8→20 轮、早停口径 raw→EMA（patience 3）、`hflip: false` 不变。**因此不是骨干单变量对照，只能整体判读。** SwinV2 的 relative position bias 只依赖 window=8、与分辨率无关，不需要 pos_embed 插值。
-- 权重与配置修复：timm 在 `strict_img_size=true` 下按 384 构造静态 attention mask 时崩溃（`RuntimeError: shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`），改 `strict_img_size: false` 走动态 mask 后前向正常；torchvision 的 ImageNet 权重 `swin_v2_t-b137f0e2.pth` 经 `src/import_backbone.py` 映射到本项目 head，**219 个张量映射成功、仅 `head.fc.bias/weight` 随机初始化**，产出 `outputs/S-001-a_init/swinv2t_in1k_loker.pt`（sha256 `17fddd03…`），训练以 `--init-from` warm start。
+- 权重与配置修复：timm 在 `strict_img_size=true` 下按 384 构造静态 attention mask 时崩溃（`RuntimeError: shape '[1, 1, 8, 1, 8, 1]' is invalid for input of size 144`），改 `strict_img_size: false` 走动态 mask 后前向正常；torchvision 的 ImageNet 权重 `swin_v2_t-b137f0e2.pth` 经 `src/import_backbone.py` 映射到本项目 head，**219 个张量映射成功、仅 `head.fc.bias/weight` 随机初始化**，产出 `outputs/initialization/S-001-a_init/swinv2t_in1k_loker.pt`（sha256 `17fddd03…`），训练以 `--init-from` warm start。
 - 执行（15:08:06–15:55:30，**47m24s**，F-001-a 退出后 20 秒由守护脚本串行接棒）：实际训练 **11/20 轮**，EMA AUC 在 ep8 达峰 0.7194 后 ep9–11 连续 3 轮未超过（0.7158 / 0.7150 / 0.7157），patience 3 触发早停，此时 lr 仍有 1.55e-5、cosine 远未走完。每轮约 4.6 分钟，单组显存 21.2 GB、GPU 利用率 95%。
 - 结果：
 
@@ -966,7 +967,7 @@ A-001-B（seed 42）完全同配置、只换 seed 到 2026（本仓库既有 see
 - 判读：**训练可用但明显低于 ConvNeXt 同批水平，属失败组。** EMA 0.7194 相对 F-001-a-EMA 0.8008 差 **0.081**、相对 D-002-a-EMA 0.8100 差 **0.091**，远超单次 SE 0.0094；分层 ge5 0.6710 / ge10 0.6633 与全集同向。有利的一面是**没有出现 D-011 里 ViT 系的「训练失效」**：ep1 即到 EMA 0.6456，11 轮持续爬升，train_loss 0.0673→0.0635 单调下降，说明 SwinV2 + 映射权重在 384 下前向与梯度都正常，问题在收敛速度与最终平台而非实现缺陷。
 - 归因（推断，未做配方级验证）：①分组 lr 比 ConvNeXt 配方低一个量级（backbone 2e-5 / head 2e-4 对 3e-4），11 轮后 lr 仍 1.55e-5，模型停在半收敛区；②patience 3 配 20 轮预算，ep8 达峰后立即被截断，没有机会在 lr 降到底后回升；③SwinV2 的 384 输入与 ImageNet 256 预训练的窗口统计存在偏移，`strict_img_size: false` 的动态 mask 虽能跑通，但未验证与静态 mask 的数值等价性。三条都可能，**现有实验无法区分**。
 - 限制：①单 seed、单次训练；②同时改了骨干 / 分辨率 / 损失 / lr / 预算 / 早停口径六项，与任何历史组的差异都不能单独归因；③未导出 valid 逐 study 预测、未跑 `cost.py`；④动态 attention mask 带来额外显存与耗时，21.2 GB 已接近 24 GB 上限，再加宽输入不可行。
-- 产物：`outputs/20261108-070806_S-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；初始化权重 `outputs/S-001-a_init/swinv2t_in1k_loker.pt`；训练环境 `/root/weights/swin_v2_t-b137f0e2.pth`（未入库）。**不进入提交候选。**
+- 产物：`outputs/experiments/S/S-001-a/`（`config.yaml`、`train.log`、`metrics.csv`、`best.pt`、`best_ema.pt`、`last.pt`、`tb/`、`tb_ema/`）；初始化权重 `outputs/initialization/S-001-a_init/swinv2t_in1k_loker.pt`；训练环境 `/root/weights/swin_v2_t-b137f0e2.pth`（未入库）。**不进入提交候选。**
 
 ## 冻结结论
 
@@ -1037,3 +1038,22 @@ python src/run_train.py \
 ```
 
 启动前确认日志包含“预训练权重: 已加载”，并在 `best.pt` 的 `metadata` 中核对 `freeze_backbone: true`、`trainable_params` 小于 `total_params`；实际指标与耗时回填 [training_log.md](training_log.md) 后再做结论。
+
+## PC-001：患者检查次数后处理（D-002-a-EMA 历史 valid CPU 探索，2026-11-08）
+
+- 样本与来源：859 studies、228 患者；读取 `outputs/predictions/valid/D-002-a-EMA.csv` 与 `data/valid.csv`，逐 study 标签、患者映射、概率范围及完整覆盖经入口核验。复用历史 seed 42 EMA 预测；本次不加载权重、不读图片、不重新训练，没有新增 best epoch。
+- 命令：`.venv/bin/python src/run_patient_count_prior.py explore --predictions outputs/predictions/valid/D-002-a-EMA.csv --metadata data/valid.csv --out outputs/count_prior_D002a_EMA`；本机 CPU，进程退出码 0，`/usr/bin/time -p` 墙钟 **0.87 s**（四个候选合计，不是 GPU 推理耗时）。
+- 固定设计：自动按 valid 内不同 Study_id 计数，`g(n)=log(1+min(n,10))-log(2)`；异常1–9加 beta*g，class10减；beta=0/0.05/0.10/0.20，eps=1e-6。每个候选从同一原始概率开始，不累计调整。
+
+| beta | Study Macro-AUC | ΔAUC | Macro-F1@0.5 | ΔF1 | 9类AUC（class2–10） | Brier（越低越好） |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.810015 | +0.000000 | 0.428330 | +0.000000 | 0.819633 | 0.178708 |
+| 0.05 | 0.810215 | +0.000200 | 0.428892 | +0.000562 | 0.819656 | 0.184637 |
+| 0.1 | 0.810187 | +0.000172 | 0.425662 | -0.002668 | 0.819353 | 0.190780 |
+| 0.2 | 0.809695 | -0.000320 | 0.424158 | -0.004172 | 0.818662 | 0.203642 |
+
+- 点估计最高为 beta=0.05：ΔAUC **+0.000200**、ΔF1 **+0.000562**，均很小；class1 AUC +0.001796，其加权贡献约占总体增量90%，class2–10诊断AUC仅+0.000023；逐类5升5降，没有一致改善。Brier从0.178708升至0.184637，更大强度继续变差，不能将此偏置称为校准改善。
+- beta=0.05分层：<5 次288 studies，AUC 0.855445→0.856157；5–9次162 studies，0.759820→0.759904；≥5次571 studies，0.766328→0.766464；≥10次409 studies，0.759865→0.759865。≥10组统一封顶得到同类同常数偏置，组内排序不变，因此该子集AUC不变是公式预期，不代表改善了该组辨别能力。
+- 结论：本次仅支持“无卡后处理链路能运行”；没有稳定收益证据，不冻结beta、不进入正式test，不扩展候选网格。本次没有bootstrap/CI、患者级OOF或多seed复核；在同一valid上比较候选存在选型偏差，不能把最高点估计当独立验证结果。
+- 工程验证：`python -m pytest tests/test_patient_counts.py tests/test_patient_count_prior.py tests/test_patient_oof.py tests/test_patient_count_prior_cli.py -q`：**40 passed in 2.82s**。只覆盖所列合成测试；没有运行真实OOF训练或GPU耗时自检。
+- 产物：`outputs/count_prior_D002a_EMA/` 内含 `summary.csv`、`report.json`、四份调整概率、原始概率副本、逐类与计数审计；输入SHA-256已写入report。工作簿 `~/Desktop/loker_exp.xlsx` 的D系列实验追加PC-001四个候选（行62–65），共享0.87s CPU成本，无新增训练成本。

@@ -29,6 +29,10 @@ from common.metrics import macro_f1_curve, parse_thresholds, per_class_report
 from common.utils import resolve_device
 from data.dataset import build_loader
 from infer.predict import load_checkpoint_model, predict_loader
+from data.patient_counts import counts_from_records
+from infer.patient_count_prior import (
+    apply_prior_frame, load_prior, require_research_split, validate_prior_recipe, validate_prior_checkpoints,
+)
 
 
 def save_predictions(path: str | Path, predictions: pd.DataFrame, y_true: np.ndarray) -> Path:
@@ -70,17 +74,33 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="逐 study 预测 CSV 的输出路径，包含 Study_id、真实标签与 10 类概率",
     )
+    parser.add_argument("--patient-count-prior", help="固定的患者检查次数参数 JSON；自动从当前完整 split 计数")
+    parser.add_argument("--adjusted-pred-out", help="额外保存调整后概率（--pred-out 仍保存原始概率）")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    if args.adjusted_pred_out and not args.patient_count_prior:
+        raise ValueError("--adjusted-pred-out 必须配合 --patient-count-prior")
+    if args.adjusted_pred_out and args.pred_out and Path(args.adjusted_pred_out).resolve() == Path(args.pred_out).resolve():
+        raise ValueError("原始与调整后预测必须保存到不同文件")
     config = load_config(args.config)
+    prior = None
+    if args.patient_count_prior:
+        require_research_split(args.split)
+        if config.data.full_train:
+            raise ValueError("full_train 模型已见官方 valid，不能用于患者次数后处理的独立复核")
+        prior = load_prior(args.patient_count_prior)
+        validate_prior_recipe(prior, [config])
     device = resolve_device(config.device)
 
     checkpoint = load_checkpoint(args.checkpoint, map_location="cpu")
+    if prior is not None:
+        validate_prior_checkpoints(prior, [checkpoint])
     manifest_path = checkpoint_manifest_path(config, checkpoint, args.checkpoint)
     loader = build_loader(config, args.split, pin_memory=device.type == "cuda", manifest_path=manifest_path)
+    prior_counts = counts_from_records(loader.dataset.records) if prior is not None else None
     model = load_checkpoint_model(config, args.checkpoint, device)
     predictions = predict_loader(model, loader, device, config)
 
@@ -108,6 +128,19 @@ def main(argv: list[str] | None = None) -> None:
     if args.pred_out:
         output_path = save_predictions(args.pred_out, predictions, y_true)
         print(f"逐 study 预测已写入: {output_path}")
+
+    if prior is not None:
+        adjusted = apply_prior_frame(predictions, prior_counts, prior)
+        adjusted_scores = adjusted[probability_columns].to_numpy(dtype=np.float64)
+        adjusted_report = per_class_report(y_true, adjusted_scores, config.eval.threshold)
+        print(f"患者次数后处理（自动计数，beta={prior.beta:g}）：")
+        print(f"macro-AUC: {adjusted_report['auc'].mean():.4f} | "
+              f"Δ={adjusted_report['auc'].mean() - report['auc'].mean():+.6f}")
+        print(f"macro-F1（阈值 {config.eval.threshold:g}）: {adjusted_report['f1'].mean():.4f}")
+        print(adjusted_report.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
+        if args.adjusted_pred_out:
+            output_path = save_predictions(args.adjusted_pred_out, adjusted, y_true)
+            print(f"调整后逐 study 预测已写入: {output_path}")
 
 
 if __name__ == "__main__":

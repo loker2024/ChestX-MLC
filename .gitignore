@@ -48,6 +48,8 @@ env/
 /outputs/
 /logs/
 /wandb/
+/cost_run/
+/.omo/
 *.pt
 *.pth
 *.ckpt

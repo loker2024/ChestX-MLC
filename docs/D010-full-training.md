@@ -41,7 +41,7 @@ python src/run_infer.py --config outputs/<run>/config.yaml --checkpoint outputs/
 | D-010-c | 12:53:44–13:08:04 | 14m20s | 0.9952 → 0.9382 → 0.8956 → 0.8460 → 0.7632 | `8ff8b95b8976bf17dc514e2844a9c9f5c620b457ff9c33ed80c410dd4eaff9c1` |
 | D-010-d | 13:08:04–13:23:16 | 15m12s | 0.9881 → 0.9247 → 0.8692 → 0.8104 → 0.7037 | `3806f8c50d8521b785ec0839ff0acefc94176ce4803e54ae47c53b23fc0bb061` |
 
-产物在 `outputs/20261107-122517_D-010-a/`、`outputs/20261107-123943_D-010-b/`、`outputs/20261107-125348_D-010-c/`、`outputs/20261107-130808_D-010-d/`。四组均确认「预训练权重: 已加载」，训练 19,372 studies、无验证集，每轮 1,210 batch；`full_train_manifest.json` 清单 SHA-256 四组一致 `0766a71e5fd5745da6cea3c0e263f60f19011cb11bc94804d2c86f36a917b45c`。没有独立验证分数；原 valid 已进入训练，不能以原 valid 分数比较 D-002-a-EMA，也不能根据平台反馈反复挑模型。详细记录见 `docs/training_log.md` 的 D-010 章节。
+产物在 `outputs/experiments/D/D-010-a/`、`outputs/experiments/D/D-010-b/`、`outputs/experiments/D/D-010-c/`、`outputs/experiments/D/D-010-d/`。四组均确认「预训练权重: 已加载」，训练 19,372 studies、无验证集，每轮 1,210 batch；`full_train_manifest.json` 清单 SHA-256 四组一致 `0766a71e5fd5745da6cea3c0e263f60f19011cb11bc94804d2c86f36a917b45c`。没有独立验证分数；原 valid 已进入训练，不能以原 valid 分数比较 D-002-a-EMA，也不能根据平台反馈反复挑模型。详细记录见 `docs/training_log.md` 的 D-010 章节。
 
 ## 推理与耗时自检（2026-11-07）
 

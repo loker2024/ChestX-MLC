@@ -90,7 +90,7 @@ DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`�
 ### 实验参数
 
 - 模型与权重：A-001 = 2（归一化 0.5）、RUN-009-A = 1（0.25）、A-001-D = 1（0.25）。
-- checkpoint（训练环境 `/root/ChestX-MLC/` 下）：`outputs/20261030-150749_A-001_convnext_tiny_s42/best.pt`、`outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt`、`outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/best.pt`。
+- checkpoint（训练环境 `/root/ChestX-MLC/` 下）：`outputs/experiments/A/A-001_convnext_tiny_s42/best.pt`、`outputs/experiments/RUN/run009a_effv2s_384_s2026/best.pt`、`outputs/experiments/A/A-001d_convnext_tiny_mean_s42/best.pt`。
 - fusion：`probability`，即先对每个模型的 study logits 取 sigmoid，再按归一化权重加权平均。
 - 选择依据：valid 上共比较 13 组融合（2 模型等权、权重 1:3 / 3:1、probability / logit，及 3 模型对照）；本方案 Macro-AUC 最高、逐类 AUC 全胜单模型，Macro-F1 高于 2 模型最佳（0.4286）。完整对比数据在训练环境 `outputs/ensemble/valid/` 各目录的 `metrics.json`、`per_class.csv`、`f1_curve.csv`。
 
@@ -98,9 +98,9 @@ DenseNet-121（`densenet121.ra_in1k`）、320×320 输入、`pos_weight: true`�
 
 ```bash
 HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
-  --checkpoint outputs/20261030-150749_A-001_convnext_tiny_s42/best.pt \
-               outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt \
-               outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/best.pt \
+  --checkpoint outputs/experiments/A/A-001_convnext_tiny_s42/best.pt \
+               outputs/experiments/RUN/run009a_effv2s_384_s2026/best.pt \
+               outputs/experiments/A/A-001d_convnext_tiny_mean_s42/best.pt \
   --weights 2,1,1 --fusion probability --split test --out outputs/ensemble/test
 ```
 
@@ -135,9 +135,9 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 
 ```bash
 HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
-  --checkpoint outputs/20261030-150749_A-001_convnext_tiny_s42/best.pt \
-               outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt \
-               outputs/20261030-190645_A-001d_convnext_tiny_mean_s42/best.pt \
+  --checkpoint outputs/experiments/A/A-001_convnext_tiny_s42/best.pt \
+               outputs/experiments/RUN/run009a_effv2s_384_s2026/best.pt \
+               outputs/experiments/A/A-001d_convnext_tiny_mean_s42/best.pt \
   --weights 1,1,1 --fusion probability --split test --out outputs/ensemble/test_w111
 ```
 
@@ -163,7 +163,7 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 
 ### 实验参数
 
-- 模型与权重：`outputs/20261102-145203_D-002-a/best_ema.pt`（与 A-FUSE-5 成本测试所用同一权重，md5 `e97524bb…`）。
+- 模型与权重：`outputs/experiments/D/D-002-a/best_ema.pt`（与 A-FUSE-5 成本测试所用同一权重，md5 `e97524bb…`）。
 - 训练口径：seed 42、`train.ema_enabled: true` + decay 0.999、lr 3e-4、warmup 2、cosine 至 1e-5、weight decay 0.01、`pos_weight: true`、batch_studies 16、BCE。
 - 推理口径：`image.size: 320`、letterbox、ImageNet 归一化、无 hflip；不设 `--threshold`，输出每个 study 全部 10 类概率。
 
@@ -171,8 +171,8 @@ HF_HUB_OFFLINE=1 .venv/bin/python src/run_ensemble.py \
 
 ```bash
 HF_HUB_OFFLINE=1 .venv/bin/python src/run_infer.py \
-  --config outputs/20261102-145203_D-002-a/config.yaml \
-  --checkpoint outputs/20261102-145203_D-002-a/best_ema.pt \
+  --config outputs/experiments/D/D-002-a/config.yaml \
+  --checkpoint outputs/experiments/D/D-002-a/best_ema.pt \
   --out outputs/submission_D-002-a-EMA/submission.csv
 ```
 
@@ -199,10 +199,10 @@ A-FUSE-6：ConvNeXt 分档门槛池的 4 模型等权概率融合（D-006-b-EMA 
 ### 实验参数
 
 - 成员与权重（等权 1:1:1:1，`probability` 融合）：
-  - `outputs/20261104-201457_D-006-b/best_ema.pt`（单模型 valid 0.8108，池内最高）
-  - `outputs/20261102-145203_D-002-a/best_ema.pt`（0.8100）
-  - `outputs/20261101-202325_C-005-c/best.pt`（0.8029，正侧位加权聚合口径）
-  - `outputs/20261030-140736_run009a_effv2s_384_s2026/best.pt`（0.7945，EfficientNetV2-S @384）
+  - `outputs/experiments/D/D-006-b/best_ema.pt`（单模型 valid 0.8108，池内最高）
+  - `outputs/experiments/D/D-002-a/best_ema.pt`（0.8100）
+  - `outputs/experiments/C/C-005-c/best.pt`（0.8029，正侧位加权聚合口径）
+  - `outputs/experiments/RUN/run009a_effv2s_384_s2026/best.pt`（0.7945，EfficientNetV2-S @384）
 - 候选池口径：ConvNeXt 骨干 ≥ 0.800、其他骨干 ≥ 0.790，非重复、非 B/T 系列、非 ResNet，且同实验有 EMA 时不取 raw。
 - 搜索规模：C(25,2..5) 共 68,380 组等权组合，prob 空间；k=4 的 top-1 即本方案。
 
